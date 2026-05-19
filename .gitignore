@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+data/processed_targets/*
+data/comsol_exports/*
+candidates/candidate_*
+candidates/ranked_candidates.csv
+!data/processed_targets/.gitkeep
+!data/comsol_exports/.gitkeep
+!candidates/.gitkeep

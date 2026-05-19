@@ -1,0 +1,48 @@
+# 项目基础设置 / Basic project settings
+project:
+  name: "variable_thickness_chladni_plate" # 项目名称 / Project name
+  grid_size: 6 # 厚度矩阵大小 / Thickness matrix size
+  plate_length_mm: 100.0 # 板长度 / Plate length
+  plate_width_mm: 100.0 # 板宽度 / Plate width
+  center_clamp_radius_mm: 8.0 # 中心夹持半径 / Center clamp radius
+
+# 厚度设计变量 / Thickness design variables
+thickness:
+  levels_mm: [2.0, 2.5, 3.0, 3.5] # 可制造厚度等级 / Manufacturable thickness levels
+  default_mm: 2.5 # 默认厚度 / Default thickness
+  max_neighbor_difference_mm: 1.0 # 相邻单元最大厚度差 / Maximum neighbour thickness difference
+
+# 材料参数 / Material parameters
+material:
+  density_kg_m3: 1200.0 # 密度 / Density
+  poisson_ratio: 0.35 # 泊松比 / Poisson ratio
+  youngs_modulus_pa: 2.0e9 # 杨氏模量 / Young's modulus
+
+# COMSOL 仿真设置 / COMSOL simulation settings
+simulation:
+  num_modes: 20 # 导出模态数量 / Number of exported modes
+  frequency_min_hz: 0.0 # 最小目标频率 / Minimum target frequency
+  frequency_max_hz: 3000.0 # 最大目标频率 / Maximum target frequency
+
+# 目标图与节点线提取设置 / Target and nodal extraction settings
+nodal_extraction:
+  image_size: 256 # 算法统一图像尺寸 / Unified algorithm image size
+  epsilon_ratio: 0.05 # 节点线阈值比例 / Nodal threshold ratio
+  target_line_width_px: 12 # 目标线宽 / Target line width
+  remove_center_region: true # 是否移除中心夹持区域 / Whether to remove center clamp
+
+# 优化设置 / Optimisation settings
+optimisation:
+  method: "random_search" # 第一版优化方法 / First optimisation method
+  population_size: 20 # 每批候选数量 / Candidates per batch
+  num_iterations: 1 # 第一版迭代次数 / First-version iteration count
+  roughness_weight: 0.05 # 粗糙度惩罚权重 / Roughness penalty weight
+  mass_weight: 0.01 # 质量惩罚权重 / Mass penalty weight
+  frequency_weight: 0.01 # 频率惩罚权重 / Frequency penalty weight
+
+# 路径设置 / Path settings
+paths:
+  target_pattern: "data/target_patterns/target.png" # 目标图路径 / Target image path
+  processed_targets_dir: "data/processed_targets" # 处理后目标图目录 / Processed target directory
+  candidates_dir: "candidates" # 候选结构目录 / Candidate directory
+  comsol_exports_dir: "data/comsol_exports" # COMSOL 导出目录 / COMSOL export directory
