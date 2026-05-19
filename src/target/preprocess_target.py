@@ -44,6 +44,28 @@ def binary_dilation(binary: np.ndarray, iterations: int) -> np.ndarray:  # 执�
     return result  # 返回膨胀结果 / Return dilated result
 
 
+def binary_erosion(binary: np.ndarray, iterations: int) -> np.ndarray:  # 执行简单二值腐蚀 / Run simple binary erosion
+    result = binary.astype(bool)  # 转为布尔数组 / Convert to boolean array
+    for _ in range(iterations):  # 遍历腐蚀次数 / Iterate erosion passes
+        padded = np.pad(result, 1, mode="constant", constant_values=False)  # 给图像加边框 / Pad image border
+        result = padded[1:-1, 1:-1] & padded[:-2, 1:-1] & padded[2:, 1:-1] & padded[1:-1, :-2] & padded[1:-1, 2:]  # 十字邻域腐蚀 / Cross-neighbour erosion
+    return result  # 返回腐蚀结果 / Return eroded result
+
+
+def extract_target_edges(binary: np.ndarray) -> np.ndarray:  # 提取填充图案边界 / Extract filled-pattern edges
+    eroded = binary_erosion(binary, 1)  # 腐蚀前景区域 / Erode foreground region
+    edges = binary & ~eroded  # 用原图减去腐蚀图得到边界 / Subtract eroded map from original to get edges
+    return edges.astype(bool)  # 返回边界图 / Return edge map
+
+
+def apply_target_mode(binary: np.ndarray, mode: str) -> np.ndarray:  # 应用目标提取模式 / Apply target extraction mode
+    if mode == "edge":  # 判断是否提取边界 / Check edge mode
+        return extract_target_edges(binary)  # 返回边界目标 / Return edge target
+    if mode == "filled":  # 判断是否保留填充区域 / Check filled mode
+        return binary.astype(bool)  # 返回填充目标 / Return filled target
+    return binary.astype(bool)  # 默认按线条处理 / Default to stroke target
+
+
 def thicken_target_line(binary: np.ndarray, target_width_px: int) -> np.ndarray:  # 加粗目标线 / Thicken target line
     iterations = max(0, int(target_width_px // 2))  # 计算膨胀次数 / Compute dilation iterations
     if iterations == 0:  # 判断是否需要膨胀 / Check whether dilation is needed
@@ -60,11 +82,12 @@ def save_target_outputs(binary: np.ndarray, output_dir: str | Path) -> None:  # 
     preview.save(out_dir / "target_preview.png")  # 保存预览图 / Save preview image
 
 
-def preprocess_target(path: str | Path, output_size: int = 256, line_width_px: int = 12, center_radius_px: int | None = None, output_dir: str | Path | None = None) -> np.ndarray:  # 预处理目标图 / Preprocess target image
+def preprocess_target(path: str | Path, output_size: int = 256, line_width_px: int = 12, center_radius_px: int | None = None, output_dir: str | Path | None = None, target_mode: str = "stroke") -> np.ndarray:  # 预处理目标图 / Preprocess target image
     image = load_target_image(path)  # 读取目标图 / Load target image
     resized = resize_image(image, output_size)  # 缩放到统一尺寸 / Resize to unified size
     binary = binarize_target(resized)  # 二值化图像 / Binarise image
-    thickened = thicken_target_line(binary, line_width_px)  # 加粗目标线 / Thicken target line
+    shaped = apply_target_mode(binary, target_mode)  # 应用目标提取模式 / Apply target extraction mode
+    thickened = thicken_target_line(shaped, line_width_px)  # 加粗目标线 / Thicken target line
     processed = remove_center_region(thickened, center_radius_px) if center_radius_px else thickened  # 可选移除中心区 / Optionally remove center region
     if output_dir is not None:  # 判断是否保存输出 / Check whether to save outputs
         save_target_outputs(processed, output_dir)  # 保存结果文件 / Save result files

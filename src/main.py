@@ -19,11 +19,14 @@ def build_parser() -> argparse.ArgumentParser:  # 创建命令行解析器 / Bui
 
 
 def prepare_target(config: dict):  # 准备目标图案 / Prepare target pattern
+    from src.target.analyse_target import save_target_analysis  # 延迟导入目标分析函数 / Lazily import target analysis function
     from src.target.preprocess_target import preprocess_target  # 延迟导入目标预处理函数 / Lazily import target preprocessing function
     image_size = int(config["nodal_extraction"]["image_size"])  # 读取图像尺寸 / Read image size
     line_width = int(config["nodal_extraction"]["target_line_width_px"])  # 读取目标线宽 / Read target line width
+    target_mode = str(config["nodal_extraction"].get("target_mode", "stroke"))  # 读取目标提取模式 / Read target extraction mode
     plate_radius_px = int(image_size * config["project"]["center_clamp_radius_mm"] / config["project"]["plate_length_mm"])  # 计算中心半径像素 / Compute center radius in pixels
-    target = preprocess_target(config["paths"]["target_pattern"], image_size, line_width, plate_radius_px, config["paths"]["processed_targets_dir"])  # 执行目标预处理 / Run target preprocessing
+    target = preprocess_target(config["paths"]["target_pattern"], image_size, line_width, plate_radius_px, config["paths"]["processed_targets_dir"], target_mode)  # 执行目标预处理 / Run target preprocessing
+    save_target_analysis(target, config["paths"]["processed_targets_dir"], int(config["project"]["grid_size"]), line_width)  # 保存目标分析 / Save target analysis
     return target  # 返回目标二值图 / Return target binary map
 
 

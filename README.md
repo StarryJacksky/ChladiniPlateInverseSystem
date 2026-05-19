@@ -61,6 +61,21 @@ Generate candidate matrices:
 python -m src.main generate-candidates
 ```
 
+Prepare the target image and create a suitability report:
+
+```powershell
+python -m src.main prepare-target
+```
+
+The output report is:
+
+```text
+data/processed_targets/target_analysis.json
+```
+
+For filled logos such as an `IC` image, the default `target_mode: "edge"` extracts the letter outline before scoring.  
+对于 `IC` 这类填充式 Logo，默认的 `target_mode: "edge"` 会先提取字母轮廓，再用于评分。
+
 After COMSOL exports `mode_01.csv ... mode_20.csv` and `frequencies.csv`, score candidates:
 
 ```powershell

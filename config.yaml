@@ -28,6 +28,7 @@ simulation:
 nodal_extraction:
   image_size: 256 # 算法统一图像尺寸 / Unified algorithm image size
   epsilon_ratio: 0.05 # 节点线阈值比例 / Nodal threshold ratio
+  target_mode: "edge" # 目标提取模式 / Target extraction mode
   target_line_width_px: 12 # 目标线宽 / Target line width
   remove_center_region: true # 是否移除中心夹持区域 / Whether to remove center clamp
 
