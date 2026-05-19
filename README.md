@@ -61,6 +61,18 @@ Generate candidate matrices:
 python -m src.main generate-candidates
 ```
 
+Generate thickness previews for existing candidates:
+
+```powershell
+python -m src.main generate-previews
+```
+
+Each preview is saved as:
+
+```text
+candidates/candidate_xxx_xxxx/preview_thickness.png
+```
+
 Prepare the target image and create a suitability report:
 
 ```powershell

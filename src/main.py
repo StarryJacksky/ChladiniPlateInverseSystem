@@ -6,13 +6,14 @@ from pathlib import Path  # 导入路径工具 / Import path utilities
 
 from src.config import ensure_project_dirs  # 导入目录创建函数 / Import directory creation helper
 from src.config import load_config  # 导入配置读取函数 / Import configuration loader
+from src.optimisation.random_search import generate_existing_candidate_previews  # 导入预览生成函数 / Import preview generation function
 from src.optimisation.random_search import generate_random_search_batch  # 导入批量生成函数 / Import batch generation function
 from src.optimisation.random_search import score_available_candidates  # 导入候选评分函数 / Import candidate scoring function
 
 
 def build_parser() -> argparse.ArgumentParser:  # 创建命令行解析器 / Build command-line parser
     parser = argparse.ArgumentParser(description="Chladni inverse design MVP. / Chladni 逆向设计 MVP。")  # 初始化解析器 / Initialise parser
-    parser.add_argument("command", choices=["prepare-target", "generate-candidates", "score-candidates"], help="Workflow command. / 工作流命令。")  # 添加命令参数 / Add command argument
+    parser.add_argument("command", choices=["prepare-target", "generate-candidates", "generate-previews", "score-candidates"], help="Workflow command. / 工作流命令。")  # 添加命令参数 / Add command argument
     parser.add_argument("--config", default="config.yaml", help="Config file path. / 配置文件路径。")  # 添加配置路径参数 / Add config path argument
     parser.add_argument("--generation", type=int, default=0, help="Candidate generation index. / 候选代数编号。")  # 添加代数参数 / Add generation argument
     return parser  # 返回解析器 / Return parser
@@ -42,6 +43,9 @@ def main() -> None:  # 主程序入口 / Main program entry
     if args.command == "generate-candidates":  # 判断是否生成候选 / Check candidate-generation command
         candidate_ids = generate_random_search_batch(config, args.generation)  # 生成候选批次 / Generate candidate batch
         print(f"Generated {len(candidate_ids)} candidates. / 已生成 {len(candidate_ids)} 个候选。")  # 打印候选数量 / Print candidate count
+    if args.command == "generate-previews":  # 判断是否生成预览 / Check preview-generation command
+        preview_paths = generate_existing_candidate_previews(config)  # 生成已有候选预览 / Generate existing candidate previews
+        print(f"Generated {len(preview_paths)} previews. / 已生成 {len(preview_paths)} 个预览。")  # 打印预览数量 / Print preview count
     if args.command == "score-candidates":  # 判断是否评分候选 / Check candidate-scoring command
         target_path = Path(config["paths"]["processed_targets_dir"]) / "target_binary.npy"  # 构造目标数组路径 / Build target array path
         if not target_path.exists():  # 检查目标数组是否存在 / Check whether target array exists

@@ -8,11 +8,23 @@ from src.comsol.export_parameters import export_candidate_for_comsol  # 导入 C
 
 
 def generate_random_search_batch(config: dict, generation: int = 0) -> list[str]:  # 生成随机搜索批次 / Generate random-search batch
+    from src.visualisation.plot_thickness import render_candidate_preview  # 延迟导入候选预览函数 / Lazily import candidate preview function
     candidate_ids = generate_candidate_batch(config, generation)  # 生成候选结构 / Generate candidate designs
     candidates_dir = Path(config["paths"]["candidates_dir"])  # 读取候选目录 / Read candidate directory
     for candidate_id in candidate_ids:  # 遍历候选编号 / Iterate candidate ids
         export_candidate_for_comsol(candidates_dir / candidate_id)  # 导出 COMSOL 参数表 / Export COMSOL parameter table
+        render_candidate_preview(candidates_dir / candidate_id)  # 生成厚度预览图 / Generate thickness preview
     return candidate_ids  # 返回候选编号 / Return candidate ids
+
+
+def generate_existing_candidate_previews(config: dict) -> list[Path]:  # 生成已有候选预览 / Generate previews for existing candidates
+    from src.visualisation.plot_thickness import render_candidate_preview  # 延迟导入候选预览函数 / Lazily import candidate preview function
+    candidates_dir = Path(config["paths"]["candidates_dir"])  # 读取候选目录 / Read candidate directory
+    preview_paths = []  # 创建预览路径列表 / Create preview path list
+    for candidate_path in sorted(candidates_dir.glob("candidate_*")):  # 遍历候选目录 / Iterate candidate directories
+        if (candidate_path / "H.csv").exists():  # 检查厚度矩阵是否存在 / Check whether thickness matrix exists
+            preview_paths.append(render_candidate_preview(candidate_path))  # 生成并记录预览 / Generate and record preview
+    return preview_paths  # 返回预览路径 / Return preview paths
 
 
 def score_available_candidates(config: dict, target_binary):  # 评分已有候选 / Score available candidates
