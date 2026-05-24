@@ -76,15 +76,13 @@ Tasks:
 
 1. Add non-invasive COMSOL/MATLAB version probes where safe.
    在安全的前提下增加非侵入式 COMSOL/MATLAB 版本探测。
-2. Expand discovery tests with simulated missing config paths and known install-path fixtures.
-   增加发现逻辑测试，覆盖配置路径缺失和已知安装路径样例。
-3. Prefer already-running processes, then known install folders, then manual override in the setup flow.
+2. Prefer already-running processes, then known install folders, then manual override in the setup flow.
    安装流程优先使用已运行进程，其次查找常见安装目录，最后才进入手动覆盖。
-4. Add manual override fields to the setup wizard when discovery fails.
+3. Add manual override fields to the setup wizard when discovery fails.
    当自动发现失败时，在安装向导中提供手动覆盖字段。
-5. Add clearer authentication/license guidance when diagnostics detect risk.
+4. Add clearer authentication/license guidance when diagnostics detect risk.
    当诊断发现风险时，提供更清楚的认证/license 指引。
-6. Keep generated artifacts recoverable and cleanup conservative.
+5. Keep generated artifacts recoverable and cleanup conservative.
    保持生成产物可恢复，清理逻辑保守。
 
 Recently completed:
@@ -92,6 +90,8 @@ Recently completed:
 
 - Config contract diagnostics for geometry, thickness, material, simulation, optimisation, paths, and COMSOL port values.
   已完成几何、厚度、材料、仿真、优化、路径和 COMSOL 端口数值的配置合同诊断。
+- Discovery tests for install-path fixtures, missing configured paths, and running-process priority.
+  已完成安装路径样例、配置路径缺失和运行进程优先级的自动发现测试。
 
 ### 5. Documentation Drafts / 文档开发版
 

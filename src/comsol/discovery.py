@@ -149,8 +149,9 @@ def unique_existing_paths(patterns: list[str]) -> list[str]:  # 按模式查找�
     return sorted(found)  # 返回排序路径 / Return sorted paths
 
 
-def discover_install_candidates() -> dict[str, list[str]]:  # 发现常见安装路径候选 / Discover common install path candidates
-    return {kind: unique_existing_paths(patterns) for kind, patterns in INSTALL_PATTERNS.items()}  # 返回各类候选路径 / Return candidates by kind
+def discover_install_candidates(patterns: dict[str, list[str]] | None = None) -> dict[str, list[str]]:  # 发现常见安装路径候选 / Discover common install path candidates
+    search_patterns = patterns or INSTALL_PATTERNS  # 读取搜索模式 / Read search patterns
+    return {kind: unique_existing_paths(kind_patterns) for kind, kind_patterns in search_patterns.items()}  # 返回各类候选路径 / Return candidates by kind
 
 
 def first_process_executable(processes: list[dict], kind: str) -> str:  # 读取指定类型的首个进程路径 / Read first process path for a kind
