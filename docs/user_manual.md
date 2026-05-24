@@ -159,8 +159,8 @@ Preflight checks:
 Diagnostics:
 诊断：
 
-- `Refresh`: checks paths, model, runner, timeout settings, and mphserver reachability.
-  `Refresh`：检查路径、模型、runner、超时设置和 mphserver 可达性。
+- `Refresh`: checks config contracts, paths, model, runner, timeout settings, and mphserver reachability.
+  `Refresh`：检查配置合同、路径、模型、runner、超时设置和 mphserver 可达性。
 - `Self-test`: runs a safer Python-only deployment check.
   `Self-test`：运行更安全的 Python-only 部署检查。
 

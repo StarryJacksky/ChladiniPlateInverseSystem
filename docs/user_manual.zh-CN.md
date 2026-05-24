@@ -99,7 +99,7 @@ Chladni Studio 帮助用户把目标视觉图案转换为阶梯厚度板候选�
 
 诊断：
 
-- `Refresh`：检查路径、模型、runner、超时设置和 mphserver 可达性。
+- `Refresh`：检查配置合同、路径、模型、runner、超时设置和 mphserver 可达性。
 - `Self-test`：运行更安全的 Python-only 部署检查。
 
 时间线与日志：

@@ -50,13 +50,16 @@ Goal: catch configuration problems before expensive COMSOL/MATLAB runs.
 
 Tasks:
 
-1. Harden config validation for paths, model files, export directories, and numeric limits.
-2. Add non-invasive COMSOL/MATLAB version probes where safe.
-3. Expand discovery tests with simulated missing config paths and known install-path fixtures.
-4. Prefer already-running processes, then known install folders, then manual override in the setup flow.
-5. Add manual override fields to the setup wizard when discovery fails.
-6. Add clearer authentication/license guidance when diagnostics detect risk.
-7. Keep generated artifacts recoverable and cleanup conservative.
+1. Add non-invasive COMSOL/MATLAB version probes where safe.
+2. Expand discovery tests with simulated missing config paths and known install-path fixtures.
+3. Prefer already-running processes, then known install folders, then manual override in the setup flow.
+4. Add manual override fields to the setup wizard when discovery fails.
+5. Add clearer authentication/license guidance when diagnostics detect risk.
+6. Keep generated artifacts recoverable and cleanup conservative.
+
+Recently completed:
+
+- Config contract diagnostics for geometry, thickness, material, simulation, optimisation, paths, and COMSOL port values.
 
 ### 5. Documentation Drafts
 

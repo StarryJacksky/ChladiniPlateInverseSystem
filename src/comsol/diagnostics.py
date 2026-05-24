@@ -15,6 +15,16 @@ from src.comsol.run_livelink import build_matlab_batch  # 导入 MATLAB batch �
 from src.comsol.server import is_server_reachable  # 导入 server 端口检查 / Import server port check
 
 
+MATERIAL_RANGES = {  # 定义材料参数合理范围 / Define reasonable material parameter ranges
+    "density_kg_m3": (100.0, 25000.0),  # 密度范围 / Density range
+    "poisson_ratio": (0.0, 0.49),  # 泊松比范围 / Poisson-ratio range
+    "youngs_modulus_pa": (1.0e6, 5.0e12),  # 杨氏模量范围 / Young's modulus range
+    "thermal_conductivity_w_mk": (1.0e-4, 5000.0),  # 导热范围 / Thermal-conductivity range
+    "heat_capacity_j_kgk": (1.0, 10000.0),  # 热容范围 / Heat-capacity range
+    "thermal_expansion_1_k": (0.0, 1.0e-3),  # 热膨胀范围 / Thermal-expansion range
+}  # 结束材料范围 / End material ranges
+
+
 def resolve_project_path(value: str | Path) -> Path:  # 解析项目相对路径 / Resolve project-relative path
     path = Path(value).expanduser()  # 展开用户目录 / Expand user directory
     return path if path.is_absolute() else Path.cwd() / path  # 返回绝对路径 / Return absolute path
@@ -47,6 +57,123 @@ def check_output_directory(label: str, value: str | Path) -> dict:  # 检查输�
 def self_test_item(label: str, ok: bool, message: str, path: str = "", required: bool = True) -> dict:  # 构造自检条目 / Build self-test item
     status = "ok" if ok else ("fail" if required else "warn")  # 计算条目状态 / Compute item status
     return {"label": label, "status": status, "message": message, "path": path, "required": required}  # 返回自检条目 / Return self-test item
+
+
+def section_value(config: dict, section: str, key: str, default=None):  # 读取配置分区值 / Read config section value
+    return config.get(section, {}).get(key, default)  # 返回分区键值 / Return section key value
+
+
+def coerce_float(value, default: float = 0.0) -> float:  # 容错转换浮点数 / Convert to float tolerantly
+    try:  # 捕获转换错误 / Catch conversion errors
+        return float(value)  # 返回浮点数 / Return float value
+    except (TypeError, ValueError):  # 处理无效数值 / Handle invalid value
+        return default  # 返回默认值 / Return default value
+
+
+def coerce_float_list(values) -> list[float]:  # 容错转换浮点列表 / Convert to float list tolerantly
+    if not isinstance(values, list):  # 检查是否不是列表 / Check non-list value
+        return []  # 返回空列表 / Return empty list
+    output = []  # 创建输出列表 / Create output list
+    for value in values:  # 遍历输入值 / Iterate input values
+        try:  # 捕获单项转换错误 / Catch item conversion error
+            output.append(float(value))  # 添加浮点值 / Add float value
+        except (TypeError, ValueError):  # 跳过无效项 / Skip invalid item
+            return []  # 返回空列表表示失败 / Return empty list as failure
+    return output  # 返回转换结果 / Return converted result
+
+
+def check_number_config(label: str, value, minimum: float, maximum: float, integer: bool = False, required: bool = True) -> dict:  # 检查数值配置 / Check numeric config
+    try:  # 捕获转换错误 / Catch conversion errors
+        number = float(value)  # 转换为浮点数 / Convert to float
+    except (TypeError, ValueError):  # 处理非数值 / Handle non-numeric value
+        return self_test_item(label, False, f"Value is not numeric: {value}. / 数值配置不是数字：{value}。", "", required)  # 返回失败 / Return failure
+    integer_ok = (not integer) or number.is_integer()  # 检查整数要求 / Check integer requirement
+    range_ok = minimum <= number <= maximum  # 检查范围 / Check range
+    ok = integer_ok and range_ok  # 汇总结果 / Combine result
+    message = f"value={number:g}, allowed={minimum:g}..{maximum:g}. / 当前值={number:g}，允许范围={minimum:g}..{maximum:g}。"  # 构造消息 / Build message
+    if integer and not integer_ok:  # 检查整数失败 / Check integer failure
+        message = f"value={number:g} must be an integer. / 当前值={number:g} 必须是整数。"  # 构造整数错误 / Build integer error
+    return self_test_item(label, ok, message, "", required)  # 返回检查结果 / Return check result
+
+
+def check_project_contract(config: dict) -> list[dict]:  # 检查项目几何合同 / Check project geometry contract
+    grid_size = int(coerce_float(section_value(config, "project", "grid_size", 0)))  # 读取网格尺寸 / Read grid size
+    plate_length = coerce_float(section_value(config, "project", "plate_length_mm", 0.0))  # 读取板长 / Read plate length
+    plate_width = coerce_float(section_value(config, "project", "plate_width_mm", 0.0))  # 读取板宽 / Read plate width
+    center_radius = coerce_float(section_value(config, "project", "center_clamp_radius_mm", 0.0))  # 读取中心夹持半径 / Read centre clamp radius
+    grid_ok = grid_size == 15 and grid_size % 2 == 1  # 检查项目网格合同 / Check project grid contract
+    plate_ok = plate_length == 150.0 and plate_width == 150.0  # 检查板尺寸合同 / Check plate size contract
+    center_ok = 0.0 < center_radius < min(plate_length, plate_width) / 2.0  # 检查中心半径 / Check centre radius
+    return [  # 返回项目检查 / Return project checks
+        self_test_item("Project grid contract", grid_ok, f"grid_size={grid_size}; expected odd 15 for current bound model. / grid_size={grid_size}；当前绑定模型要求奇数 15。"),  # 添加网格检查 / Add grid check
+        self_test_item("Plate size contract", plate_ok, f"plate={plate_length:g}x{plate_width:g} mm; expected 150x150 mm. / 板尺寸={plate_length:g}x{plate_width:g} mm；期望 150x150 mm。"),  # 添加板尺寸检查 / Add plate size check
+        self_test_item("Center clamp radius", center_ok, f"center_clamp_radius_mm={center_radius:g}. / 中心夹持半径={center_radius:g}。"),  # 添加中心半径检查 / Add centre radius check
+    ]  # 结束项目检查 / End project checks
+
+
+def check_thickness_contract(config: dict) -> list[dict]:  # 检查厚度合同 / Check thickness contract
+    levels_raw = section_value(config, "thickness", "levels_mm", [])  # 读取厚度等级 / Read thickness levels
+    levels = coerce_float_list(levels_raw)  # 转换厚度等级 / Convert thickness levels
+    default = coerce_float(section_value(config, "thickness", "default_mm", 0.0))  # 读取默认厚度 / Read default thickness
+    neighbor = coerce_float(section_value(config, "thickness", "max_neighbor_difference_mm", 0.0))  # 读取邻居差值 / Read neighbour difference
+    levels_ok = bool(levels) and levels == sorted(levels) and all(0.05 <= value <= 20.0 for value in levels)  # 检查厚度等级 / Check thickness levels
+    default_ok = default in levels  # 检查默认厚度 / Check default thickness
+    neighbor_ok = neighbor >= 0.0 and neighbor <= max(levels or [0.0])  # 检查邻居差值 / Check neighbour difference
+    return [  # 返回厚度检查 / Return thickness checks
+        self_test_item("Thickness levels", levels_ok, f"{len(levels)} level(s), range={min(levels or [0]):g}..{max(levels or [0]):g} mm. / {len(levels)} 个厚度等级，范围={min(levels or [0]):g}..{max(levels or [0]):g} mm。"),  # 添加厚度等级检查 / Add thickness level check
+        self_test_item("Default thickness", default_ok, f"default_mm={default:g}; must be one of levels_mm. / default_mm={default:g}；必须属于 levels_mm。"),  # 添加默认厚度检查 / Add default thickness check
+        self_test_item("Neighbour thickness limit", neighbor_ok, f"max_neighbor_difference_mm={neighbor:g}. / 相邻厚度限制={neighbor:g}。"),  # 添加邻居限制检查 / Add neighbour limit check
+    ]  # 结束厚度检查 / End thickness checks
+
+
+def check_material_contract(config: dict) -> list[dict]:  # 检查材料合同 / Check material contract
+    material = config.get("material", {})  # 读取材料配置 / Read material config
+    return [check_number_config(f"Material {key}", material.get(key), minimum, maximum) for key, (minimum, maximum) in MATERIAL_RANGES.items()]  # 返回材料检查 / Return material checks
+
+
+def check_simulation_contract(config: dict) -> list[dict]:  # 检查仿真合同 / Check simulation contract
+    minimum_frequency = coerce_float(section_value(config, "simulation", "frequency_min_hz", 0.0))  # 读取最小频率 / Read minimum frequency
+    maximum_frequency = coerce_float(section_value(config, "simulation", "frequency_max_hz", 0.0))  # 读取最大频率 / Read maximum frequency
+    frequency_ok = 0.0 <= minimum_frequency <= maximum_frequency <= 100000.0  # 检查频率范围 / Check frequency range
+    return [  # 返回仿真检查 / Return simulation checks
+        check_number_config("Simulation mode count", section_value(config, "simulation", "num_modes", 0), 1.0, 200.0, True),  # 添加模态数量检查 / Add mode count check
+        self_test_item("Simulation frequency range", frequency_ok, f"{minimum_frequency:g}..{maximum_frequency:g} Hz. / 频率范围={minimum_frequency:g}..{maximum_frequency:g} Hz。"),  # 添加频率范围检查 / Add frequency range check
+    ]  # 结束仿真检查 / End simulation checks
+
+
+def check_optimisation_contract(config: dict) -> list[dict]:  # 检查优化合同 / Check optimisation contract
+    optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation config
+    return [  # 返回优化检查 / Return optimisation checks
+        check_number_config("Optimisation population size", optimisation.get("population_size"), 1.0, 1000.0, True),  # 添加候选数量检查 / Add population size check
+        check_number_config("Optimisation iteration count", optimisation.get("num_iterations"), 1.0, 1000.0, True),  # 添加迭代数量检查 / Add iteration count check
+        check_number_config("Roughness weight", optimisation.get("roughness_weight"), 0.0, 10.0),  # 添加粗糙度权重检查 / Add roughness weight check
+        check_number_config("Mass weight", optimisation.get("mass_weight"), 0.0, 10.0),  # 添加质量权重检查 / Add mass weight check
+        check_number_config("Frequency weight", optimisation.get("frequency_weight"), 0.0, 10.0),  # 添加频率权重检查 / Add frequency weight check
+    ]  # 结束优化检查 / End optimisation checks
+
+
+def check_runtime_config_contract(config: dict) -> list[dict]:  # 检查运行时配置合同 / Check runtime config contract
+    comsol_config = config.get("comsol", {})  # 读取 COMSOL 配置 / Read COMSOL config
+    paths_config = config.get("paths", {})  # 读取路径配置 / Read paths config
+    target_mode = str(section_value(config, "nodal_extraction", "target_mode", ""))  # 读取目标模式 / Read target mode
+    target_mode_ok = target_mode in {"stroke", "edge", "filled"}  # 检查目标模式 / Check target mode
+    path_keys_ok = all(paths_config.get(key) for key in ["target_pattern", "processed_targets_dir", "candidates_dir", "comsol_exports_dir"])  # 检查路径键 / Check path keys
+    return [  # 返回运行时检查 / Return runtime checks
+        self_test_item("Target mode contract", target_mode_ok, f"target_mode={target_mode}. / 目标模式={target_mode}。"),  # 添加目标模式检查 / Add target mode check
+        self_test_item("Required path keys", path_keys_ok, "Target, processed, candidate, and export paths are configured. / 目标、处理、候选和导出路径已配置。"),  # 添加路径键检查 / Add path key check
+        check_number_config("COMSOL server port", comsol_config.get("server_port", 0), 1.0, 65535.0, True),  # 添加端口检查 / Add port check
+    ]  # 结束运行时检查 / End runtime checks
+
+
+def check_config_contract(config: dict) -> list[dict]:  # 检查完整配置合同 / Check complete config contract
+    checks = []  # 创建检查列表 / Create check list
+    checks.extend(check_project_contract(config))  # 添加项目检查 / Add project checks
+    checks.extend(check_thickness_contract(config))  # 添加厚度检查 / Add thickness checks
+    checks.extend(check_material_contract(config))  # 添加材料检查 / Add material checks
+    checks.extend(check_simulation_contract(config))  # 添加仿真检查 / Add simulation checks
+    checks.extend(check_optimisation_contract(config))  # 添加优化检查 / Add optimisation checks
+    checks.extend(check_runtime_config_contract(config))  # 添加运行时检查 / Add runtime checks
+    return checks  # 返回所有配置检查 / Return all config checks
 
 
 def check_runner_contract(runner_path: Path) -> dict:  # 检查 LiveLink runner 合同 / Check LiveLink runner contract
@@ -183,7 +310,8 @@ def diagnose_comsol_environment(config: dict) -> dict:  # 诊断 COMSOL/MATLAB �
     runtime_config, applied_paths, discovery = config_with_runtime_discovery(config, discovery)  # 应用运行时发现结果 / Apply runtime discovery result
     comsol_config = runtime_config.get("comsol", {})  # 读取 COMSOL 配置 / Read COMSOL config
     paths_config = runtime_config.get("paths", {})  # 读取路径配置 / Read paths config
-    checks = [  # 创建路径检查列表 / Create path check list
+    checks = check_config_contract(runtime_config)  # 先运行配置合同检查 / Run config contract checks first
+    checks.extend([  # 追加路径检查列表 / Append path check list
         check_path("COMSOL command", comsol_config.get("comsol_command_path", ""), True, True),  # 检查 COMSOL 命令 / Check COMSOL command
         infer_comsol_version(comsol_config.get("comsol_command_path", "")),  # 添加 COMSOL 版本提示 / Add COMSOL version hint
         check_path("MATLAB command", comsol_config.get("matlab_path", ""), True, True),  # 检查 MATLAB 命令 / Check MATLAB command
@@ -194,7 +322,7 @@ def diagnose_comsol_environment(config: dict) -> dict:  # 诊断 COMSOL/MATLAB �
         check_path("Source MPH model", comsol_config.get("source_model_path", ""), False, False),  # 检查原始模型 / Check source model
         check_output_directory("COMSOL exports", paths_config.get("comsol_exports_dir", "data/comsol_exports")),  # 检查导出目录 / Check export directory
         check_timeout_config(config),  # 检查超时配置 / Check timeout configuration
-    ]  # 结束路径检查列表 / End path check list
+    ])  # 结束路径检查列表 / End path check list
     checks.extend(discovery_check_items(discovery))  # 加入自动发现提示 / Add auto-discovery hints
     if applied_paths:  # 检查是否应用运行时补全 / Check whether runtime completion was applied
         applied_text = ", ".join(f"{key} from {source}" for key, source in applied_paths.items())  # 构造应用说明 / Build applied-path description

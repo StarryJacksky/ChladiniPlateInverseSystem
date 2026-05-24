@@ -99,7 +99,7 @@ Preflight checks:
 
 Diagnostics:
 
-- `Refresh`: checks paths, model, runner, timeout settings, and mphserver reachability.
+- `Refresh`: checks config contracts, paths, model, runner, timeout settings, and mphserver reachability.
 - `Self-test`: runs a safer Python-only deployment check.
 
 Timeline and Logs:
