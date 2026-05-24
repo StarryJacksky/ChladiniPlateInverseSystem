@@ -789,6 +789,19 @@ def report_value(value, fallback: str = "-") -> str:  # 格式化报告值 / For
     return html.escape(str(value))  # 返回转义文本 / Return escaped text
 
 
+def report_size_label(size_bytes: int | float | str | None) -> str:  # 格式化报告文件大小 / Format report file size
+    try:  # 捕获大小转换错误 / Catch size conversion errors
+        size = float(size_bytes or 0)  # 转换为浮点字节数 / Convert to float bytes
+    except (TypeError, ValueError):  # 处理非法大小 / Handle invalid size
+        return "-"  # 返回回退值 / Return fallback value
+    units = ["B", "KB", "MB", "GB"]  # 定义单位列表 / Define unit list
+    unit_index = 0  # 初始化单位索引 / Initialize unit index
+    while size >= 1024 and unit_index < len(units) - 1:  # 循环缩放单位 / Scale units iteratively
+        size /= 1024  # 转换到下一单位 / Convert to next unit
+        unit_index += 1  # 增加单位索引 / Increment unit index
+    return f"{size:.1f} {units[unit_index]}"  # 返回格式化大小 / Return formatted size
+
+
 def report_metric_rows(score: dict) -> str:  # 构建报告指标行 / Build report metric rows
     metrics = [("Best mode", score.get("best_mode")), ("IoU", score.get("best_iou")), ("Dice", score.get("best_dice")), ("Frequency Hz", score.get("frequency_hz")), ("Final score", score.get("final_score"))]  # 定义指标列表 / Define metric list
     return "\n".join(f"<div class='metric'><span>{html.escape(label)}</span><strong>{report_value(value)}</strong></div>" for label, value in metrics)  # 返回指标 HTML / Return metric HTML
@@ -800,6 +813,95 @@ def report_mode_table(score: dict) -> str:  # 构建模态指标表 / Build mode
         return "<p>No per-mode metrics were recorded.</p>"  # 返回空表提示 / Return empty-table note
     body = "\n".join(f"<tr><td>{report_value(row.get('mode'))}</td><td>{report_value(row.get('iou'))}</td><td>{report_value(row.get('dice'))}</td><td>{report_value(row.get('similarity'))}</td></tr>" for row in rows)  # 构建表格主体 / Build table body
     return f"<table><thead><tr><th>Mode</th><th>IoU</th><th>Dice</th><th>Similarity</th></tr></thead><tbody>{body}</tbody></table>"  # 返回表格 / Return table
+
+
+def report_ranking_table(rows: list[dict]) -> str:  # 构建运行报告排行表 / Build run-report ranking table
+    if not rows:  # 检查是否无排行 / Check whether ranking is absent
+        return "<p>No ranking data has been generated yet.</p>"  # 返回空排行提示 / Return empty-ranking note
+    body = "\n".join(f"<tr><td>{index + 1}</td><td>{report_value(row.get('candidate_id'))}</td><td>{report_value(row.get('best_mode'))}</td><td>{report_value(row.get('best_iou'))}</td><td>{report_value(row.get('best_dice'))}</td><td>{report_value(row.get('frequency_hz'))}</td><td>{report_value(row.get('final_score'))}</td></tr>" for index, row in enumerate(rows[:50]))  # 构建排行表体 / Build ranking body
+    return f"<table><thead><tr><th>Rank</th><th>Candidate</th><th>Mode</th><th>IoU</th><th>Dice</th><th>Hz</th><th>Score</th></tr></thead><tbody>{body}</tbody></table>"  # 返回排行表 / Return ranking table
+
+
+def report_history_table(rows: list[dict]) -> str:  # 构建运行报告历史表 / Build run-report history table
+    if not rows:  # 检查是否无历史 / Check whether history is absent
+        return "<p>No generation history has been generated yet.</p>"  # 返回空历史提示 / Return empty-history note
+    body = "\n".join(f"<tr><td>{report_value(row.get('generation'))}</td><td>{report_value(row.get('candidate_count'))}</td><td>{report_value(row.get('simulated_count'))}</td><td>{report_value(row.get('scored_count'))}</td><td>{report_value(row.get('best_candidate'))}</td><td>{report_value(row.get('final_score'))}</td></tr>" for row in rows[:50])  # 构建历史表体 / Build history body
+    return f"<table><thead><tr><th>Generation</th><th>Candidates</th><th>Simulated</th><th>Scored</th><th>Best</th><th>Score</th></tr></thead><tbody>{body}</tbody></table>"  # 返回历史表 / Return history table
+
+
+def report_artifact_table(summary: dict) -> str:  # 构建运行报告产物表 / Build run-report artifact table
+    groups = summary.get("groups", []) if isinstance(summary.get("groups", []), list) else []  # 读取产物分组 / Read artifact groups
+    if not groups:  # 检查是否无产物摘要 / Check whether artifact summary is absent
+        return "<p>No artifact summary is available.</p>"  # 返回空产物提示 / Return empty-artifact note
+    body = "\n".join(f"<tr><td>{report_value(group.get('label'))}</td><td>{report_value(group.get('count'))}</td><td>{report_value(report_size_label(group.get('size_bytes')))}</td></tr>" for group in groups)  # 构建产物表体 / Build artifact body
+    return f"<table><thead><tr><th>Group</th><th>Files</th><th>Size</th></tr></thead><tbody>{body}</tbody></table>"  # 返回产物表 / Return artifact table
+
+
+def build_run_report_html(config: dict) -> str:  # 构建整次运行 HTML 报告 / Build full-run HTML report
+    ranking = load_ranking(config)  # 读取候选排行 / Load candidate ranking
+    history = load_generation_history(config)  # 读取代数历史 / Load generation history
+    artifacts = load_artifact_summary(config)  # 读取产物摘要 / Load artifact summary
+    target_summary = load_target_analysis_summary(config)  # 读取目标摘要 / Load target summary
+    workflow = workflow_snapshot()  # 读取工作流状态 / Read workflow state
+    best = ranking[0] if ranking else {}  # 读取最佳候选 / Read best candidate
+    analysis = target_summary.get("analysis", {})  # 读取目标分析 / Read target analysis
+    created_at = datetime.now().isoformat(timespec="seconds")  # 生成报告时间 / Build report timestamp
+    lines = [  # 创建 HTML 行列表 / Create HTML line list
+        "<!doctype html>",  # 添加文档类型 / Add doctype
+        "<html lang='en'>",  # 添加 HTML 开始 / Add HTML start
+        "<head>",  # 添加头部开始 / Add head start
+        "  <meta charset='utf-8'>",  # 添加字符集 / Add charset
+        "  <meta name='viewport' content='width=device-width, initial-scale=1'>",  # 添加视口 / Add viewport
+        "  <title>Chladni run report</title>",  # 添加标题 / Add title
+        "  <style>",  # 添加样式开始 / Add style start
+        "    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #eef2f3; color: #18211f; }",  # 添加页面样式 / Add page style
+        "    main { max-width: 1120px; margin: 0 auto; padding: 28px; }",  # 添加主体样式 / Add main style
+        "    header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding-bottom: 18px; border-bottom: 1px solid #cfd8d2; }",  # 添加头部样式 / Add header style
+        "    h1 { margin: 0; font-size: 30px; line-height: 1.1; }",  # 添加一级标题样式 / Add h1 style
+        "    h2 { margin: 28px 0 12px; font-size: 15px; text-transform: uppercase; letter-spacing: 0; }",  # 添加二级标题样式 / Add h2 style
+        "    .muted { color: #68746f; font-size: 13px; line-height: 1.45; }",  # 添加弱文本样式 / Add muted text style
+        "    .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }",  # 添加指标网格样式 / Add metric grid style
+        "    .metric { display: grid; gap: 6px; padding: 12px; border: 1px solid #d7ddd7; border-radius: 8px; background: #fffdf8; }",  # 添加指标卡样式 / Add metric card style
+        "    .metric span { color: #68746f; font-size: 11px; text-transform: uppercase; }",  # 添加指标标签样式 / Add metric label style
+        "    .metric strong { font-size: 16px; overflow-wrap: anywhere; }",  # 添加指标值样式 / Add metric value style
+        "    table { width: 100%; border-collapse: collapse; background: #fbfcfb; border: 1px solid #d7ddd7; }",  # 添加表格样式 / Add table style
+        "    th, td { padding: 8px 10px; border-bottom: 1px solid #d7ddd7; text-align: left; font-size: 13px; }",  # 添加单元格样式 / Add cell style
+        "    th { color: #68746f; font-size: 11px; text-transform: uppercase; }",  # 添加表头样式 / Add table head style
+        "    pre { white-space: pre-wrap; background: #101716; color: #fffdf8; padding: 12px; border-radius: 8px; overflow: auto; }",  # 添加代码块样式 / Add pre style
+        "    @media (max-width: 760px) { .metrics { grid-template-columns: 1fr; } header { display: grid; } main { padding: 16px; } }",  # 添加响应式样式 / Add responsive style
+        "  </style>",  # 添加样式结束 / Add style end
+        "</head>",  # 添加头部结束 / Add head end
+        "<body>",  # 添加正文开始 / Add body start
+        "  <main>",  # 添加主体开始 / Add main start
+        "    <header>",  # 添加报告头部开始 / Add report header start
+        "      <div>",  # 添加标题容器开始 / Add title container start
+        "        <h1>Chladni run report</h1>",  # 添加报告标题 / Add report title
+        "        <div class='muted'>Full workflow summary / 整次运行摘要</div>",  # 添加双语说明 / Add bilingual note
+        "      </div>",  # 添加标题容器结束 / Add title container end
+        f"      <div class='muted'>Created {report_value(created_at)}<br>Status {report_value(workflow.get('stage'))}</div>",  # 添加生成时间和状态 / Add created time and status
+        "    </header>",  # 添加报告头部结束 / Add report header end
+        "    <section class='metrics'>",  # 添加指标区开始 / Add metric section start
+        f"      <div class='metric'><span>Best candidate</span><strong>{report_value(best.get('candidate_id'))}</strong></div>",  # 添加最佳候选 / Add best candidate
+        f"      <div class='metric'><span>Best mode</span><strong>{report_value(best.get('best_mode'))}</strong></div>",  # 添加最佳模态 / Add best mode
+        f"      <div class='metric'><span>IoU</span><strong>{report_value(best.get('best_iou'))}</strong></div>",  # 添加 IoU / Add IoU
+        f"      <div class='metric'><span>Score</span><strong>{report_value(best.get('final_score'))}</strong></div>",  # 添加分数 / Add score
+        f"      <div class='metric'><span>Artifacts</span><strong>{report_value(report_size_label(artifacts.get('total_size_bytes')))}</strong></div>",  # 添加产物大小 / Add artifact size
+        "    </section>",  # 添加指标区结束 / Add metric section end
+        "    <h2>Target Analysis</h2>",  # 添加目标分析标题 / Add target analysis heading
+        f"    <pre>{html.escape(json.dumps(analysis, ensure_ascii=False, indent=2))}</pre>",  # 添加目标分析 JSON / Add target-analysis JSON
+        "    <h2>Ranking</h2>",  # 添加排行标题 / Add ranking heading
+        f"    {report_ranking_table(ranking)}",  # 添加排行表 / Add ranking table
+        "    <h2>Generation History</h2>",  # 添加历史标题 / Add history heading
+        f"    {report_history_table(history)}",  # 添加历史表 / Add history table
+        "    <h2>Artifacts</h2>",  # 添加产物标题 / Add artifact heading
+        f"    {report_artifact_table(artifacts)}",  # 添加产物表 / Add artifact table
+        "    <h2>Workflow State</h2>",  # 添加工作流标题 / Add workflow heading
+        f"    <pre>{html.escape(json.dumps(workflow, ensure_ascii=False, indent=2))}</pre>",  # 添加工作流 JSON / Add workflow JSON
+        "  </main>",  # 添加主体结束 / Add main end
+        "</body>",  # 添加正文结束 / Add body end
+        "</html>",  # 添加 HTML 结束 / Add HTML end
+    ]  # 结束 HTML 行列表 / End HTML line list
+    return "\n".join(lines)  # 返回完整 HTML / Return complete HTML
 
 
 def build_candidate_report_html(config: dict, candidate_id: str) -> str:  # 构建候选 HTML 报告 / Build candidate HTML report
@@ -1014,6 +1116,9 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                     self.send_bytes(build_candidate_report_html(config, candidate_id).encode("utf-8"), "text/html; charset=utf-8")  # 返回 HTML 报告 / Return HTML report
                 except Exception as exc:  # 处理异常 / Handle exception
                     self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
+                return  # 结束请求 / Finish request
+            if route == "/api/run-report":  # 判断是否请求整次运行报告 / Check full-run report request
+                self.send_bytes(build_run_report_html(config).encode("utf-8"), "text/html; charset=utf-8")  # 返回 HTML 报告 / Return HTML report
                 return  # 结束请求 / Finish request
             if route == "/api/workflow":  # 判断是否请求工作流状态 / Check workflow-status request
                 self.send_json(workflow_snapshot())  # 返回工作流状态 / Return workflow status

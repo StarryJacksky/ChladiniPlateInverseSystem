@@ -45,6 +45,7 @@ Recommended target images:
 - Connected component count.
 - First-loop suitability recommendation.
 - Warnings for fine detail, complexity, and area balance.
+- A short quality guidance note for imported photos, logos, and dense hand drawings.
 
 If the recommendation is `Late-stage target`, use it later after the optimization loop is stable, or simplify the image first.
 
@@ -125,6 +126,8 @@ You can:
 - Filter by minimum IoU.
 - Open target/simulated/overlay images in a larger viewer.
 - Switch between scored modes.
+- Compare the top visible candidates in the overview block.
+- Open a full run report from the overview.
 - Open a readable candidate report.
 - Download a candidate result package.
 

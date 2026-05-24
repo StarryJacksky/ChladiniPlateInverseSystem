@@ -23,10 +23,13 @@ Goal: let users draw/import, run, inspect, and compare without opening files man
 
 Tasks:
 
-1. Add stronger candidate-to-candidate comparison views.
-2. Add clearer best-candidate summary and ranking explanation.
-3. Extend report-style export from selected candidates to full run summaries.
-4. Improve target-quality recommendations for imported photos and logos.
+1. Add deeper multi-candidate visual comparison once more real COMSOL images are available.
+2. Add final screenshot-driven walkthroughs after the UI stops moving.
+
+Recently completed:
+
+- Result overview now explains ranking, shows a top-candidate comparison strip, and links to a full run report.
+- Target Quality now gives practical guidance for imported photos, logos, and dense hand drawings.
 
 ### 3. Automation Robustness
 
@@ -108,6 +111,6 @@ Needs stable UI screenshots, final install paths, final lab-specific COMSOL/MATL
 
 Codex is not yet blocked.
 
-Continue with: COMSOL/MATLAB running-process detection and auto-discovery, frontend polish, comparison/report features, run validation/cancel behavior, backend config hardening, and documentation refinement.
+Continue with: frontend polish, Python-only smoke validation, non-invasive version inference, backend config hardening, and documentation refinement.
 
 Only after those are complete should the project wait mainly for real material data, final COMSOL model acceptance, and physical validation data.

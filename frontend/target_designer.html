@@ -608,6 +608,41 @@
       line-height: 1.35; /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
+    .result-note { /* 样式设置 / Style setting */
+      padding: 10px; /* 样式设置 / Style setting */
+      border-left: 3px solid var(--accent); /* 样式设置 / Style setting */
+      border-radius: 6px; /* 样式设置 / Style setting */
+      background: rgba(18, 111, 100, 0.07); /* 样式设置 / Style setting */
+      color: var(--text); /* 样式设置 / Style setting */
+      font-size: 12px; /* 样式设置 / Style setting */
+      line-height: 1.45; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .rank-compare { /* 样式设置 / Style setting */
+      display: grid; /* 样式设置 / Style setting */
+      gap: 6px; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .rank-compare-row { /* 样式设置 / Style setting */
+      display: grid; /* 样式设置 / Style setting */
+      grid-template-columns: 24px minmax(0, 1fr) auto; /* 样式设置 / Style setting */
+      gap: 8px; /* 样式设置 / Style setting */
+      align-items: center; /* 样式设置 / Style setting */
+      padding: 8px; /* 样式设置 / Style setting */
+      border: 1px solid rgba(16, 23, 22, 0.10); /* 样式设置 / Style setting */
+      border-radius: 8px; /* 样式设置 / Style setting */
+      background: #ffffff; /* 样式设置 / Style setting */
+      color: var(--muted); /* 样式设置 / Style setting */
+      font-size: 11px; /* 样式设置 / Style setting */
+      line-height: 1.35; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .rank-compare-row strong { /* 样式设置 / Style setting */
+      color: var(--ink); /* 样式设置 / Style setting */
+      font-size: 12px; /* 样式设置 / Style setting */
+      overflow-wrap: anywhere; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
     .metric-grid { /* 样式设置 / Style setting */
       display: grid; /* 样式设置 / Style setting */
       grid-template-columns: repeat(3, minmax(0, 1fr)); /* 样式设置 / Style setting */
@@ -693,6 +728,16 @@
     .quality-flag.warn { /* 样式设置 / Style setting */
       background: rgba(164, 72, 33, 0.12); /* 样式设置 / Style setting */
       color: var(--warn); /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .quality-guidance { /* 样式设置 / Style setting */
+      padding: 10px; /* 样式设置 / Style setting */
+      border: 1px solid rgba(16, 23, 22, 0.10); /* 样式设置 / Style setting */
+      border-radius: 8px; /* 样式设置 / Style setting */
+      background: rgba(255, 255, 255, 0.72); /* 样式设置 / Style setting */
+      color: var(--text); /* 样式设置 / Style setting */
+      font-size: 12px; /* 样式设置 / Style setting */
+      line-height: 1.45; /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
     .tune-overview { /* 样式设置 / Style setting */
@@ -1671,6 +1716,9 @@
         <section class="panel"> <!-- 页面结构 / Page structure -->
           <h2>Result Overview</h2> <!-- 页面结构 / Page structure -->
           <div id="resultOverview" class="result-overview">No ranking yet</div> <!-- 页面结构 / Page structure -->
+          <div class="panel-actions"> <!-- 页面结构 / Page structure -->
+            <a class="download-link" href="/api/run-report" target="_blank" rel="noreferrer">Run report</a> <!-- 页面结构 / Page structure -->
+          </div> <!-- 页面结构 / Page structure -->
         </section> <!-- 页面结构 / Page structure -->
         <section class="panel"> <!-- 页面结构 / Page structure -->
           <h2>Results</h2> <!-- 页面结构 / Page structure -->
@@ -2837,6 +2885,39 @@
     }
 
     // 前端逻辑 / Frontend logic
+    function targetGuidanceText(analysis) {
+      // 前端逻辑 / Frontend logic
+      const notes = [];
+      // 前端逻辑 / Frontend logic
+      if (analysis.grid_resolution_warning) {
+        // 前端逻辑 / Frontend logic
+        notes.push("Fine details may be smaller than one 15 x 15 design cell, so simplify thin strokes before COMSOL scoring.");
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (analysis.logo_complexity_warning) {
+        // 前端逻辑 / Frontend logic
+        notes.push("The imported mark has many separated parts; merge tiny islands or use edge mode for photo-like input.");
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (analysis.area_warning) {
+        // 前端逻辑 / Frontend logic
+        notes.push("The foreground area is unusually sparse or dense; rebalance black-white coverage for a more stable nodal target.");
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (!notes.length) {
+        // 前端逻辑 / Frontend logic
+        notes.push("Target quality looks suitable for a first automated run; keep the processed preview visually close to the intended pattern.");
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      return notes.join(" ");
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
     function renderTargetAnalysis(payload) {
       // 前端逻辑 / Frontend logic
       const analysis = payload.analysis || payload || {};
@@ -2873,6 +2954,7 @@
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${targetRecommendationText(analysis.recommendation)}</strong><span>Fit</span></div>
         <!-- 模板内容 / Template content --></div>
         <!-- 模板内容 / Template content --><div class="quality-flags">${flagHtml}</div>
+        <!-- 模板内容 / Template content --><div class="quality-guidance">${escapeText(targetGuidanceText(analysis))}</div>
       <!-- 模板内容 / Template content -->`;
     // 前端逻辑 / Frontend logic
     }
@@ -2974,6 +3056,8 @@
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.best_dice)}</strong><span>Dice</span></div>
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.final_score)}</strong><span>Score</span></div>
         <!-- 模板内容 / Template content --></div>
+        <!-- 模板内容 / Template content --><div class="result-note">${rankingExplanation(best, rows)}</div>
+        <!-- 模板内容 / Template content -->${renderTopCandidateComparison(rows)}
       <!-- 模板内容 / Template content -->`;
       // 前端逻辑 / Frontend logic
       resultsList.innerHTML = rows.slice(0, 10).map((row, index) => `
@@ -3010,6 +3094,42 @@
       resultMinIouInput.value = "";
       // 前端逻辑 / Frontend logic
       renderRankingRows();
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
+    function rankingExplanation(best, rows) {
+      // 前端逻辑 / Frontend logic
+      const candidateCount = rows.length;
+      // 前端逻辑 / Frontend logic
+      const bestFrequency = formatFrequency(best.frequency_hz);
+      // 前端逻辑 / Frontend logic
+      return `Ranking prioritises target overlap first, then keeps the result useful by applying the configured roughness, mass, and frequency penalties. The current leader is compared against ${candidateCount} visible candidates, with best mode ${escapeText(best.best_mode)} at ${bestFrequency} Hz.`;
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
+    function renderTopCandidateComparison(rows) {
+      // 前端逻辑 / Frontend logic
+      const topRows = rows.slice(0, 3);
+      // 前端逻辑 / Frontend logic
+      if (!topRows.length) {
+        // 前端逻辑 / Frontend logic
+        return "";
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      return `
+        <!-- 模板内容 / Template content --><div class="rank-compare">
+          <!-- 模板内容 / Template content -->${topRows.map((row, index) => `
+            <!-- 模板内容 / Template content --><button class="rank-compare-row" type="button" data-candidate-id="${escapeText(row.candidate_id)}">
+              <!-- 模板内容 / Template content --><span>#${index + 1}</span>
+              <!-- 模板内容 / Template content --><strong>${escapeText(row.candidate_id)}</strong>
+              <!-- 模板内容 / Template content --><span>IoU ${formatScore(row.best_iou)} · Dice ${formatScore(row.best_dice)} · ${formatScore(row.final_score)}</span>
+            <!-- 模板内容 / Template content --></button>
+          <!-- 模板内容 / Template content -->`).join("")}
+        <!-- 模板内容 / Template content --></div>
+      <!-- 模板内容 / Template content -->`;
     // 前端逻辑 / Frontend logic
     }
 
@@ -4747,6 +4867,18 @@
     tabButtons.forEach((button) => button.addEventListener("click", () => selectSidebarTab(button.dataset.tabTarget)));
     // 前端逻辑 / Frontend logic
     resultsList.addEventListener("click", (event) => {
+      // 前端逻辑 / Frontend logic
+      const button = event.target.closest("[data-candidate-id]");
+      // 前端逻辑 / Frontend logic
+      if (button) {
+        // 前端逻辑 / Frontend logic
+        loadCandidateDetail(button.dataset.candidateId);
+      // 前端逻辑 / Frontend logic
+      }
+    // 前端逻辑 / Frontend logic
+    });
+    // 前端逻辑 / Frontend logic
+    resultOverview.addEventListener("click", (event) => {
       // 前端逻辑 / Frontend logic
       const button = event.target.closest("[data-candidate-id]");
       // 前端逻辑 / Frontend logic

@@ -32,14 +32,18 @@ Goal: let users draw/import, run, inspect, and compare without opening files man
 Tasks:
 任务：
 
-1. Add stronger candidate-to-candidate comparison views.
-   增强候选之间的横向比较视图。
-2. Add clearer best-candidate summary and ranking explanation.
-   增加更清楚的最佳候选摘要和排名解释。
-3. Extend report-style export from selected candidates to full run summaries.
-   将报告式导出从单个候选扩展到整次运行摘要。
-4. Improve target-quality recommendations for imported photos and logos.
-   改进导入照片和 Logo 的目标质量建议。
+1. Add deeper multi-candidate visual comparison once more real COMSOL images are available.
+   等更多真实 COMSOL 图像可用后，增加更深入的多候选视觉比较。
+2. Add final screenshot-driven walkthroughs after the UI stops moving.
+   等 UI 稳定后，增加带最终截图的操作 walkthrough。
+
+Recently completed:
+最近完成：
+
+- Result overview now explains ranking, shows a top-candidate comparison strip, and links to a full run report.
+  Results 总览现在会解释排名、显示顶部候选对比条，并链接到整次运行报告。
+- Target Quality now gives practical guidance for imported photos, logos, and dense hand drawings.
+  Target Quality 现在会针对导入照片、Logo 和复杂手绘目标给出实用建议。
 
 ### 3. Automation Robustness / 自动化稳健性
 
@@ -157,8 +161,8 @@ Needs stable UI screenshots, final install paths, final lab-specific COMSOL/MATL
 Codex is not yet blocked.
 Codex 目前还没有进入等待阶段。
 
-Continue with: COMSOL/MATLAB running-process detection and auto-discovery, frontend polish, comparison/report features, run validation/cancel behavior, backend config hardening, and documentation refinement.
-下一步继续做：COMSOL/MATLAB 运行进程检测与自动发现、前端打磨、比较/报告功能、运行校验/取消行为、后端配置加固和文档细化。
+Continue with: frontend polish, Python-only smoke validation, non-invasive version inference, backend config hardening, and documentation refinement.
+下一步继续做：前端打磨、无 COMSOL 烟测验证、非侵入式版本推断、后端配置加固和文档细化。
 
 Only after those are complete should the project wait mainly for real material data, final COMSOL model acceptance, and physical validation data.
 只有这些完成后，项目才主要进入等待真实材料数据、最终 COMSOL 模型验收和实体验证数据的阶段。

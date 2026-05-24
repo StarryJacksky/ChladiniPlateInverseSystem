@@ -73,6 +73,8 @@ Recommended target images:
   第一轮适配建议。
 - Warnings for fine detail, complexity, and area balance.
   细节、复杂度和面积平衡警告。
+- A short quality guidance note for imported photos, logos, and dense hand drawings.
+  针对导入照片、Logo 和复杂手绘目标的简短质量建议。
 
 If the recommendation is `Late-stage target`, use it later after the optimization loop is stable, or simplify the image first.
 如果建议是 `Late-stage target`，可以等优化流程稳定后再用，或先简化图案。
@@ -202,6 +204,10 @@ You can:
   放大查看目标、仿真、叠加图片。
 - Switch between scored modes.
   在已评分模态之间切换。
+- Compare the top visible candidates in the overview block.
+  在总览区横向比较当前可见的前几个候选。
+- Open a full run report from the overview.
+  从总览区打开整次运行报告。
 - Open a readable candidate report.
   打开可读的候选报告。
 - Download a candidate result package.
