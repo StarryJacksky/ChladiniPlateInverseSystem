@@ -35,11 +35,14 @@ Goal: make the Run tab predictable before asking users to trust one-click automa
 Tasks:
 
 1. Validate COMSOL/MATLAB running-process detection and install-path discovery on clean Windows, macOS, and Linux machines.
-2. Add a frontend setup wizard around the existing `apply-comsol-discovery` command.
-3. Add deeper model-specific preflight checks after the final COMSOL model is frozen.
-4. Add a safe cancel/stop pathway for local workflow state.
-5. Improve failed-run recovery messages using diagnostics and logs.
-6. Keep Python-only self-test independent from COMSOL/MATLAB execution.
+2. Add deeper model-specific preflight checks after the final COMSOL model is frozen.
+3. Improve failed-run recovery messages using diagnostics and logs.
+4. Keep Python-only self-test independent from COMSOL/MATLAB execution.
+
+Recently completed:
+
+- Frontend setup assistant for COMSOL/MATLAB discovery, path confirmation, and diagnostics verification.
+- Safe local Stop pathway with persisted cancelling/cancelled workflow state.
 
 ### 4. Backend Checks and Contracts
 

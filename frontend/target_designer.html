@@ -1716,6 +1716,7 @@
           </div> <!-- 页面结构 / Page structure -->
           <div class="panel-actions"> <!-- 页面结构 / Page structure -->
             <button id="runWorkflowButton" type="button" class="primary">Run</button> <!-- 页面结构 / Page structure -->
+            <button id="cancelWorkflowButton" type="button" disabled>Stop</button> <!-- 页面结构 / Page structure -->
           </div> <!-- 页面结构 / Page structure -->
           <div id="workflowStatus" class="status">Idle</div> <!-- 页面结构 / Page structure -->
           <div id="workflowProgress" class="workflow-progress" hidden> <!-- 页面结构 / Page structure -->
@@ -1910,6 +1911,8 @@
     const simulateToggle = document.getElementById("simulateToggle");
     // 前端逻辑 / Frontend logic
     const runWorkflowButton = document.getElementById("runWorkflowButton");
+    // 前端逻辑 / Frontend logic
+    const cancelWorkflowButton = document.getElementById("cancelWorkflowButton");
     // 前端逻辑 / Frontend logic
     const runPresetButtons = Array.from(document.querySelectorAll("[data-run-preset]"));
     // 前端逻辑 / Frontend logic
@@ -3505,7 +3508,7 @@
         // 前端逻辑 / Frontend logic
         const logPath = event.log_path ? `<span>${escapeText(event.log_path)}</span>` : "";
         // 前端逻辑 / Frontend logic
-        const tone = event.stage === "error" || event.stage === "interrupted" ? " error" : "";
+        const tone = event.stage === "error" || event.stage === "interrupted" || event.stage === "cancelled" ? " error" : "";
         // 前端逻辑 / Frontend logic
         return `
           <!-- 模板内容 / Template content --><div class="timeline-item">
@@ -3558,9 +3561,11 @@
       // 前端逻辑 / Frontend logic
       runWorkflowButton.disabled = Boolean(state.running);
       // 前端逻辑 / Frontend logic
+      cancelWorkflowButton.disabled = !state.running || Boolean(state.cancel_requested);
+      // 前端逻辑 / Frontend logic
       updateStudioStrip();
       // 前端逻辑 / Frontend logic
-      if (state.stage === "done" || state.stage === "error") {
+      if (state.stage === "done" || state.stage === "error" || state.stage === "cancelled" || state.stage === "interrupted") {
         // 前端逻辑 / Frontend logic
         workflowProgress.hidden = true;
         // 前端逻辑 / Frontend logic
@@ -3658,6 +3663,8 @@
       // 前端逻辑 / Frontend logic
       runWorkflowButton.disabled = true;
       // 前端逻辑 / Frontend logic
+      cancelWorkflowButton.disabled = false;
+      // 前端逻辑 / Frontend logic
       workflowStatus.textContent = "Starting...";
       // 前端逻辑 / Frontend logic
       workflowProgress.hidden = true;
@@ -3709,6 +3716,43 @@
         renderWorkflowHint({ stage: "error", error: error.message, message: error.message }, latestWorkflowEvents);
         // 前端逻辑 / Frontend logic
         runWorkflowButton.disabled = false;
+        // 前端逻辑 / Frontend logic
+        cancelWorkflowButton.disabled = true;
+      // 前端逻辑 / Frontend logic
+      }
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
+    async function cancelWorkflow() {
+      // 前端逻辑 / Frontend logic
+      cancelWorkflowButton.disabled = true;
+      // 前端逻辑 / Frontend logic
+      workflowStatus.textContent = "Stopping at next safe checkpoint...";
+      // 前端逻辑 / Frontend logic
+      try {
+        // 前端逻辑 / Frontend logic
+        const response = await fetch("/api/cancel-workflow", { method: "POST" });
+        // 前端逻辑 / Frontend logic
+        const state = await response.json();
+        // 前端逻辑 / Frontend logic
+        if (!response.ok) {
+          // 前端逻辑 / Frontend logic
+          throw new Error(state.error || "Cancel failed");
+        // 前端逻辑 / Frontend logic
+        }
+        // 前端逻辑 / Frontend logic
+        workflowStatus.textContent = state.message || "Cancel requested";
+        // 前端逻辑 / Frontend logic
+        renderWorkflowTimeline(state.events || [], state);
+        // 前端逻辑 / Frontend logic
+        setTimeout(pollWorkflow, 1000);
+      // 前端逻辑 / Frontend logic
+      } catch (error) {
+        // 前端逻辑 / Frontend logic
+        workflowStatus.textContent = error.message;
+        // 前端逻辑 / Frontend logic
+        cancelWorkflowButton.disabled = !latestWorkflowState.running;
       // 前端逻辑 / Frontend logic
       }
     // 前端逻辑 / Frontend logic
@@ -4603,6 +4647,8 @@
     saveScoringButton.addEventListener("click", saveScoring);
     // 前端逻辑 / Frontend logic
     runWorkflowButton.addEventListener("click", runWorkflow);
+    // 前端逻辑 / Frontend logic
+    cancelWorkflowButton.addEventListener("click", cancelWorkflow);
     // 前端逻辑 / Frontend logic
     runPresetButtons.forEach((button) => button.addEventListener("click", () => applyRunPreset(button.dataset.runPreset)));
     // 前端逻辑 / Frontend logic

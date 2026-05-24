@@ -85,6 +85,11 @@ Run presets:
 - On: run the COMSOL/MATLAB bridge.
 - Off: run the Python-side workflow without COMSOL simulation.
 
+Run control:
+
+- `Run`: starts the queued local workflow after preflight checks.
+- `Stop`: requests a safe cancellation; the current external COMSOL/MATLAB command is not force-killed, and the workflow stops at the next safe checkpoint.
+
 Preflight checks:
 
 - Candidate count must be from 1 to 100.
@@ -99,7 +104,7 @@ Diagnostics:
 
 Timeline and Logs:
 
-- Timeline shows queued, target preparation, candidate generation, simulation, scoring, done, and error stages.
+- Timeline shows queued, target preparation, candidate generation, simulation, scoring, cancelling, cancelled, done, and error stages.
 - Logs show recent COMSOL/MATLAB output tails.
 
 Artifacts:

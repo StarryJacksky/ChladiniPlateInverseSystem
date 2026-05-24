@@ -136,6 +136,14 @@ Run presets:
 - Off: run the Python-side workflow without COMSOL simulation.
   关闭：只运行 Python 侧流程，不跑 COMSOL 仿真。
 
+Run control:
+运行控制：
+
+- `Run`: starts the queued local workflow after preflight checks.
+  `Run`：通过运行前检查后，启动本地排队工作流。
+- `Stop`: requests a safe cancellation; the current external COMSOL/MATLAB command is not force-killed, and the workflow stops at the next safe checkpoint.
+  `Stop`：请求安全取消；当前外部 COMSOL/MATLAB 命令不会被强杀，工作流会在下一个安全检查点停止。
+
 Preflight checks:
 运行前检查：
 
@@ -159,8 +167,8 @@ Diagnostics:
 Timeline and Logs:
 时间线与日志：
 
-- Timeline shows queued, target preparation, candidate generation, simulation, scoring, done, and error stages.
-  Timeline 显示排队、目标预处理、候选生成、仿真、评分、完成和错误阶段。
+- Timeline shows queued, target preparation, candidate generation, simulation, scoring, cancelling, cancelled, done, and error stages.
+  Timeline 显示排队、目标预处理、候选生成、仿真、评分、正在取消、已取消、完成和错误阶段。
 - Logs show recent COMSOL/MATLAB output tails.
   Logs 显示最近的 COMSOL/MATLAB 输出尾部。
 

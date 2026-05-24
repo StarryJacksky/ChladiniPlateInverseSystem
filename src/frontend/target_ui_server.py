@@ -48,8 +48,9 @@ RETENTION_LIMITS = {  # 定义产物保留参数范围 / Define artifact retenti
 }  # 结束产物保留参数范围 / End artifact retention ranges
 
 WORKFLOW_LOCK = threading.Lock()  # 创建工作流状态锁 / Create workflow state lock
+WORKFLOW_CANCEL_EVENT = threading.Event()  # 创建工作流取消事件 / Create workflow cancellation event
 WORKFLOW_EVENT_LIMIT = 80  # 限制保存的工作流事件数量 / Limit stored workflow event count
-WORKFLOW_JOB = {"running": False, "stage": "idle", "message": "Idle", "result": None, "error": "", "current_candidate": "", "current_index": 0, "total": 0, "events": []}  # 创建工作流状态 / Create workflow state
+WORKFLOW_JOB = {"running": False, "cancel_requested": False, "stage": "idle", "message": "Idle", "result": None, "error": "", "current_candidate": "", "current_index": 0, "total": 0, "events": []}  # 创建工作流状态 / Create workflow state
 
 
 def update_workflow_state(**updates) -> None:  # 更新工作流状态 / Update workflow state
@@ -103,14 +104,16 @@ def restore_workflow_state(config: dict) -> None:  # 恢复持久化工作流状
         return  # 结束恢复 / Finish restore
     state["events"] = list(state.get("events", []))[-WORKFLOW_EVENT_LIMIT:]  # 恢复事件列表 / Restore event list
     if state.get("running"):  # 检查是否为重启前运行中状态 / Check stale running state before restart
-        state.update({"running": False, "stage": "interrupted", "message": "Previous workflow was interrupted by a UI/server restart. / 上一次工作流被 UI/服务重启中断。", "error": "Workflow interrupted by restart. / 工作流被重启中断。", "current_candidate": "", "current_index": 0, "total": 0})  # 标记中断状态 / Mark interrupted state
+        state.update({"running": False, "cancel_requested": False, "stage": "interrupted", "message": "Previous workflow was interrupted by a UI/server restart. / 上一次工作流被 UI/服务重启中断。", "error": "Workflow interrupted by restart. / 工作流被重启中断。", "current_candidate": "", "current_index": 0, "total": 0})  # 标记中断状态 / Mark interrupted state
         state["events"].append(normalise_workflow_event({"stage": "interrupted", "message": state["message"]}))  # 记录中断事件 / Record interruption event
+    state["cancel_requested"] = bool(state.get("cancel_requested", False))  # 规范取消标记 / Normalize cancellation flag
     update_workflow_state(**state)  # 恢复到内存状态 / Restore into memory state
     persist_workflow_state(config)  # 写回规范化状态 / Write normalized state
 
 
 def run_workflow_thread(config: dict, payload: dict) -> None:  # 后台运行自动工作流 / Run automatic workflow in background
     from src.optimisation.workflow import run_design_workflow  # 延迟导入完整工作流 / Lazily import full workflow
+    from src.optimisation.workflow import WorkflowCancelled  # 延迟导入取消异常 / Lazily import cancellation exception
     try:  # 捕获后台工作流错误 / Catch background workflow errors
         workflow_config = copy.deepcopy(config)  # 复制配置避免污染运行时 / Copy config to avoid runtime mutation
         workflow_payload = validate_workflow_payload(payload, workflow_config)  # 校验工作流载荷 / Validate workflow payload
@@ -118,12 +121,29 @@ def run_workflow_thread(config: dict, payload: dict) -> None:  # 后台运行自
         limit = workflow_payload["limit"]  # 读取候选数量 / Read candidate limit
         num_modes = workflow_payload["num_modes"]  # 读取模态数量 / Read mode count
         simulate = workflow_payload["simulate"]  # 读取是否仿真 / Read simulation flag
+        def cancel_check() -> bool:  # 定义取消检查函数 / Define cancellation check function
+            return WORKFLOW_CANCEL_EVENT.is_set()  # 返回取消事件状态 / Return cancellation event state
         def progress(event: dict) -> None:  # 定义进度回调 / Define progress callback
+            if cancel_check():  # 检查是否请求取消 / Check whether cancellation requested
+                raise WorkflowCancelled("Workflow cancelled by user. / 用户已取消工作流。")  # 抛出取消异常 / Raise cancellation exception
             update_and_persist_workflow_state(config, event=event, stage=event.get("stage", ""), message=event.get("message", ""), current_candidate=event.get("current_candidate", ""), current_index=int(event.get("current_index", 0) or 0), total=int(event.get("total", 0) or 0), result=event if event.get("stage") == "done" else workflow_snapshot().get("result"))  # 更新进度状态 / Update progress state
-        result = run_design_workflow(workflow_config, generation, limit, num_modes, simulate, progress)  # 运行完整工作流 / Run complete workflow
-        update_and_persist_workflow_state(config, running=False, stage="done", message="Workflow complete. / 工作流完成。", result=result, error="", current_candidate="", current_index=0, total=0)  # 写入完成状态 / Store completion state
+        result = run_design_workflow(workflow_config, generation, limit, num_modes, simulate, progress, cancel_check)  # 运行完整工作流 / Run complete workflow
+        update_and_persist_workflow_state(config, running=False, cancel_requested=False, stage="done", message="Workflow complete. / 工作流完成。", result=result, error="", current_candidate="", current_index=0, total=0)  # 写入完成状态 / Store completion state
+    except WorkflowCancelled as exc:  # 处理工作流取消 / Handle workflow cancellation
+        WORKFLOW_CANCEL_EVENT.clear()  # 清除取消事件 / Clear cancellation event
+        update_and_persist_workflow_state(config, event={"stage": "cancelled", "message": str(exc)}, running=False, cancel_requested=False, stage="cancelled", message=str(exc), error="", current_candidate="", current_index=0, total=0)  # 写入取消状态 / Store cancelled state
     except Exception as exc:  # 处理工作流异常 / Handle workflow exception
-        update_and_persist_workflow_state(config, event={"stage": "error", "message": str(exc)}, running=False, stage="error", message=str(exc), error=str(exc))  # 写入错误状态 / Store error state
+        WORKFLOW_CANCEL_EVENT.clear()  # 清除取消事件 / Clear cancellation event
+        update_and_persist_workflow_state(config, event={"stage": "error", "message": str(exc)}, running=False, cancel_requested=False, stage="error", message=str(exc), error=str(exc))  # 写入错误状态 / Store error state
+
+
+def request_workflow_cancel(config: dict) -> dict:  # 请求取消工作流 / Request workflow cancellation
+    state = workflow_snapshot()  # 读取当前状态 / Read current state
+    if not state.get("running"):  # 检查是否没有运行中工作流 / Check no running workflow
+        raise RuntimeError("No workflow is running. / 当前没有运行中的工作流。")  # 抛出未运行错误 / Raise not-running error
+    WORKFLOW_CANCEL_EVENT.set()  # 标记取消事件 / Mark cancellation event
+    update_and_persist_workflow_state(config, event={"stage": "cancelling", "message": "Cancel requested; stopping at the next safe checkpoint. / 已请求取消，将在下一个安全检查点停止。"}, cancel_requested=True, stage="cancelling", message="Cancel requested; stopping at the next safe checkpoint. / 已请求取消，将在下一个安全检查点停止。")  # 写入取消请求 / Store cancellation request
+    return workflow_snapshot()  # 返回更新状态 / Return updated state
 
 
 def project_root() -> Path:  # 获取项目根目录 / Get project root directory
@@ -1043,15 +1063,24 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 except Exception as exc:  # 处理路径保存异常 / Handle path save exception
                     self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
                 return  # 结束请求 / Finish request
+            if route == "/api/cancel-workflow":  # 检查取消工作流路由 / Check workflow cancellation route
+                try:  # 捕获取消错误 / Catch cancellation errors
+                    self.send_json(request_workflow_cancel(config))  # 请求取消并返回状态 / Request cancellation and return state
+                except RuntimeError as exc:  # 处理没有运行中的工作流 / Handle no running workflow
+                    self.send_json({"error": str(exc)}, HTTPStatus.CONFLICT)  # 返回冲突错误 / Return conflict error
+                except Exception as exc:  # 处理取消异常 / Handle cancellation exception
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
+                return  # 结束请求 / Finish request
             if route == "/api/run-workflow":  # 检查自动工作流路由 / Check automatic workflow route
                 try:  # 捕获启动错误 / Catch startup errors
                     if workflow_snapshot().get("running"):  # 检查是否已有工作流运行 / Check existing workflow
                         self.send_json({"error": "Workflow is already running. / 工作流已在运行。"}, HTTPStatus.CONFLICT)  # 返回冲突错误 / Return conflict error
                         return  # 结束请求 / Finish request
+                    WORKFLOW_CANCEL_EVENT.clear()  # 清除旧取消事件 / Clear stale cancellation event
                     length = int(self.headers.get("Content-Length", "0"))  # 读取请求体长度 / Read request body length
                     raw_payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 读取并解析 JSON / Read and parse JSON
                     payload = validate_workflow_payload(raw_payload, config)  # 校验工作流载荷 / Validate workflow payload
-                    update_and_persist_workflow_state(config, event={"stage": "queued", "message": "Workflow queued. / 工作流已排队。"}, running=True, stage="queued", message="Workflow queued. / 工作流已排队。", result=None, error="", current_candidate="", current_index=0, total=0, events=[])  # 设置排队状态 / Set queued state
+                    update_and_persist_workflow_state(config, event={"stage": "queued", "message": "Workflow queued. / 工作流已排队。"}, running=True, cancel_requested=False, stage="queued", message="Workflow queued. / 工作流已排队。", result=None, error="", current_candidate="", current_index=0, total=0, events=[])  # 设置排队状态 / Set queued state
                     thread = threading.Thread(target=run_workflow_thread, args=(config, payload), daemon=True)  # 创建后台线程 / Create background thread
                     thread.start()  # 启动后台线程 / Start background thread
                     self.send_json(workflow_snapshot())  # 返回初始状态 / Return initial status
