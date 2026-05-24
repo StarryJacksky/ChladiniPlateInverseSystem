@@ -194,6 +194,14 @@ The important required checks are COMSOL command, MATLAB command, bound MPH mode
 
 For Python-only testing, turn off `Run COMSOL`.
 
+Command-line Python-only smoke check:
+
+```bash
+python scripts/check_python_smoke.py
+```
+
+This check runs in a temporary directory and should create `target_binary.npy`, `target_preview.png`, `target_analysis.json`, `H.csv`, and `metadata.json`.
+
 ## 8. Common Problems
 
 `PermissionError` when starting the UI:

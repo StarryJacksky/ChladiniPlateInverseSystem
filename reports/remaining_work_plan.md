@@ -124,10 +124,16 @@ Tasks:
 
 1. Confirm clone/install/self-test/launch workflow on a clean environment.
    在干净环境确认 clone、安装、自检、启动流程。
-2. Confirm target import, preprocessing, candidate generation, and UI refresh.
-   确认目标导入、预处理、候选生成和 UI 刷新。
-3. Document expected files after a smoke test.
-   记录烟测后应出现的文件。
+2. Confirm UI target import and refresh manually after final screenshots are ready.
+   等最终截图准备好后，手动确认 UI 目标导入与刷新。
+
+Recently completed:
+最近完成：
+
+- Added `scripts/check_python_smoke.py` to verify target preprocessing and candidate generation in a temporary directory without COMSOL.
+  已新增 `scripts/check_python_smoke.py`，可在临时目录中无 COMSOL 验证目标预处理和候选生成。
+- Documented expected smoke-test files in the deployment guide.
+  已在部署指南中记录烟测后应出现的文件。
 
 ## B. Needs Real Project Data Later / 需要真实项目数据后再做
 

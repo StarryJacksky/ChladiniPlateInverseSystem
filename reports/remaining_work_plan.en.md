@@ -82,8 +82,12 @@ Goal: let new users verify the app without COMSOL first.
 Tasks:
 
 1. Confirm clone/install/self-test/launch workflow on a clean environment.
-2. Confirm target import, preprocessing, candidate generation, and UI refresh.
-3. Document expected files after a smoke test.
+2. Confirm UI target import and refresh manually after final screenshots are ready.
+
+Recently completed:
+
+- Added `scripts/check_python_smoke.py` to verify target preprocessing and candidate generation in a temporary directory without COMSOL.
+- Documented expected smoke-test files in the deployment guide.
 
 ## B. Needs Real Project Data Later
 

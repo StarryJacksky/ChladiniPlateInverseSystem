@@ -194,6 +194,14 @@ python -m src.main apply-comsol-discovery
 
 只测试 Python 流程时，请关闭 `Run COMSOL`。
 
+命令行无 COMSOL 烟测：
+
+```bash
+python scripts/check_python_smoke.py
+```
+
+该检查会在临时目录运行，并应创建 `target_binary.npy`、`target_preview.png`、`target_analysis.json`、`H.csv` 和 `metadata.json`。
+
 ## 8. 常见问题
 
 启动 UI 出现 `PermissionError`：
