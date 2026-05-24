@@ -12,7 +12,10 @@ This folder contains user-facing deployment and operation documents.
 2. [User Manual](./user_manual.en.md)
    How to draw or import a target, tune material/scoring parameters, run automation, inspect results, and manage artifacts.
 
-3. [Remaining Work Plan](../reports/remaining_work_plan.en.md)
+3. [Code Structure and Logic](./code_structure.en.md)
+   Beginner-friendly explanation of the project folders, code flow, and generated data.
+
+4. [Remaining Work Plan](../reports/remaining_work_plan.en.md)
    Ordered remaining tasks, separated into work Codex can continue now and work that needs real lab data later.
 
 ## Current Status

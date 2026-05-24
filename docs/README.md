@@ -15,7 +15,11 @@ This folder contains user-facing deployment and operation documents.
    How to draw or import a target, tune material/scoring parameters, run automation, inspect results, and manage artifacts.
    如何绘制或导入目标、调整材料与评分参数、运行自动化、查看结果并管理产物。
 
-3. [Remaining Work Plan / 剩余工作顺序表](../reports/remaining_work_plan.md) ([中文](../reports/remaining_work_plan.zh-CN.md) | [English](../reports/remaining_work_plan.en.md))
+3. [Code Structure and Logic / 项目代码结构与逻辑说明](code_structure.md) ([中文](code_structure.zh-CN.md) | [English](code_structure.en.md))
+   Beginner-friendly explanation of the project folders, code flow, and generated data.
+   面向零基础读者解释项目目录、代码流程和生成数据。
+
+4. [Remaining Work Plan / 剩余工作顺序表](../reports/remaining_work_plan.md) ([中文](../reports/remaining_work_plan.zh-CN.md) | [English](../reports/remaining_work_plan.en.md))
    Ordered remaining tasks, separated into work Codex can continue now and work that needs real lab data later.
    按顺序整理剩余任务，并区分 Codex 现在能继续做的任务与之后需要真实实验数据的任务。
 

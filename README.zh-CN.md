@@ -108,6 +108,7 @@ python -m src.main self-test
 
 - [Windows/macOS/Linux 部署教程](./docs/deployment_guide.zh-CN.md) ([双语](./docs/deployment_guide.md) | [English](./docs/deployment_guide.en.md))
 - [软件使用说明书](./docs/user_manual.zh-CN.md) ([双语](./docs/user_manual.md) | [English](./docs/user_manual.en.md))
+- [项目代码结构与逻辑说明](./docs/code_structure.zh-CN.md) ([双语](./docs/code_structure.md) | [English](./docs/code_structure.en.md))
 - [文档索引](./docs/README.zh-CN.md) ([双语](./docs/README.md) | [English](./docs/README.en.md))
 - [后续任务规划](./reports/remaining_work_plan.zh-CN.md) ([双语](./reports/remaining_work_plan.md) | [English](./reports/remaining_work_plan.en.md))
 

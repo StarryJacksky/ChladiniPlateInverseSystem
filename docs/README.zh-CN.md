@@ -12,7 +12,10 @@
 2. [软件使用说明书](./user_manual.zh-CN.md)
    如何绘制或导入目标、调整材料与评分参数、运行自动化、查看结果并管理产物。
 
-3. [剩余工作顺序表](../reports/remaining_work_plan.zh-CN.md)
+3. [项目代码结构与逻辑说明](./code_structure.zh-CN.md)
+   面向零基础读者解释项目目录、代码流程和生成数据。
+
+4. [剩余工作顺序表](../reports/remaining_work_plan.zh-CN.md)
    按顺序整理剩余任务，并区分 Codex 现在能继续做的任务与之后需要真实实验数据的任务。
 
 ## 当前状态

@@ -10,6 +10,7 @@ Chladni Studio 是一个用于 Chladni 板的本地逆向设计工具。用户�
 
 - [Deployment Guide / 三系统部署教程](./docs/deployment_guide.md) ([中文](./docs/deployment_guide.zh-CN.md) | [English](./docs/deployment_guide.en.md))
 - [User Manual / 软件使用说明书](./docs/user_manual.md) ([中文](./docs/user_manual.zh-CN.md) | [English](./docs/user_manual.en.md))
+- [Code Structure and Logic / 项目代码结构与逻辑说明](./docs/code_structure.md) ([中文](./docs/code_structure.zh-CN.md) | [English](./docs/code_structure.en.md))
 - [Documentation Index / 文档索引](./docs/README.md) ([中文](./docs/README.zh-CN.md) | [English](./docs/README.en.md))
 - [Remaining Work Plan / 后续任务规划](./reports/remaining_work_plan.md) ([中文](./reports/remaining_work_plan.zh-CN.md) | [English](./reports/remaining_work_plan.en.md))
 
