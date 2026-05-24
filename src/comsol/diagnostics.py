@@ -208,8 +208,8 @@ def check_timeout_config(config: dict) -> dict:  # 检查超时配置 / Check ti
 
 
 def infer_comsol_version(command_path: str | Path) -> dict:  # 从路径推断 COMSOL 版本 / Infer COMSOL version from path
-    path_text = str(command_path)  # 转换路径文本 / Convert path to text
-    match = re.search(r"COMSOL(\d)(\d)", path_text, re.IGNORECASE)  # 匹配 macOS 安装目录 / Match macOS install folder
+    path_text = str(command_path).replace("\\", "/")  # 转换并归一化路径文本 / Convert and normalize path text
+    match = re.search(r"(?:COMSOL|comsol)[/_ -]*(\d)(\d)(?:\b|/)", path_text, re.IGNORECASE)  # 匹配跨平台 COMSOL 目录 / Match cross-platform COMSOL folder
     version = f"{match.group(1)}.{match.group(2)}" if match else ""  # 构造版本字符串 / Build version string
     ok = bool(version)  # 判断是否识别版本 / Decide whether version was found
     message = f"Detected COMSOL {version} from path. / 从路径识别到 COMSOL {version}。" if ok else "COMSOL version was not inferred from the command path. / 未能从命令路径推断 COMSOL 版本。"  # 生成版本消息 / Build version message
@@ -217,8 +217,8 @@ def infer_comsol_version(command_path: str | Path) -> dict:  # 从路径推断 C
 
 
 def infer_matlab_version(command_path: str | Path) -> dict:  # 从路径推断 MATLAB 版本 / Infer MATLAB version from path
-    path_text = str(command_path)  # 转换路径文本 / Convert path to text
-    match = re.search(r"MATLAB_(R\d{4}[ab])", path_text, re.IGNORECASE)  # 匹配 MATLAB 应用目录 / Match MATLAB app folder
+    path_text = str(command_path).replace("\\", "/")  # 转换并归一化路径文本 / Convert and normalize path text
+    match = re.search(r"MATLAB[_/ -]*(R\d{4}[ab])", path_text, re.IGNORECASE)  # 匹配跨平台 MATLAB 目录 / Match cross-platform MATLAB folder
     version = match.group(1).upper() if match else ""  # 读取版本字符串 / Read version string
     ok = bool(version)  # 判断是否识别版本 / Decide whether version was found
     message = f"Detected MATLAB {version} from path. / 从路径识别到 MATLAB {version}。" if ok else "MATLAB version was not inferred from the command path. / 未能从命令路径推断 MATLAB 版本。"  # 生成版本消息 / Build version message
