@@ -106,6 +106,7 @@ Timeline and Logs:
 
 - Timeline shows queued, target preparation, candidate generation, simulation, scoring, cancelling, cancelled, done, and error stages.
 - Logs show recent COMSOL/MATLAB output tails.
+- On failure, Recovery hints combine workflow state, diagnostics, and recent logs to suggest the next check.
 
 Artifacts:
 

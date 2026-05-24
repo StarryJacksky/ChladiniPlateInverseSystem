@@ -429,6 +429,54 @@ def load_log_tails(config: dict) -> dict:  # 读取最近运行日志 / Load rec
     return {"logs": logs}  # 返回日志列表 / Return log list
 
 
+def append_recovery_hint(hints: list[dict], titles: set[str], status: str, title: str, message: str, action: str, source: str = "") -> None:  # 添加去重恢复建议 / Add deduplicated recovery hint
+    if title in titles:  # 检查标题是否已存在 / Check whether title already exists
+        return  # 跳过去重项 / Skip duplicate item
+    titles.add(title)  # 记录标题 / Record title
+    hints.append({"status": status, "title": title, "message": message, "action": action, "source": source})  # 添加恢复建议 / Add recovery hint
+
+
+def collect_recovery_hints(config: dict) -> dict:  # 汇总恢复建议 / Collect recovery hints
+    from src.comsol.diagnostics import diagnose_comsol_environment  # 延迟导入诊断函数 / Lazily import diagnostics function
+    state = workflow_snapshot()  # 读取工作流状态 / Read workflow state
+    diagnostics = diagnose_comsol_environment(config)  # 运行环境诊断 / Run environment diagnostics
+    logs = load_log_tails(config).get("logs", [])  # 读取日志摘要 / Read log summaries
+    text_parts = [state.get("message", ""), state.get("error", "")]  # 收集状态文本 / Collect state text
+    text_parts.extend(event.get("message", "") for event in state.get("events", []))  # 收集事件文本 / Collect event text
+    text_parts.extend(log.get("content", "") for log in logs if log.get("exists"))  # 收集日志文本 / Collect log text
+    text = " ".join(text_parts).lower()  # 合并并小写文本 / Join and lower text
+    hints = []  # 创建建议列表 / Create hint list
+    titles = set()  # 创建去重标题集合 / Create dedupe title set
+    failure_state = state.get("stage") in {"error", "interrupted"} or bool(state.get("error"))  # 判断是否失败状态 / Decide whether workflow failed
+    failed_checks = [item for item in diagnostics.get("checks", []) if item.get("status") == "fail"]  # 查找失败诊断 / Find failed diagnostics
+    warned_checks = [item for item in diagnostics.get("checks", []) if item.get("status") == "warn"]  # 查找警告诊断 / Find warning diagnostics
+    for item in failed_checks:  # 遍历失败诊断 / Iterate failed diagnostics
+        append_recovery_hint(hints, titles, "fail", f"Fix {item.get('label', 'diagnostic check')}", item.get("message", "Path or configuration check failed."), item.get("path", "") or "Open Run > Diagnostics, correct this item, then refresh diagnostics.", "diagnostics")  # 添加失败诊断建议 / Add failed diagnostic hint
+    if failure_state and ("timeout" in text or "timed out" in text):  # 检查超时文本 / Check timeout text
+        append_recovery_hint(hints, titles, "warn", "Reduce run size or increase timeout", "The latest run appears to have timed out.", "Use Smoke, lower mode count, or raise comsol.livelink_timeout_s in config.yaml.", "logs")  # 添加超时建议 / Add timeout hint
+    if failure_state and ("license" in text or "licensed" in text or "checkout" in text):  # 检查授权文本 / Check license text
+        append_recovery_hint(hints, titles, "warn", "Confirm COMSOL/MATLAB license", "The logs or diagnostics mention license risk.", "Open COMSOL and MATLAB once, confirm login/license dialogs, then rerun diagnostics.", "logs")  # 添加授权建议 / Add license hint
+    if failure_state and ("mphserver" in text or "port" in text or "2036" in text):  # 检查 server 文本 / Check server text
+        append_recovery_hint(hints, titles, "warn", "Check mphserver connection", "The run may be blocked by COMSOL server startup or port reachability.", "Refresh diagnostics; if needed, close stale mphserver sessions or change comsol.server_port.", "logs")  # 添加 server 建议 / Add server hint
+    if failure_state and "matlab" in text and ("not found" in text or "no such file" in text or "permission" in text):  # 检查 MATLAB 路径文本 / Check MATLAB path text
+        append_recovery_hint(hints, titles, "fail", "Fix MATLAB command path", "MATLAB path or executable permission looks wrong.", "Use Run > Discover, then Apply paths or Save paths.", "logs")  # 添加 MATLAB 建议 / Add MATLAB hint
+    if failure_state and "comsol" in text and ("not found" in text or "no such file" in text or "permission" in text):  # 检查 COMSOL 路径文本 / Check COMSOL path text
+        append_recovery_hint(hints, titles, "fail", "Fix COMSOL command path", "COMSOL path or executable permission looks wrong.", "Use Run > Discover, then Apply paths or Save paths.", "logs")  # 添加 COMSOL 建议 / Add COMSOL hint
+    if failure_state and (".mph" in text or "model" in text):  # 检查模型文本 / Check model text
+        append_recovery_hint(hints, titles, "warn", "Verify bound MPH model", "The failure may involve the bound COMSOL model file or its parameter contract.", "Confirm comsol.model_path exists and matches the 15 x 15 parameterized model.", "logs")  # 添加模型建议 / Add model hint
+    if failure_state and ("livelink" in text or "run_chladni_candidate" in text):  # 检查 LiveLink 文本 / Check LiveLink text
+        append_recovery_hint(hints, titles, "warn", "Check LiveLink runner", "The MATLAB LiveLink runner may be missing, incompatible, or failing inside MATLAB.", "Run Self-test and inspect the latest candidate livelink.log.", "logs")  # 添加 LiveLink 建议 / Add LiveLink hint
+    if not diagnostics.get("ready_for_auto_run"):  # 检查诊断未就绪 / Check diagnostics not ready
+        append_recovery_hint(hints, titles, "warn", "Refresh diagnostics before retry", "Automatic COMSOL/MATLAB run readiness is not confirmed.", "Open Run > Diagnostics, click Refresh, then resolve failed required checks.", "diagnostics")  # 添加诊断建议 / Add diagnostics hint
+    if not hints and state.get("stage") in {"error", "interrupted"}:  # 检查失败但无具体建议 / Check failed state without specific hints
+        append_recovery_hint(hints, titles, "warn", "Inspect latest logs", "No specific recovery pattern was detected.", "Open Logs and inspect the newest livelink.log or mphserver.log tail.", "logs")  # 添加通用建议 / Add generic hint
+    if not hints:  # 检查无恢复事项 / Check no recovery actions
+        append_recovery_hint(hints, titles, "ok", "No recovery action needed", "Current diagnostics do not show a blocking failure.", "Continue with a Smoke run or refresh diagnostics after changing paths.", "diagnostics")  # 添加正常建议 / Add ok hint
+    status = "fail" if any(item.get("status") == "fail" for item in hints) else ("warn" if any(item.get("status") == "warn" for item in hints) else "ok")  # 汇总状态 / Summarize status
+    log_matches = [log.get("path", "") for log in logs if log.get("exists") and any(token in log.get("content", "").lower() for token in ["error", "license", "timeout", "failed", "exception"])]  # 收集可疑日志 / Collect suspicious logs
+    return {"status": status, "hints": hints, "log_matches": log_matches[:5], "diagnostics_ready": diagnostics.get("ready_for_auto_run", False), "failed_checks": failed_checks, "warned_checks": warned_checks[:5]}  # 返回恢复建议 / Return recovery hints
+
+
 def summarize_paths(label: str, paths: list[Path]) -> dict:  # 汇总一组文件路径 / Summarize a group of file paths
     existing = [path for path in paths if path.exists() and path.is_file()]  # 筛选存在文件 / Filter existing files
     size_bytes = sum(path.stat().st_size for path in existing)  # 计算总字节数 / Compute total byte size
@@ -969,6 +1017,9 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 return  # 结束请求 / Finish request
             if route == "/api/workflow":  # 判断是否请求工作流状态 / Check workflow-status request
                 self.send_json(workflow_snapshot())  # 返回工作流状态 / Return workflow status
+                return  # 结束请求 / Finish request
+            if route == "/api/recovery":  # 判断是否请求恢复建议 / Check recovery-hints request
+                self.send_json(collect_recovery_hints(config))  # 返回恢复建议 / Return recovery hints
                 return  # 结束请求 / Finish request
             if route == "/api/diagnostics":  # 判断是否请求环境诊断 / Check diagnostics request
                 from src.comsol.diagnostics import diagnose_comsol_environment  # 延迟导入诊断函数 / Lazily import diagnostics function

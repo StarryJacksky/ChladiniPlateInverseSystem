@@ -3472,6 +3472,56 @@
     }
 
     // 前端逻辑 / Frontend logic
+    function renderRecoveryHints(data) {
+      // 前端逻辑 / Frontend logic
+      const hints = data.hints || [];
+      // 前端逻辑 / Frontend logic
+      const logMatches = data.log_matches || [];
+      // 前端逻辑 / Frontend logic
+      if (!hints.length) {
+        // 前端逻辑 / Frontend logic
+        renderWorkflowHint(latestWorkflowState, latestWorkflowEvents);
+        // 前端逻辑 / Frontend logic
+        return;
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      workflowHint.hidden = false;
+      // 前端逻辑 / Frontend logic
+      workflowHint.innerHTML = `
+        <!-- 模板内容 / Template content --><strong>Recovery hints</strong>
+        <!-- 模板内容 / Template content -->${hints.map((hint) => `<span><b>${escapeText(hint.title)}</b> · ${escapeText(hint.message)} ${escapeText(hint.action)}</span>`).join("")}
+        <!-- 模板内容 / Template content -->${logMatches.length ? `<span>Related logs: ${logMatches.map((path) => escapeText(path)).join(" · ")}</span>` : ""}
+      <!-- 模板内容 / Template content -->`;
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
+    async function loadRecoveryHints() {
+      // 前端逻辑 / Frontend logic
+      try {
+        // 前端逻辑 / Frontend logic
+        const response = await fetch(`/api/recovery?t=${Date.now()}`);
+        // 前端逻辑 / Frontend logic
+        const data = await response.json();
+        // 前端逻辑 / Frontend logic
+        if (!response.ok) {
+          // 前端逻辑 / Frontend logic
+          throw new Error(data.error || "Recovery hints unavailable");
+        // 前端逻辑 / Frontend logic
+        }
+        // 前端逻辑 / Frontend logic
+        renderRecoveryHints(data);
+      // 前端逻辑 / Frontend logic
+      } catch (_error) {
+        // 前端逻辑 / Frontend logic
+        renderWorkflowHint(latestWorkflowState, latestWorkflowEvents);
+      // 前端逻辑 / Frontend logic
+      }
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
     function renderWorkflowTimeline(events, state = latestWorkflowState) {
       // 前端逻辑 / Frontend logic
       latestWorkflowEvents = events || [];
@@ -3568,6 +3618,12 @@
       if (state.stage === "done" || state.stage === "error" || state.stage === "cancelled" || state.stage === "interrupted") {
         // 前端逻辑 / Frontend logic
         workflowProgress.hidden = true;
+        // 前端逻辑 / Frontend logic
+        if (state.stage === "error" || state.stage === "interrupted" || state.error) {
+          // 前端逻辑 / Frontend logic
+          await loadRecoveryHints();
+        // 前端逻辑 / Frontend logic
+        }
         // 前端逻辑 / Frontend logic
         await loadRanking();
         // 前端逻辑 / Frontend logic

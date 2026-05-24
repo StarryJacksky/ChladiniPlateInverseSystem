@@ -36,13 +36,13 @@
 
 1. 在干净的 Windows、macOS、Linux 机器上验证 COMSOL/MATLAB 运行进程检测与安装路径发现。
 2. 最终 COMSOL 模型冻结后，增加更深入的模型专属运行前检查。
-3. 结合诊断和日志改进失败恢复提示。
-4. 保持 Python-only 自检不依赖 COMSOL/MATLAB 实际启动。
+3. 保持 Python-only 自检不依赖 COMSOL/MATLAB 实际启动。
 
 最近完成：
 
 - 已完成 COMSOL/MATLAB 自动发现、路径确认与诊断验证的前端安装向导。
 - 已完成本地安全停止入口，并持久化 cancelling/cancelled 工作流状态。
+- 已完成结合工作流状态、诊断和最近 COMSOL/MATLAB 日志的后端恢复建议。
 
 ### 4. 后端检查与合同
 

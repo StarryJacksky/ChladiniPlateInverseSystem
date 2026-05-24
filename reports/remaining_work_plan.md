@@ -53,9 +53,7 @@ Tasks:
    在干净的 Windows、macOS、Linux 机器上验证 COMSOL/MATLAB 运行进程检测与安装路径发现。
 2. Add deeper model-specific preflight checks after the final COMSOL model is frozen.
    最终 COMSOL 模型冻结后，增加更深入的模型专属运行前检查。
-3. Improve failed-run recovery messages using diagnostics and logs.
-   结合诊断和日志改进失败恢复提示。
-4. Keep Python-only self-test independent from COMSOL/MATLAB execution.
+3. Keep Python-only self-test independent from COMSOL/MATLAB execution.
    保持 Python-only 自检不依赖 COMSOL/MATLAB 实际启动。
 
 Recently completed:
@@ -65,6 +63,8 @@ Recently completed:
   已完成 COMSOL/MATLAB 自动发现、路径确认与诊断验证的前端安装向导。
 - Safe local Stop pathway with persisted cancelling/cancelled workflow state.
   已完成本地安全停止入口，并持久化 cancelling/cancelled 工作流状态。
+- Backend recovery hints that combine workflow state, diagnostics, and recent COMSOL/MATLAB logs.
+  已完成结合工作流状态、诊断和最近 COMSOL/MATLAB 日志的后端恢复建议。
 
 ### 4. Backend Checks and Contracts / 后端检查与合同
 

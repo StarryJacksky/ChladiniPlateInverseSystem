@@ -171,6 +171,8 @@ Timeline and Logs:
   Timeline 显示排队、目标预处理、候选生成、仿真、评分、正在取消、已取消、完成和错误阶段。
 - Logs show recent COMSOL/MATLAB output tails.
   Logs 显示最近的 COMSOL/MATLAB 输出尾部。
+- On failure, Recovery hints combine workflow state, diagnostics, and recent logs to suggest the next check.
+  失败时，Recovery hints 会结合工作流状态、诊断和最近日志，提示下一步检查。
 
 Artifacts:
 产物：
