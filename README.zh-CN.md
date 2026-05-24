@@ -94,10 +94,10 @@ python -m src.main self-test
 
 ## 文档
 
-- [Windows/macOS/Linux 双语部署教程](./docs/deployment_guide.md)
-- [软件使用说明书](./docs/user_manual.md)
-- [文档索引](./docs/README.md)
-- [后续任务规划](./reports/remaining_work_plan.md)
+- [Windows/macOS/Linux 部署教程](./docs/deployment_guide.zh-CN.md) ([双语](./docs/deployment_guide.md) | [English](./docs/deployment_guide.en.md))
+- [软件使用说明书](./docs/user_manual.zh-CN.md) ([双语](./docs/user_manual.md) | [English](./docs/user_manual.en.md))
+- [文档索引](./docs/README.zh-CN.md) ([双语](./docs/README.md) | [English](./docs/README.en.md))
+- [后续任务规划](./reports/remaining_work_plan.zh-CN.md) ([双语](./reports/remaining_work_plan.md) | [English](./reports/remaining_work_plan.en.md))
 
 这些文档目前是开发版。正式发布前还需要加入最终界面截图、真实实验材料参数、实验室 COMSOL/MATLAB 安装路径和授权注意事项。
 

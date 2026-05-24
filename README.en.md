@@ -94,10 +94,10 @@ python -m src.main self-test
 
 ## Documentation
 
-- [Windows/macOS/Linux Bilingual Deployment Guide](./docs/deployment_guide.md)
-- [Software User Manual](./docs/user_manual.md)
-- [Documentation Index](./docs/README.md)
-- [Ordered Remaining Work Plan](./reports/remaining_work_plan.md)
+- [Windows/macOS/Linux Deployment Guide](./docs/deployment_guide.en.md) ([Bilingual](./docs/deployment_guide.md) | [中文](./docs/deployment_guide.zh-CN.md))
+- [Software User Manual](./docs/user_manual.en.md) ([Bilingual](./docs/user_manual.md) | [中文](./docs/user_manual.zh-CN.md))
+- [Documentation Index](./docs/README.en.md) ([Bilingual](./docs/README.md) | [中文](./docs/README.zh-CN.md))
+- [Ordered Remaining Work Plan](./reports/remaining_work_plan.en.md) ([Bilingual](./reports/remaining_work_plan.md) | [中文](./reports/remaining_work_plan.zh-CN.md))
 
 These documents are still development versions. Before release, they should be completed with final screenshots, measured material parameters, and lab-specific COMSOL/MATLAB paths and licensing notes.
 

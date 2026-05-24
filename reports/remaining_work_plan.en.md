@@ -1,0 +1,108 @@
+# Remaining Work Plan
+
+[Language](./remaining_work_plan.md): [Bilingual](./remaining_work_plan.md) | [中文](./remaining_work_plan.zh-CN.md) | English
+
+This document separates tasks Codex can continue now from tasks blocked by real material, COMSOL, or physical-test data.
+
+## A. Can Continue Now
+
+### 1. Frontend Design Polish
+
+Goal: make the app feel like a serious engineering design console, not a temporary debug page.
+
+Tasks:
+
+1. Unify visual hierarchy across Target, Tune, Results, and Run tabs.
+2. Tighten spacing, typography, and empty states in Results and Run.
+3. Keep the first screen as the usable workspace, not a marketing page.
+4. Verify desktop and narrow layouts in the browser after each visible change.
+
+### 2. Frontend Function Completion
+
+Goal: let users draw/import, run, inspect, and compare without opening files manually.
+
+Tasks:
+
+1. Add stronger candidate-to-candidate comparison views.
+2. Add clearer best-candidate summary and ranking explanation.
+3. Extend report-style export from selected candidates to full run summaries.
+4. Improve target-quality recommendations for imported photos and logos.
+
+### 3. Automation Robustness
+
+Goal: make the Run tab predictable before asking users to trust one-click automation.
+
+Tasks:
+
+1. Add automatic COMSOL/MATLAB discovery before manual path configuration.
+2. Detect already-running COMSOL, MATLAB, and mphserver processes before scanning install folders.
+3. Add deeper model-specific preflight checks after the final COMSOL model is frozen.
+4. Add a safe cancel/stop pathway for local workflow state.
+5. Improve failed-run recovery messages using diagnostics and logs.
+6. Keep Python-only self-test independent from COMSOL/MATLAB execution.
+
+### 4. Backend Checks and Contracts
+
+Goal: catch configuration problems before expensive COMSOL/MATLAB runs.
+
+Tasks:
+
+1. Harden config validation for paths, model files, export directories, and numeric limits.
+2. Add non-invasive COMSOL/MATLAB version probes where safe.
+3. Add cross-platform process detection for already-running COMSOL, MATLAB, and mphserver without reading process memory.
+4. Scan common Windows, macOS, and Linux install locations for COMSOL, MATLAB, LiveLink, and mphserver.
+5. Prefer already-running processes, then known install folders, then manual override in the setup flow.
+6. Add a setup wizard that writes detected paths into `config.yaml`, with manual override when discovery fails.
+7. Add clearer authentication/license guidance when diagnostics detect risk.
+8. Keep generated artifacts recoverable and cleanup conservative.
+
+### 5. Documentation Drafts
+
+Goal: make GitHub understandable before final screenshots and lab-specific values exist.
+
+Tasks:
+
+1. Keep README as a short entry page.
+2. Maintain the Windows/macOS/Linux deployment guide in `docs/deployment_guide.md`.
+3. Maintain the software user manual in `docs/user_manual.md`.
+4. Add final screenshots later after UI stops moving.
+
+### 6. Python-Only Smoke Test Path
+
+Goal: let new users verify the app without COMSOL first.
+
+Tasks:
+
+1. Confirm clone/install/self-test/launch workflow on a clean environment.
+2. Confirm target import, preprocessing, candidate generation, and UI refresh.
+3. Document expected files after a smoke test.
+
+## B. Needs Real Project Data Later
+
+### 1. Material Calibration
+
+Needs measured or trusted values for density, Young's modulus, Poisson ratio, and thermal parameters.
+
+### 2. COMSOL Baseline Freeze
+
+Needs the final MPH model, final hole/spacer assumptions, final boundary naming, and final fixed constraints.
+
+### 3. Physical Validation
+
+Needs measured plate frequencies, excitation setup, and photographed or extracted physical nodal patterns.
+
+### 4. Optimization Tuning
+
+Needs enough COMSOL results to tune scoring weights, random search settings, and genetic algorithm operators.
+
+### 5. Final Release Guide
+
+Needs stable UI screenshots, final install paths, final lab-specific COMSOL/MATLAB notes, and confirmed troubleshooting cases.
+
+## C. Current Waiting Boundary
+
+Codex is not yet blocked.
+
+Continue with: COMSOL/MATLAB running-process detection and auto-discovery, frontend polish, comparison/report features, run validation/cancel behavior, backend config hardening, and documentation refinement.
+
+Only after those are complete should the project wait mainly for real material data, final COMSOL model acceptance, and physical validation data.

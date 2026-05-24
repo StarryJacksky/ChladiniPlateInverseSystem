@@ -1,5 +1,7 @@
 # Remaining Work Plan / 剩余工作顺序表
 
+[Language / 语言](./remaining_work_plan.md): Bilingual | [中文](./remaining_work_plan.zh-CN.md) | [English](./remaining_work_plan.en.md)
+
 This document separates tasks Codex can continue now from tasks blocked by real material, COMSOL, or physical-test data.
 本文把 Codex 现在还能继续做的任务，与需要真实材料、COMSOL 或实体测试数据后才能做的任务分开。
 
@@ -47,13 +49,17 @@ Goal: make the Run tab predictable before asking users to trust one-click automa
 Tasks:
 任务：
 
-1. Add deeper model-specific preflight checks after the final COMSOL model is frozen.
+1. Add automatic COMSOL/MATLAB discovery before manual path configuration.
+   在要求用户手动填写路径前，先自动发现本机 COMSOL/MATLAB。
+2. Detect already-running COMSOL, MATLAB, and mphserver processes before scanning install folders.
+   扫描安装目录前，先检测用户已经启动的 COMSOL、MATLAB 和 mphserver 进程。
+3. Add deeper model-specific preflight checks after the final COMSOL model is frozen.
    最终 COMSOL 模型冻结后，增加更深入的模型专属运行前检查。
-2. Add a safe cancel/stop pathway for local workflow state.
+4. Add a safe cancel/stop pathway for local workflow state.
    增加安全取消/停止本地工作流状态的路径。
-3. Improve failed-run recovery messages using diagnostics and logs.
+5. Improve failed-run recovery messages using diagnostics and logs.
    结合诊断和日志改进失败恢复提示。
-4. Keep Python-only self-test independent from COMSOL/MATLAB execution.
+6. Keep Python-only self-test independent from COMSOL/MATLAB execution.
    保持 Python-only 自检不依赖 COMSOL/MATLAB 实际启动。
 
 ### 4. Backend Checks and Contracts / 后端检查与合同
@@ -68,9 +74,17 @@ Tasks:
    加强路径、模型文件、导出目录和数值范围的配置校验。
 2. Add non-invasive COMSOL/MATLAB version probes where safe.
    在安全的前提下增加非侵入式 COMSOL/MATLAB 版本探测。
-3. Add clearer authentication/license guidance when diagnostics detect risk.
+3. Add cross-platform process detection for already-running COMSOL, MATLAB, and mphserver without reading process memory.
+   增加跨平台运行进程检测，识别已启动的 COMSOL、MATLAB 和 mphserver，但不读取进程内存。
+4. Scan common Windows, macOS, and Linux install locations for COMSOL, MATLAB, LiveLink, and mphserver.
+   扫描 Windows、macOS、Linux 常见安装位置，寻找 COMSOL、MATLAB、LiveLink 和 mphserver。
+5. Prefer already-running processes, then known install folders, then manual override in the setup flow.
+   安装流程优先使用已运行进程，其次查找常见安装目录，最后才进入手动覆盖。
+6. Add a setup wizard that writes detected paths into `config.yaml`, with manual override when discovery fails.
+   增加安装向导，把自动发现的路径写入 `config.yaml`；发现失败时允许手动覆盖。
+7. Add clearer authentication/license guidance when diagnostics detect risk.
    当诊断发现风险时，提供更清楚的认证/license 指引。
-4. Keep generated artifacts recoverable and cleanup conservative.
+8. Keep generated artifacts recoverable and cleanup conservative.
    保持生成产物可恢复，清理逻辑保守。
 
 ### 5. Documentation Drafts / 文档开发版
@@ -137,8 +151,8 @@ Needs stable UI screenshots, final install paths, final lab-specific COMSOL/MATL
 Codex is not yet blocked.
 Codex 目前还没有进入等待阶段。
 
-Continue with: frontend polish, comparison/report features, run validation/cancel behavior, backend config hardening, and documentation refinement.
-下一步继续做：前端打磨、比较/报告功能、运行校验/取消行为、后端配置加固和文档细化。
+Continue with: COMSOL/MATLAB running-process detection and auto-discovery, frontend polish, comparison/report features, run validation/cancel behavior, backend config hardening, and documentation refinement.
+下一步继续做：COMSOL/MATLAB 运行进程检测与自动发现、前端打磨、比较/报告功能、运行校验/取消行为、后端配置加固和文档细化。
 
 Only after those are complete should the project wait mainly for real material data, final COMSOL model acceptance, and physical validation data.
 只有这些完成后，项目才主要进入等待真实材料数据、最终 COMSOL 模型验收和实体验证数据的阶段。

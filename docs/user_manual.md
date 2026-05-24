@@ -1,5 +1,7 @@
 # User Manual / 软件使用说明书
 
+[Language / 语言](./user_manual.md): Bilingual | [中文](./user_manual.zh-CN.md) | [English](./user_manual.en.md)
+
 This manual explains the current Chladni Studio workflow.
 本说明书解释当前 Chladni Studio 的使用流程。
 
