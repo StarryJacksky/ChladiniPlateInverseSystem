@@ -4,6 +4,9 @@ import numpy as np  # 导入数值计算库 / Import numerical library
 
 
 def center_cells_for_grid(grid_size: int) -> list[tuple[int, int]]:  # 计算中心单元 / Compute center cells
+    if grid_size % 2 == 1:  # 判断是否为奇数网格 / Check whether grid is odd
+        center = grid_size // 2  # 计算中心索引 / Compute center index
+        return [(center, center)]  # 返回单个中心单元 / Return single center cell
     left = grid_size // 2 - 1  # 中心左上索引 / Top-left center index
     right = grid_size // 2  # 中心右下索引 / Bottom-right center index
     return [(left, left), (left, right), (right, left), (right, right)]  # 返回 2x2 中心单元 / Return 2x2 center cells
@@ -28,12 +31,15 @@ def nearest_allowed_level(value: float, levels: list[float]) -> float:  # 找最
     return float(level_array[index])  # 返回最近等级 / Return nearest level
 
 
-def repair_neighbor_constraint(H: np.ndarray, levels: list[float], max_diff: float, passes: int = 8) -> np.ndarray:  # 修复相邻约束 / Repair neighbour constraint
+def repair_neighbor_constraint(H: np.ndarray, levels: list[float], max_diff: float, passes: int = 12, fixed_cells: list[tuple[int, int]] | None = None) -> np.ndarray:  # 修复相邻约束 / Repair neighbour constraint
     repaired = H.copy()  # 复制矩阵 / Copy matrix
     rows, cols = repaired.shape  # 获取矩阵尺寸 / Get matrix size
+    fixed = set(fixed_cells or [])  # 创建固定单元集合 / Create fixed-cell set
     for _ in range(passes):  # 多轮平滑修复 / Run several repair passes
         for row in range(rows):  # 遍历行 / Iterate rows
             for col in range(cols):  # 遍历列 / Iterate columns
+                if (row, col) in fixed:  # 判断是否为固定单元 / Check fixed cell
+                    continue  # 跳过固定单元 / Skip fixed cell
                 neighbours = []  # 创建邻居列表 / Create neighbour list
                 if row > 0:  # 判断上邻居 / Check upper neighbour
                     neighbours.append(repaired[row - 1, col])  # 加入上邻居 / Add upper neighbour
@@ -45,7 +51,8 @@ def repair_neighbor_constraint(H: np.ndarray, levels: list[float], max_diff: flo
                     neighbours.append(repaired[row, col + 1])  # 加入右邻居 / Add right neighbour
                 average = float(np.mean(neighbours)) if neighbours else float(repaired[row, col])  # 计算邻居均值 / Compute neighbour average
                 if any(abs(repaired[row, col] - neighbour) > max_diff for neighbour in neighbours):  # 检查是否违规 / Check whether cell violates constraint
-                    repaired[row, col] = nearest_allowed_level(average, levels)  # 调整到最近等级 / Move to nearest allowed level
+                    valid_levels = [level for level in levels if all(abs(float(level) - float(neighbour)) <= max_diff for neighbour in neighbours)]  # 筛选满足邻居约束的等级 / Filter neighbour-compatible levels
+                    repaired[row, col] = nearest_allowed_level(average, valid_levels or levels)  # 调整到最近可行等级 / Move to nearest feasible level
         if check_neighbor_constraint(repaired, max_diff):  # 判断是否已修好 / Check whether repaired
             break  # 结束修复循环 / Stop repair loop
     return repaired  # 返回修复结果 / Return repaired result

@@ -16,8 +16,9 @@ def generate_random_H(grid_size: int, levels: list[float], default_thickness: fl
     H = random_gen.choice(np.asarray(levels, dtype=float), size=(grid_size, grid_size))  # 随机选择厚度等级 / Randomly choose thickness levels
     center_cells = center_cells_for_grid(grid_size)  # 获取中心单元 / Get center cells
     H = enforce_center_constraint(H, center_cells, default_thickness)  # 固定中心厚度 / Fix center thickness
-    H = repair_neighbor_constraint(H, levels, max_neighbor_diff)  # 修复相邻厚度约束 / Repair neighbour constraint
+    H = repair_neighbor_constraint(H, levels, max_neighbor_diff, fixed_cells=center_cells)  # 修复相邻厚度约束 / Repair neighbour constraint
     H = enforce_center_constraint(H, center_cells, default_thickness)  # 再次固定中心厚度 / Fix center thickness again
+    H = repair_neighbor_constraint(H, levels, max_neighbor_diff, fixed_cells=center_cells)  # 修复中心固定后的邻居 / Repair neighbours after centre fixing
     if not check_neighbor_constraint(H, max_neighbor_diff):  # 检查最终约束 / Check final constraint
         raise ValueError("Generated matrix violates neighbour constraint. / 生成矩阵不满足相邻约束。")  # 抛出错误 / Raise error
     return H  # 返回厚度矩阵 / Return thickness matrix

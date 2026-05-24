@@ -7,6 +7,8 @@ from PIL import Image  # 导入图像工具 / Import image utilities
 from PIL import ImageDraw  # 导入绘图工具 / Import drawing utilities
 from PIL import ImageFont  # 导入字体工具 / Import font utilities
 
+from src.candidate.constraints import center_cells_for_grid  # 导入中心单元函数 / Import centre-cell helper
+
 
 def load_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:  # 加载字体 / Load font
     font_path = Path("C:/Windows/Fonts/msyh.ttc")  # 设置微软雅黑字体路径 / Set Microsoft YaHei font path
@@ -47,8 +49,7 @@ def render_thickness_matrix(H: np.ndarray, output_path: str | Path, title: str =
     min_value = float(np.min(H))  # 获取最小厚度 / Get minimum thickness
     max_value = float(np.max(H))  # 获取最大厚度 / Get maximum thickness
     grid_top = title_height + margin  # 计算网格顶部位置 / Compute grid top position
-    center_rows = {rows // 2 - 1, rows // 2}  # 计算中心行集合 / Compute center row set
-    center_cols = {cols // 2 - 1, cols // 2}  # 计算中心列集合 / Compute center column set
+    center_cells = set(center_cells_for_grid(rows)) if rows == cols else set()  # 计算中心单元集合 / Compute centre-cell set
     for row in range(rows):  # 遍历矩阵行 / Iterate matrix rows
         for col in range(cols):  # 遍历矩阵列 / Iterate matrix columns
             x0 = margin + col * cell  # 计算单元左边界 / Compute cell left edge
@@ -62,7 +63,7 @@ def render_thickness_matrix(H: np.ndarray, output_path: str | Path, title: str =
             tx = x0 + (cell - (box[2] - box[0])) / 2  # 计算文字 x 坐标 / Compute text x coordinate
             ty = y0 + (cell - (box[3] - box[1])) / 2  # 计算文字 y 坐标 / Compute text y coordinate
             draw.text((tx, ty), label, fill=(255, 255, 255), font=label_font)  # 绘制厚度数值 / Draw thickness value
-            if row in center_rows and col in center_cols:  # 判断是否为中心固定单元 / Check whether this is center fixed cell
+            if (row, col) in center_cells:  # 判断是否为中心固定单元 / Check whether this is center fixed cell
                 draw_center_marker(draw, x0, y0, x1, y1)  # 绘制中心标记 / Draw center marker
     legend_y = grid_top + rows * cell + 22  # 计算图例 y 坐标 / Compute legend y coordinate
     draw.text((margin, legend_y), "Thickness / 厚度 (mm)", fill=(24, 32, 40), font=small_font)  # 绘制图例标题 / Draw legend title

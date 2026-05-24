@@ -7,6 +7,10 @@ data/processed_targets/*
 data/comsol_exports/*
 candidates/candidate_*
 candidates/ranked_candidates.csv
+reports/*_export.m
+reports/*_export.m.status
+reports/*_export.m.recovery
+reports/comsol_model_audit.json
 !data/processed_targets/.gitkeep
 !data/comsol_exports/.gitkeep
 !candidates/.gitkeep

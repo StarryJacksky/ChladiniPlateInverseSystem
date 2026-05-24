@@ -13,9 +13,15 @@ from src.optimisation.random_search import score_available_candidates  # 导入�
 
 def build_parser() -> argparse.ArgumentParser:  # 创建命令行解析器 / Build command-line parser
     parser = argparse.ArgumentParser(description="Chladni inverse design MVP. / Chladni 逆向设计 MVP。")  # 初始化解析器 / Initialise parser
-    parser.add_argument("command", choices=["prepare-target", "generate-candidates", "generate-previews", "score-candidates"], help="Workflow command. / 工作流命令。")  # 添加命令参数 / Add command argument
+    parser.add_argument("command", choices=["prepare-target", "target-ui", "run-workflow", "generate-candidates", "generate-previews", "simulate-candidate", "simulate-batch", "render-mode-previews", "audit-comsol-model", "diagnose-comsol", "self-test", "validate-comsol-exports", "score-candidates"], help="Workflow command. / 工作流命令。")  # 添加命令参数 / Add command argument
     parser.add_argument("--config", default="config.yaml", help="Config file path. / 配置文件路径。")  # 添加配置路径参数 / Add config path argument
-    parser.add_argument("--generation", type=int, default=0, help="Candidate generation index. / 候选代数编号。")  # 添加代数参数 / Add generation argument
+    parser.add_argument("--host", default="127.0.0.1", help="Target UI host. / 目标 UI 主机。")  # 添加 UI 主机参数 / Add UI host argument
+    parser.add_argument("--port", type=int, default=8765, help="Target UI port. / 目标 UI 端口。")  # 添加 UI 端口参数 / Add UI port argument
+    parser.add_argument("--generation", type=int, default=None, help="Candidate generation index. / 候选代数编号。")  # 添加代数参数 / Add generation argument
+    parser.add_argument("--model", default="", help="COMSOL MPH model path for audit. / 用于审计的 COMSOL MPH 模型路径。")  # 添加模型路径参数 / Add model path argument
+    parser.add_argument("--candidate-id", default="", help="Candidate id for COMSOL simulation. / 用于 COMSOL 仿真的候选编号。")  # 添加候选编号参数 / Add candidate id argument
+    parser.add_argument("--num-modes", type=int, default=0, help="Number of COMSOL modes to export. / COMSOL 导出模态数量。")  # 添加模态数量参数 / Add mode-count argument
+    parser.add_argument("--limit", type=int, default=0, help="Preview render limit. / 预览渲染数量上限。")  # 添加预览数量参数 / Add preview limit argument
     return parser  # 返回解析器 / Return parser
 
 
@@ -40,19 +46,70 @@ def main() -> None:  # 主程序入口 / Main program entry
     if args.command == "prepare-target":  # 判断是否处理目标图 / Check target-preparation command
         prepare_target(config)  # 处理目标图 / Prepare target image
         print("Target prepared. / 目标图已处理。")  # 打印完成信息 / Print completion message
+    if args.command == "target-ui":  # 判断是否启动目标绘图界面 / Check target-UI command
+        from src.frontend.target_ui_server import run_target_ui  # 延迟导入本地 UI 服务 / Lazily import local UI server
+        run_target_ui(config, args.host, args.port)  # 启动绘图界面服务 / Start drawing UI server
+    if args.command == "run-workflow":  # 判断是否运行完整工作流 / Check full-workflow command
+        from src.optimisation.workflow import run_design_workflow  # 延迟导入完整工作流 / Lazily import full workflow
+        result = run_design_workflow(config, args.generation, args.limit or None, args.num_modes or None, True)  # 运行完整自动流程 / Run complete automatic workflow
+        print(result)  # 打印工作流结果 / Print workflow result
     if args.command == "generate-candidates":  # 判断是否生成候选 / Check candidate-generation command
-        candidate_ids = generate_random_search_batch(config, args.generation)  # 生成候选批次 / Generate candidate batch
+        if args.limit:  # 检查是否指定候选数量 / Check candidate-count override
+            config["optimisation"]["population_size"] = args.limit  # 临时设置候选数量 / Temporarily set candidate count
+        candidate_ids = generate_random_search_batch(config, args.generation or 0)  # 生成候选批次 / Generate candidate batch
         print(f"Generated {len(candidate_ids)} candidates. / 已生成 {len(candidate_ids)} 个候选。")  # 打印候选数量 / Print candidate count
     if args.command == "generate-previews":  # 判断是否生成预览 / Check preview-generation command
         preview_paths = generate_existing_candidate_previews(config)  # 生成已有候选预览 / Generate existing candidate previews
         print(f"Generated {len(preview_paths)} previews. / 已生成 {len(preview_paths)} 个预览。")  # 打印预览数量 / Print preview count
+    if args.command == "simulate-candidate":  # 判断是否仿真候选 / Check candidate-simulation command
+        from src.comsol.run_livelink import run_livelink_candidate  # 延迟导入 LiveLink runner / Lazily import LiveLink runner
+        if not args.candidate_id:  # 检查候选编号 / Check candidate id
+            raise ValueError("--candidate-id is required for simulate-candidate. / simulate-candidate 需要 --candidate-id。")  # 抛出参数错误 / Raise argument error
+        result = run_livelink_candidate(config, args.candidate_id, args.num_modes or None, args.model or None)  # 运行候选仿真 / Run candidate simulation
+        print(f"Simulated {result['candidate_id']} into {result['export_dir']}. / 已仿真 {result['candidate_id']}，导出到 {result['export_dir']}。")  # 打印仿真结果 / Print simulation result
+    if args.command == "simulate-batch":  # 判断是否批量仿真 / Check batch-simulation command
+        from src.comsol.run_livelink import run_livelink_batch  # 延迟导入批量 LiveLink runner / Lazily import batch LiveLink runner
+        candidate_ids = [args.candidate_id] if args.candidate_id else None  # 读取指定候选编号 / Read optional candidate id
+        results = run_livelink_batch(config, candidate_ids, args.generation, args.limit or None, args.num_modes or None, args.model or None)  # 批量仿真候选 / Run candidate batch
+        print(f"Simulated {len(results)} candidates. / 已仿真 {len(results)} 个候选。")  # 打印批量结果 / Print batch result
+    if args.command == "render-mode-previews":  # 判断是否渲染模态预览 / Check mode-preview command
+        from src.visualisation.plot_modes import render_export_previews  # 延迟导入模态预览函数 / Lazily import mode preview renderer
+        if not args.candidate_id:  # 检查候选编号 / Check candidate id
+            raise ValueError("--candidate-id is required for render-mode-previews. / render-mode-previews 需要 --candidate-id。")  # 抛出参数错误 / Raise argument error
+        export_dir = Path(config["paths"]["comsol_exports_dir"]) / args.candidate_id  # 构造导出目录 / Build export directory
+        center_radius_px = int(int(config["nodal_extraction"]["image_size"]) * float(config["project"]["center_clamp_radius_mm"]) / float(config["project"]["plate_length_mm"])) if config["nodal_extraction"].get("remove_center_region", True) else 0  # 计算中心掩膜半径 / Compute centre mask radius
+        previews = render_export_previews(export_dir, int(config["nodal_extraction"]["image_size"]), float(config["nodal_extraction"]["epsilon_ratio"]), args.limit or None, center_radius_px)  # 渲染预览 / Render previews
+        print(f"Rendered {len(previews)} mode previews. / 已渲染 {len(previews)} 个模态预览。")  # 打印预览数量 / Print preview count
+    if args.command == "audit-comsol-model":  # 判断是否审计 COMSOL 模型 / Check COMSOL-model audit command
+        from src.comsol.model_audit import audit_mph_model  # 延迟导入模型审计函数 / Lazily import model audit function
+        from src.comsol.model_audit import save_model_audit  # 延迟导入审计保存函数 / Lazily import audit saver
+        model_path = args.model or config.get("comsol", {}).get("model_path", "comsol_templates/baseline_model.mph")  # 读取模型路径 / Read model path
+        audit = audit_mph_model(model_path)  # 审计模型结构 / Audit model structure
+        report_path = Path("reports") / "comsol_model_audit.json"  # 构造审计报告路径 / Build audit report path
+        save_model_audit(audit, report_path)  # 保存审计报告 / Save audit report
+        print(f"Model audit saved: {report_path} / 模型审计已保存：{report_path}")  # 打印审计报告路径 / Print audit report path
+    if args.command == "diagnose-comsol":  # 判断是否诊断 COMSOL 环境 / Check COMSOL diagnostics command
+        import json  # 延迟导入 JSON / Lazily import JSON
+        from src.comsol.diagnostics import diagnose_comsol_environment  # 延迟导入环境诊断 / Lazily import environment diagnostics
+        print(json.dumps(diagnose_comsol_environment(config), ensure_ascii=False, indent=2))  # 打印诊断结果 / Print diagnostics result
+    if args.command == "self-test":  # 判断是否运行部署自检 / Check deployment self-test command
+        import json  # 延迟导入 JSON / Lazily import JSON
+        from src.comsol.diagnostics import run_deployment_self_test  # 延迟导入部署自检 / Lazily import deployment self-test
+        print(json.dumps(run_deployment_self_test(config), ensure_ascii=False, indent=2))  # 打印自检结果 / Print self-test result
+    if args.command == "validate-comsol-exports":  # 判断是否验证 COMSOL 导出 / Check COMSOL-export validation command
+        from src.comsol.validate_exports import save_validation_report  # 延迟导入报告保存函数 / Lazily import report saver
+        from src.comsol.validate_exports import validate_all_exports  # 延迟导入导出验证函数 / Lazily import export validator
+        results = validate_all_exports(config)  # 检查所有导出目录 / Validate all export directories
+        report_path = Path(config["paths"]["comsol_exports_dir"]) / "validation_report.json"  # 构造报告路径 / Build report path
+        save_validation_report(results, report_path)  # 保存验证报告 / Save validation report
+        print(f"Validated {len(results)} export folders. Report: {report_path} / 已验证 {len(results)} 个导出目录。报告：{report_path}")  # 打印验证结果 / Print validation result
     if args.command == "score-candidates":  # 判断是否评分候选 / Check candidate-scoring command
         target_path = Path(config["paths"]["processed_targets_dir"]) / "target_binary.npy"  # 构造目标数组路径 / Build target array path
         if not target_path.exists():  # 检查目标数组是否存在 / Check whether target array exists
             prepare_target(config)  # 自动处理目标图 / Automatically prepare target
         import numpy as np  # 延迟导入 NumPy / Lazily import NumPy
         target_binary = np.load(target_path).astype(bool)  # 读取目标二值图 / Load target binary map
-        ranking = score_available_candidates(config, target_binary)  # 评分已有候选 / Score available candidates
+        ranking = score_available_candidates(config, target_binary, args.candidate_id or None, args.generation)  # 评分已有候选 / Score available candidates
         print(ranking if ranking else "No scored candidates yet. / 暂无可评分候选。")  # 打印排名或提示 / Print ranking or message
 
 

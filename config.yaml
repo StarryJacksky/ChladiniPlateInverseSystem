@@ -1,28 +1,47 @@
 # 项目基础设置 / Basic project settings
 project:
   name: "variable_thickness_chladni_plate" # 项目名称 / Project name
-  grid_size: 6 # 厚度矩阵大小 / Thickness matrix size
-  plate_length_mm: 100.0 # 板长度 / Plate length
-  plate_width_mm: 100.0 # 板宽度 / Plate width
+  grid_size: 15 # 厚度矩阵大小 / Thickness matrix size
+  plate_length_mm: 150.0 # 板长度 / Plate length
+  plate_width_mm: 150.0 # 板宽度 / Plate width
   center_clamp_radius_mm: 8.0 # 中心夹持半径 / Center clamp radius
 
 # 厚度设计变量 / Thickness design variables
 thickness:
-  levels_mm: [2.0, 2.5, 3.0, 3.5] # 可制造厚度等级 / Manufacturable thickness levels
-  default_mm: 2.5 # 默认厚度 / Default thickness
+  levels_mm: [0.6, 0.8, 0.9, 1.0, 1.3, 1.4, 1.8, 2.0] # 可制造厚度等级 / Manufacturable thickness levels
+  default_mm: 2.0 # 默认厚度 / Default thickness
   max_neighbor_difference_mm: 1.0 # 相邻单元最大厚度差 / Maximum neighbour thickness difference
 
 # 材料参数 / Material parameters
 material:
-  density_kg_m3: 1200.0 # 密度 / Density
+  density_kg_m3: 1200 # 密度 / Density
   poisson_ratio: 0.35 # 泊松比 / Poisson ratio
-  youngs_modulus_pa: 2.0e9 # 杨氏模量 / Young's modulus
+  youngs_modulus_pa: 2000000000 # 杨氏模量 / Young's modulus
+  thermal_conductivity_w_mk: 0.18 # 导热系数 / Thermal conductivity
+  heat_capacity_j_kgk: 1200 # 定压热容 / Heat capacity
+  thermal_expansion_1_k: 0.00008 # 热膨胀系数 / Thermal expansion coefficient
 
 # COMSOL 仿真设置 / COMSOL simulation settings
 simulation:
   num_modes: 20 # 导出模态数量 / Number of exported modes
-  frequency_min_hz: 0.0 # 最小目标频率 / Minimum target frequency
-  frequency_max_hz: 3000.0 # 最大目标频率 / Maximum target frequency
+  frequency_min_hz: 0 # 最小目标频率 / Minimum target frequency
+  frequency_max_hz: 3000 # 最大目标频率 / Maximum target frequency
+
+# COMSOL 模型合同 / COMSOL model contract
+comsol:
+  model_path: "comsol_templates/Chladni_15x15_bound.mph" # 绑定模型路径 / Bound model path
+  source_model_path: "/Users/apple/Documents/Chladni.mph" # 原始基准模型路径 / Original baseline model path
+  comsol_command_path: "/Applications/COMSOL64/Multiphysics/bin/comsol" # COMSOL 命令路径 / COMSOL command path
+  server_host: "127.0.0.1" # COMSOL server 主机 / COMSOL server host
+  server_port: 2036 # COMSOL server 端口 / COMSOL server port
+  auto_start_server: true # 自动启动 COMSOL server / Automatically start COMSOL server
+  server_start_timeout_s: 30 # COMSOL server 启动等待秒数 / COMSOL server startup wait seconds
+  matlab_path: "/Applications/MATLAB_R2024a.app/bin/matlab" # MATLAB 路径 / MATLAB path
+  livelink_timeout_s: 7200 # 单次 LiveLink 运行超时秒数 / Single LiveLink run timeout seconds
+  runner_path: "comsol_templates/run_chladni_candidate.m" # LiveLink 运行脚本 / LiveLink runner script
+  study_tag: "std1" # 特征频率研究标签 / Eigenfrequency study tag
+  shell_tag: "shell" # 壳物理场标签 / Shell physics tag
+  displacement_expression: "shell.w" # 面外位移表达式 / Out-of-plane displacement expression
 
 # 目标图与节点线提取设置 / Target and nodal extraction settings
 nodal_extraction:
@@ -47,3 +66,9 @@ paths:
   processed_targets_dir: "data/processed_targets" # 处理后目标图目录 / Processed target directory
   candidates_dir: "candidates" # 候选结构目录 / Candidate directory
   comsol_exports_dir: "data/comsol_exports" # COMSOL 导出目录 / COMSOL export directory
+
+# 产物保留策略 / Artifact retention policy
+artifact_retention:
+  keep_latest_generations: 3 # 始终保留最近代数 / Always keep newest generations
+  keep_recent_days: 14 # 始终保留最近天数 / Always keep recent days
+  regenerable_only: true # 仅清理可再生成产物 / Only clean regenerable artifacts

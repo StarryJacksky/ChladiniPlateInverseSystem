@@ -12,6 +12,7 @@ from src.comsol.import_results import load_frequencies  # 导入频率读取 / I
 from src.comsol.import_results import load_mode_csv  # 导入模态读取 / Import mode loader
 from src.nodal.extract_nodal import extract_nodal_region  # 导入节点线提取 / Import nodal extraction
 from src.nodal.extract_nodal import postprocess_nodal_region  # 导入节点线后处理 / Import nodal postprocessing
+from src.nodal.extract_nodal import remove_center_region  # 导入中心区域移除 / Import centre-region removal
 from src.scoring.metrics import compute_dice  # 导入 Dice 指标 / Import Dice metric
 from src.scoring.metrics import compute_iou  # 导入 IoU 指标 / Import IoU metric
 from src.scoring.metrics import frequency_penalty  # 导入频率惩罚 / Import frequency penalty
@@ -27,7 +28,7 @@ def resize_binary_to_shape(binary: np.ndarray, shape: tuple[int, int]) -> np.nda
     return resized.astype(bool)  # 返回布尔结果 / Return boolean result
 
 
-def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], image_size: int, epsilon_ratio: float) -> dict:  # 对候选所有模态评分 / Score all candidate modes
+def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], image_size: int, epsilon_ratio: float, center_radius_px: int = 0) -> dict:  # 对候选所有模态评分 / Score all candidate modes
     best = {"best_mode": None, "best_iou": -1.0, "best_dice": -1.0, "best_similarity": -1.0, "all_modes": []}  # 初始化最佳结果 / Initialise best result
     for mode_file in mode_files:  # 遍历模态文件 / Iterate mode files
         mode_number = int(mode_file.stem.split("_")[-1])  # 从文件名读取模态编号 / Read mode number from filename
@@ -35,6 +36,7 @@ def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], ima
         W = interpolate_to_grid(x, y, w, image_size)  # 插值到统一网格 / Interpolate to unified grid
         nodal = extract_nodal_region(W, epsilon_ratio)  # 提取节点线 / Extract nodal region
         nodal = postprocess_nodal_region(nodal)  # 后处理节点线 / Postprocess nodal region
+        nodal = remove_center_region(nodal, center_radius_px) if center_radius_px > 0 else nodal  # 移除中心夹持区 / Remove centre clamp region
         target = resize_binary_to_shape(target_binary, nodal.shape)  # 对齐目标图尺寸 / Align target map shape
         iou = compute_iou(nodal, target)  # 计算 IoU / Compute IoU
         dice = compute_dice(nodal, target)  # 计算 Dice / Compute Dice
@@ -62,7 +64,8 @@ def score_candidate(candidate_dir: str | Path, export_dir: str | Path, target_bi
     if not mode_files:  # 检查是否存在模态文件 / Check whether mode files exist
         raise FileNotFoundError(f"No mode_*.csv files found in {export_path}. / 未找到模态文件。")  # 抛出缺失文件错误 / Raise missing-file error
     frequencies = load_frequencies(export_path / "frequencies.csv")  # 读取频率文件 / Load frequency file
-    mode_score = score_candidate_modes(target_binary, mode_files, int(config["nodal_extraction"]["image_size"]), float(config["nodal_extraction"]["epsilon_ratio"]))  # 计算模态评分 / Compute mode scores
+    center_radius_px = int(int(config["nodal_extraction"]["image_size"]) * float(config["project"]["center_clamp_radius_mm"]) / float(config["project"]["plate_length_mm"])) if config["nodal_extraction"].get("remove_center_region", True) else 0  # 计算中心掩膜半径 / Compute centre mask radius
+    mode_score = score_candidate_modes(target_binary, mode_files, int(config["nodal_extraction"]["image_size"]), float(config["nodal_extraction"]["epsilon_ratio"]), center_radius_px)  # 计算模态评分 / Compute mode scores
     best_frequency = frequencies.get(int(mode_score["best_mode"]), 0.0)  # 获取最佳模态频率 / Get best-mode frequency
     final_score = compute_final_score(H, mode_score, best_frequency, config)  # 计算最终分数 / Compute final score
     result = {**mode_score, "frequency_hz": best_frequency, **final_score}  # 合并结果 / Merge results

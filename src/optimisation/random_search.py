@@ -12,7 +12,7 @@ def generate_random_search_batch(config: dict, generation: int = 0) -> list[str]
     candidate_ids = generate_candidate_batch(config, generation)  # 生成候选结构 / Generate candidate designs
     candidates_dir = Path(config["paths"]["candidates_dir"])  # 读取候选目录 / Read candidate directory
     for candidate_id in candidate_ids:  # 遍历候选编号 / Iterate candidate ids
-        export_candidate_for_comsol(candidates_dir / candidate_id)  # 导出 COMSOL 参数表 / Export COMSOL parameter table
+        export_candidate_for_comsol(candidates_dir / candidate_id, config.get("material"))  # 导出 COMSOL 参数表 / Export COMSOL parameter table
         render_candidate_preview(candidates_dir / candidate_id)  # 生成厚度预览图 / Generate thickness preview
     return candidate_ids  # 返回候选编号 / Return candidate ids
 
@@ -27,12 +27,16 @@ def generate_existing_candidate_previews(config: dict) -> list[Path]:  # 生成�
     return preview_paths  # 返回预览路径 / Return preview paths
 
 
-def score_available_candidates(config: dict, target_binary):  # 评分已有候选 / Score available candidates
+def score_available_candidates(config: dict, target_binary, candidate_id: str | None = None, generation: int | None = None):  # 评分已有候选 / Score available candidates
     from src.scoring.score_candidate import score_candidate  # 延迟导入候选评分 / Lazily import candidate scoring
     candidates_dir = Path(config["paths"]["candidates_dir"])  # 读取候选目录 / Read candidate directory
     exports_dir = Path(config["paths"]["comsol_exports_dir"])  # 读取 COMSOL 导出目录 / Read COMSOL export directory
     rows = []  # 创建结果行列表 / Create result rows
-    for candidate_path in sorted(candidates_dir.glob("candidate_*")):  # 遍历候选目录 / Iterate candidate directories
+    pattern = f"candidate_{generation:03d}_*" if generation is not None else "candidate_*"  # 构造候选匹配模式 / Build candidate glob pattern
+    candidate_paths = [candidates_dir / candidate_id] if candidate_id else sorted(candidates_dir.glob(pattern))  # 选择候选目录 / Select candidate directories
+    for candidate_path in candidate_paths:  # 遍历候选目录 / Iterate candidate directories
+        if not candidate_path.exists():  # 检查候选目录是否存在 / Check whether candidate directory exists
+            continue  # 跳过不存在候选 / Skip missing candidate
         export_path = exports_dir / candidate_path.name  # 构造 COMSOL 导出路径 / Build COMSOL export path
         if not export_path.exists():  # 检查导出目录是否存在 / Check whether export directory exists
             continue  # 跳过未仿真的候选 / Skip unsimulated candidate

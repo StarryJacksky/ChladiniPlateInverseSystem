@@ -19,16 +19,32 @@ def load_mode_csv(path: str | Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]
     return np.asarray(xs), np.asarray(ys), np.asarray(ws)  # 返回三列数组 / Return three arrays
 
 
-def interpolate_to_grid(x: np.ndarray, y: np.ndarray, w: np.ndarray, grid_size: int = 256) -> np.ndarray:  # 插值到规则网格 / Interpolate to regular grid
-    xi = np.rint((x - x.min()) / max(x.max() - x.min(), 1e-12) * (grid_size - 1)).astype(int)  # 映射 x 到像素索引 / Map x to pixel index
-    yi = np.rint((y - y.min()) / max(y.max() - y.min(), 1e-12) * (grid_size - 1)).astype(int)  # 映射 y 到像素索引 / Map y to pixel index
-    W = np.zeros((grid_size, grid_size), dtype=float)  # 创建位移网格 / Create displacement grid
-    counts = np.zeros((grid_size, grid_size), dtype=float)  # 创建计数网格 / Create count grid
-    np.add.at(W, (yi, xi), w)  # 累加同像素位移 / Accumulate displacement per pixel
-    np.add.at(counts, (yi, xi), 1.0)  # 累加同像素计数 / Accumulate count per pixel
-    filled = counts > 0.0  # 标记有数据像素 / Mark filled pixels
-    W[filled] = W[filled] / counts[filled]  # 计算平均位移 / Compute mean displacement
-    return W.astype(float)  # 返回浮点网格 / Return float grid
+def interpolate_to_grid(x: np.ndarray, y: np.ndarray, w: np.ndarray, grid_size: int = 256, neighbours: int = 8, chunk_size: int = 2048) -> np.ndarray:  # 插值到规则网格 / Interpolate to regular grid
+    if len(w) == 0:  # 检查是否无数据 / Check whether data is empty
+        return np.zeros((grid_size, grid_size), dtype=float)  # 返回空网格 / Return empty grid
+    xi = np.linspace(float(x.min()), float(x.max()), grid_size)  # 生成规则 x 坐标 / Build regular x coordinates
+    yi = np.linspace(float(y.min()), float(y.max()), grid_size)  # 生成规则 y 坐标 / Build regular y coordinates
+    grid_x, grid_y = np.meshgrid(xi, yi)  # 生成规则网格坐标 / Build regular grid coordinates
+    points = np.column_stack([x.astype(float), y.astype(float)])  # 合并采样点坐标 / Combine sample coordinates
+    queries = np.column_stack([grid_x.ravel(), grid_y.ravel()])  # 合并查询点坐标 / Combine query coordinates
+    k = min(max(int(neighbours), 1), len(w))  # 限制近邻数量 / Clamp neighbour count
+    values = np.empty(len(queries), dtype=float)  # 创建插值结果数组 / Create interpolated value array
+    sample_values = w.astype(float)  # 转换采样值 / Convert sample values
+    for start in range(0, len(queries), chunk_size):  # 分块遍历查询点 / Iterate query points in chunks
+        stop = min(start + chunk_size, len(queries))  # 计算分块结束位置 / Compute chunk end index
+        chunk = queries[start:stop]  # 取出当前查询分块 / Select query chunk
+        diff = chunk[:, None, :] - points[None, :, :]  # 计算查询点到采样点差值 / Compute query-to-sample differences
+        dist2 = np.sum(diff * diff, axis=2)  # 计算平方距离 / Compute squared distances
+        nearest = np.argpartition(dist2, k - 1, axis=1)[:, :k]  # 找到近邻索引 / Find nearest-neighbour indices
+        nearest_dist2 = np.take_along_axis(dist2, nearest, axis=1)  # 取出近邻距离 / Gather nearest-neighbour distances
+        nearest_values = sample_values[nearest]  # 取出近邻位移 / Gather nearest-neighbour values
+        exact = nearest_dist2[:, 0] <= 1e-24  # 标记完全重合点 / Mark exact coordinate matches
+        weights = 1.0 / np.maximum(nearest_dist2, 1e-24)  # 计算反距离权重 / Compute inverse-distance weights
+        interpolated = np.sum(weights * nearest_values, axis=1) / np.sum(weights, axis=1)  # 计算加权位移 / Compute weighted displacement
+        if np.any(exact):  # 检查是否存在重合点 / Check whether exact matches exist
+            interpolated[exact] = nearest_values[exact, 0]  # 重合点直接使用采样值 / Use sample value for exact matches
+        values[start:stop] = interpolated  # 写入结果分块 / Store result chunk
+    return values.reshape((grid_size, grid_size)).astype(float)  # 返回浮点网格 / Return float grid
 
 
 def normalize_mode(W: np.ndarray) -> np.ndarray:  # 归一化模态位移 / Normalise mode displacement
