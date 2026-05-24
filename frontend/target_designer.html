@@ -1210,6 +1210,69 @@
       color: #b3261e; /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
+    .setup-assistant { /* 样式设置 / Style setting */
+      display: grid; /* 样式设置 / Style setting */
+      grid-template-columns: repeat(3, minmax(0, 1fr)); /* 样式设置 / Style setting */
+      gap: 8px; /* 样式设置 / Style setting */
+      margin-bottom: 12px; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .setup-step { /* 样式设置 / Style setting */
+      display: grid; /* 样式设置 / Style setting */
+      gap: 6px; /* 样式设置 / Style setting */
+      min-height: 96px; /* 样式设置 / Style setting */
+      padding: 10px; /* 样式设置 / Style setting */
+      border: 1px solid var(--line); /* 样式设置 / Style setting */
+      border-radius: 8px; /* 样式设置 / Style setting */
+      background: rgba(255, 255, 255, 0.58); /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .setup-step-head { /* 样式设置 / Style setting */
+      display: flex; /* 样式设置 / Style setting */
+      align-items: center; /* 样式设置 / Style setting */
+      justify-content: space-between; /* 样式设置 / Style setting */
+      gap: 8px; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .setup-step strong { /* 样式设置 / Style setting */
+      color: var(--text); /* 样式设置 / Style setting */
+      font-size: 12px; /* 样式设置 / Style setting */
+      line-height: 1.25; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .setup-step span { /* 样式设置 / Style setting */
+      color: var(--muted); /* 样式设置 / Style setting */
+      font-size: 11px; /* 样式设置 / Style setting */
+      line-height: 1.35; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .setup-badge { /* 样式设置 / Style setting */
+      min-width: 52px; /* 样式设置 / Style setting */
+      padding: 3px 7px; /* 样式设置 / Style setting */
+      border-radius: 999px; /* 样式设置 / Style setting */
+      background: rgba(104, 116, 111, 0.12); /* 样式设置 / Style setting */
+      color: var(--muted); /* 样式设置 / Style setting */
+      font-size: 9px; /* 样式设置 / Style setting */
+      font-weight: 800; /* 样式设置 / Style setting */
+      text-align: center; /* 样式设置 / Style setting */
+      text-transform: uppercase; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .setup-badge.ok { /* 样式设置 / Style setting */
+      background: rgba(18, 111, 100, 0.12); /* 样式设置 / Style setting */
+      color: var(--accent-dark); /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .setup-badge.warn { /* 样式设置 / Style setting */
+      background: rgba(164, 72, 33, 0.12); /* 样式设置 / Style setting */
+      color: var(--warn); /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .setup-badge.fail { /* 样式设置 / Style setting */
+      background: rgba(179, 38, 30, 0.12); /* 样式设置 / Style setting */
+      color: #b3261e; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
     .diagnostics { /* 样式设置 / Style setting */
       display: grid; /* 样式设置 / Style setting */
       gap: 8px; /* 样式设置 / Style setting */
@@ -1668,6 +1731,7 @@
         </section> <!-- 页面结构 / Page structure -->
         <section class="panel"> <!-- 页面结构 / Page structure -->
           <h2>Diagnostics</h2> <!-- 页面结构 / Page structure -->
+          <div id="setupAssistant" class="setup-assistant">Setup assistant waiting for diagnostics</div> <!-- 页面结构 / Page structure -->
           <div class="field-grid"> <!-- 页面结构 / Page structure -->
             <label class="field"><span>COMSOL path</span><input id="comsolPathInput" type="text" autocomplete="off"></label> <!-- 页面结构 / Page structure -->
             <label class="field"><span>MATLAB path</span><input id="matlabPathInput" type="text" autocomplete="off"></label> <!-- 页面结构 / Page structure -->
@@ -1865,6 +1929,8 @@
     // 前端逻辑 / Frontend logic
     const runOverview = document.getElementById("runOverview");
     // 前端逻辑 / Frontend logic
+    const setupAssistant = document.getElementById("setupAssistant");
+    // 前端逻辑 / Frontend logic
     const comsolPathInput = document.getElementById("comsolPathInput");
     // 前端逻辑 / Frontend logic
     const matlabPathInput = document.getElementById("matlabPathInput");
@@ -1935,6 +2001,8 @@
     let latestWorkflowState = {};
     // 前端逻辑 / Frontend logic
     let latestDiagnostics = {};
+    // 前端逻辑 / Frontend logic
+    let latestDiscovery = {};
     // 前端逻辑 / Frontend logic
     let latestTargetAnalysis = {};
     // 前端逻辑 / Frontend logic
@@ -3710,9 +3778,65 @@
     }
 
     // 前端逻辑 / Frontend logic
+    function renderSetupStep(status, title, message) {
+      // 前端逻辑 / Frontend logic
+      return `
+        <!-- 模板内容 / Template content --><div class="setup-step">
+          <!-- 模板内容 / Template content --><div class="setup-step-head">
+            <!-- 模板内容 / Template content --><strong>${title}</strong>
+            <!-- 模板内容 / Template content --><span class="setup-badge ${status}">${status}</span>
+          <!-- 模板内容 / Template content --></div>
+          <!-- 模板内容 / Template content --><span>${message}</span>
+        <!-- 模板内容 / Template content --></div>
+      <!-- 模板内容 / Template content -->`;
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
+    function renderSetupAssistant() {
+      // 前端逻辑 / Frontend logic
+      const discoverySummary = latestDiscovery.summary || {};
+      // 前端逻辑 / Frontend logic
+      const discoverySuggestions = latestDiscovery.suggestions || {};
+      // 前端逻辑 / Frontend logic
+      const hasComsolPath = Boolean(comsolPathInput.value.trim());
+      // 前端逻辑 / Frontend logic
+      const hasMatlabPath = Boolean(matlabPathInput.value.trim());
+      // 前端逻辑 / Frontend logic
+      const hasSuggestions = Boolean(discoverySuggestions.comsol_command_path || discoverySuggestions.matlab_path);
+      // 前端逻辑 / Frontend logic
+      const processCount = Number(discoverySummary.process_count || 0);
+      // 前端逻辑 / Frontend logic
+      const detectStatus = hasSuggestions || processCount ? "ok" : "warn";
+      // 前端逻辑 / Frontend logic
+      const confirmStatus = hasComsolPath && hasMatlabPath ? "ok" : "warn";
+      // 前端逻辑 / Frontend logic
+      const verifyStatus = latestDiagnostics.ready_for_auto_run ? "ok" : (latestDiagnostics.checks ? "warn" : "warn");
+      // 前端逻辑 / Frontend logic
+      const detectMessage = hasSuggestions ? "Found usable COMSOL/MATLAB path suggestions." : "Click Discover to scan running apps and common install folders.";
+      // 前端逻辑 / Frontend logic
+      const confirmMessage = hasComsolPath && hasMatlabPath ? "Paths are present; save or apply them before full automation." : "Confirm both command paths, or enter them manually.";
+      // 前端逻辑 / Frontend logic
+      const verifyMessage = latestDiagnostics.ready_for_auto_run ? "Diagnostics say automatic runs are ready." : "Refresh diagnostics and run self-test before trusting a full run.";
+      // 前端逻辑 / Frontend logic
+      setupAssistant.innerHTML = [
+        // 前端逻辑 / Frontend logic
+        renderSetupStep(detectStatus, "1 Detect", detectMessage),
+        // 前端逻辑 / Frontend logic
+        renderSetupStep(confirmStatus, "2 Confirm", confirmMessage),
+        // 前端逻辑 / Frontend logic
+        renderSetupStep(verifyStatus, "3 Verify", verifyMessage)
+      // 前端逻辑 / Frontend logic
+      ].join("");
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
     function renderDiagnostics(data) {
       // 前端逻辑 / Frontend logic
       latestDiagnostics = data || {};
+      // 前端逻辑 / Frontend logic
+      latestDiscovery = data.discovery || latestDiscovery;
       // 前端逻辑 / Frontend logic
       const server = data.server || {};
       // 前端逻辑 / Frontend logic
@@ -3734,12 +3858,16 @@
       // 前端逻辑 / Frontend logic
       updateStudioStrip();
       // 前端逻辑 / Frontend logic
+      renderSetupAssistant();
+      // 前端逻辑 / Frontend logic
       diagnosticsList.innerHTML = rows.join("");
     // 前端逻辑 / Frontend logic
     }
 
     // 前端逻辑 / Frontend logic
     function renderDiscovery(data) {
+      // 前端逻辑 / Frontend logic
+      latestDiscovery = data || {};
       // 前端逻辑 / Frontend logic
       const summary = data.summary || {};
       // 前端逻辑 / Frontend logic
@@ -3761,6 +3889,8 @@
       // 前端逻辑 / Frontend logic
       ];
       // 前端逻辑 / Frontend logic
+      renderSetupAssistant();
+      // 前端逻辑 / Frontend logic
       discoveryList.innerHTML = rows.join("");
     // 前端逻辑 / Frontend logic
     }
@@ -3771,6 +3901,8 @@
       comsolPathInput.value = (comsol && comsol.comsol_command_path) || "";
       // 前端逻辑 / Frontend logic
       matlabPathInput.value = (comsol && comsol.matlab_path) || "";
+      // 前端逻辑 / Frontend logic
+      renderSetupAssistant();
     // 前端逻辑 / Frontend logic
     }
 
@@ -3790,6 +3922,8 @@
         matlabPathInput.value = suggestions.matlab_path;
       // 前端逻辑 / Frontend logic
       }
+      // 前端逻辑 / Frontend logic
+      renderSetupAssistant();
     // 前端逻辑 / Frontend logic
     }
 
