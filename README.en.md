@@ -86,6 +86,18 @@ Check local COMSOL/MATLAB readiness:
 python -m src.main diagnose-comsol
 ```
 
+Inspect automatic COMSOL/MATLAB discovery:
+
+```powershell
+python -m src.main discover-comsol
+```
+
+Write accepted discovery results into `config.yaml`:
+
+```powershell
+python -m src.main apply-comsol-discovery
+```
+
 Run the Python-side self-test:
 
 ```powershell

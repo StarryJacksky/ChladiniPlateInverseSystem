@@ -34,8 +34,8 @@ Goal: make the Run tab predictable before asking users to trust one-click automa
 
 Tasks:
 
-1. Add automatic COMSOL/MATLAB discovery before manual path configuration.
-2. Detect already-running COMSOL, MATLAB, and mphserver processes before scanning install folders.
+1. Validate COMSOL/MATLAB running-process detection and install-path discovery on clean Windows, macOS, and Linux machines.
+2. Add a frontend setup wizard around the existing `apply-comsol-discovery` command.
 3. Add deeper model-specific preflight checks after the final COMSOL model is frozen.
 4. Add a safe cancel/stop pathway for local workflow state.
 5. Improve failed-run recovery messages using diagnostics and logs.
@@ -49,12 +49,11 @@ Tasks:
 
 1. Harden config validation for paths, model files, export directories, and numeric limits.
 2. Add non-invasive COMSOL/MATLAB version probes where safe.
-3. Add cross-platform process detection for already-running COMSOL, MATLAB, and mphserver without reading process memory.
-4. Scan common Windows, macOS, and Linux install locations for COMSOL, MATLAB, LiveLink, and mphserver.
-5. Prefer already-running processes, then known install folders, then manual override in the setup flow.
-6. Add a setup wizard that writes detected paths into `config.yaml`, with manual override when discovery fails.
-7. Add clearer authentication/license guidance when diagnostics detect risk.
-8. Keep generated artifacts recoverable and cleanup conservative.
+3. Expand discovery tests with simulated missing config paths and known install-path fixtures.
+4. Prefer already-running processes, then known install folders, then manual override in the setup flow.
+5. Add manual override fields to the setup wizard when discovery fails.
+6. Add clearer authentication/license guidance when diagnostics detect risk.
+7. Keep generated artifacts recoverable and cleanup conservative.
 
 ### 5. Documentation Drafts
 

@@ -5,6 +5,7 @@ import threading  # 导入线程工具 / Import threading utilities
 from datetime import datetime  # 导入时间戳工具 / Import timestamp helper
 from pathlib import Path  # 导入路径工具 / Import path utilities
 
+from src.comsol.discovery import config_with_runtime_discovery  # 导入运行时路径发现 / Import runtime path discovery
 from src.comsol.export_parameters import export_candidate_for_comsol  # 导入参数导出函数 / Import parameter export helper
 from src.comsol.server import ensure_comsol_server  # 导入 COMSOL server 检查函数 / Import COMSOL server check helper
 
@@ -89,21 +90,22 @@ def run_command_streamed(command: list[str], log_path: Path, progress=None, even
 
 
 def run_livelink_candidate(config: dict, candidate_id: str, num_modes: int | None = None, model_path: str | Path | None = None, matlab_path: str | Path | None = None, runner_path: str | Path | None = None, progress=None) -> dict:  # 运行单个候选 / Run one candidate
-    if not ensure_comsol_server(config):  # 确保 COMSOL server 可用 / Ensure COMSOL server availability
+    runtime_config, _applied, _discovery = config_with_runtime_discovery(config)  # 应用运行时路径发现 / Apply runtime path discovery
+    if not ensure_comsol_server(runtime_config):  # 确保 COMSOL server 可用 / Ensure COMSOL server availability
         raise RuntimeError("COMSOL server is not reachable. / COMSOL server 无法连接。")  # 抛出 server 错误 / Raise server error
-    candidate_dir = resolve_candidate_dir(config, candidate_id)  # 解析候选目录 / Resolve candidate directory
-    ensure_comsol_parameters(candidate_dir, config.get("material"))  # 确保参数表存在 / Ensure parameter table exists
-    modes = int(num_modes or config["simulation"]["num_modes"])  # 读取模态数量 / Read mode count
-    model = Path(model_path or config.get("comsol", {}).get("model_path", "comsol_templates/Chladni_15x15_bound.mph"))  # 解析模型路径 / Resolve model path
-    matlab = str(matlab_path or config.get("comsol", {}).get("matlab_path", DEFAULT_MATLAB_PATH))  # 解析 MATLAB 路径 / Resolve MATLAB path
-    runner = Path(runner_path or config.get("comsol", {}).get("runner_path", DEFAULT_RUNNER_PATH))  # 解析 runner 路径 / Resolve runner path
-    export_root = Path(config["paths"]["comsol_exports_dir"])  # 读取导出根目录 / Read export root
+    candidate_dir = resolve_candidate_dir(runtime_config, candidate_id)  # 解析候选目录 / Resolve candidate directory
+    ensure_comsol_parameters(candidate_dir, runtime_config.get("material"))  # 确保参数表存在 / Ensure parameter table exists
+    modes = int(num_modes or runtime_config["simulation"]["num_modes"])  # 读取模态数量 / Read mode count
+    model = Path(model_path or runtime_config.get("comsol", {}).get("model_path", "comsol_templates/Chladni_15x15_bound.mph"))  # 解析模型路径 / Resolve model path
+    matlab = str(matlab_path or runtime_config.get("comsol", {}).get("matlab_path", DEFAULT_MATLAB_PATH))  # 解析 MATLAB 路径 / Resolve MATLAB path
+    runner = Path(runner_path or runtime_config.get("comsol", {}).get("runner_path", DEFAULT_RUNNER_PATH))  # 解析 runner 路径 / Resolve runner path
+    export_root = Path(runtime_config["paths"]["comsol_exports_dir"])  # 读取导出根目录 / Read export root
     export_dir = export_root / candidate_id  # 构造导出目录 / Build export directory
     export_dir.mkdir(parents=True, exist_ok=True)  # 创建导出目录 / Create export directory
     batch = build_matlab_batch(model, candidate_dir, export_dir, runner, modes)  # 构造 MATLAB batch / Build MATLAB batch
     command = [matlab, "-batch", batch]  # 构造命令列表 / Build command list
     log_path = export_dir / "livelink.log"  # 构造候选日志路径 / Build candidate log path
-    timeout_s = float(config.get("comsol", {}).get("livelink_timeout_s", 7200))  # 读取 LiveLink 超时 / Read LiveLink timeout
+    timeout_s = float(runtime_config.get("comsol", {}).get("livelink_timeout_s", 7200))  # 读取 LiveLink 超时 / Read LiveLink timeout
     returncode, _output = run_command_streamed(command, log_path, progress, {"current_candidate": candidate_id}, timeout_s)  # 流式运行并记录日志 / Run with streamed logging
     if returncode != 0:  # 检查 MATLAB 返回码 / Check MATLAB return code
         raise RuntimeError(f"LiveLink simulation failed for {candidate_id}. See {log_path}. / {candidate_id} 的 LiveLink 仿真失败，见 {log_path}。")  # 抛出日志指向错误 / Raise log-pointing error
@@ -119,29 +121,30 @@ def list_candidate_ids(config: dict, generation: int | None = None, limit: int |
 
 
 def run_livelink_batch(config: dict, candidate_ids: list[str] | None = None, generation: int | None = None, limit: int | None = None, num_modes: int | None = None, model_path: str | Path | None = None) -> list[dict]:  # 批量运行候选 / Run candidate batch
-    if not ensure_comsol_server(config):  # 确保 COMSOL server 可用 / Ensure COMSOL server availability
+    runtime_config, _applied, _discovery = config_with_runtime_discovery(config)  # 应用运行时路径发现 / Apply runtime path discovery
+    if not ensure_comsol_server(runtime_config):  # 确保 COMSOL server 可用 / Ensure COMSOL server availability
         raise RuntimeError("COMSOL server is not reachable. / COMSOL server 无法连接。")  # 抛出 server 错误 / Raise server error
-    selected_ids = candidate_ids or list_candidate_ids(config, generation, limit)  # 选择候选编号 / Select candidate ids
+    selected_ids = candidate_ids or list_candidate_ids(runtime_config, generation, limit)  # 选择候选编号 / Select candidate ids
     if not selected_ids:  # 检查是否无候选 / Check whether candidate list is empty
         return []  # 返回空结果 / Return empty result
-    modes = int(num_modes or config["simulation"]["num_modes"])  # 读取模态数量 / Read mode count
-    model = Path(model_path or config.get("comsol", {}).get("model_path", "comsol_templates/Chladni_15x15_bound.mph"))  # 解析模型路径 / Resolve model path
-    matlab = str(config.get("comsol", {}).get("matlab_path", DEFAULT_MATLAB_PATH))  # 解析 MATLAB 路径 / Resolve MATLAB path
-    runner = Path(config.get("comsol", {}).get("runner_path", DEFAULT_RUNNER_PATH))  # 解析 runner 路径 / Resolve runner path
-    export_root = Path(config["paths"]["comsol_exports_dir"])  # 读取导出根目录 / Read export root
+    modes = int(num_modes or runtime_config["simulation"]["num_modes"])  # 读取模态数量 / Read mode count
+    model = Path(model_path or runtime_config.get("comsol", {}).get("model_path", "comsol_templates/Chladni_15x15_bound.mph"))  # 解析模型路径 / Resolve model path
+    matlab = str(runtime_config.get("comsol", {}).get("matlab_path", DEFAULT_MATLAB_PATH))  # 解析 MATLAB 路径 / Resolve MATLAB path
+    runner = Path(runtime_config.get("comsol", {}).get("runner_path", DEFAULT_RUNNER_PATH))  # 解析 runner 路径 / Resolve runner path
+    export_root = Path(runtime_config["paths"]["comsol_exports_dir"])  # 读取导出根目录 / Read export root
     runner_dir = runner.parent.resolve()  # 获取 runner 目录 / Get runner directory
     batch_parts = [f"addpath({matlab_quote(runner_dir)})"]  # 初始化 MATLAB batch 片段 / Initialise MATLAB batch parts
     results = []  # 创建结果列表 / Create result list
     for candidate_id in selected_ids:  # 遍历候选编号 / Iterate candidate ids
-        candidate_dir = resolve_candidate_dir(config, candidate_id)  # 解析候选目录 / Resolve candidate directory
-        ensure_comsol_parameters(candidate_dir, config.get("material"))  # 确保参数表存在 / Ensure parameter table exists
+        candidate_dir = resolve_candidate_dir(runtime_config, candidate_id)  # 解析候选目录 / Resolve candidate directory
+        ensure_comsol_parameters(candidate_dir, runtime_config.get("material"))  # 确保参数表存在 / Ensure parameter table exists
         export_dir = export_root / candidate_id  # 构造导出目录 / Build export directory
         export_dir.mkdir(parents=True, exist_ok=True)  # 创建导出目录 / Create export directory
         batch_parts.append(f"run_chladni_candidate({matlab_quote(model.resolve())},{matlab_quote(candidate_dir.resolve())},{matlab_quote(export_dir.resolve())},{modes})")  # 添加候选仿真命令 / Add candidate simulation command
         results.append({"candidate_id": candidate_id, "export_dir": str(export_dir), "num_modes": modes})  # 记录预期结果 / Record expected result
     command = [matlab, "-batch", "; ".join(batch_parts)]  # 构造单 MATLAB 批量命令 / Build one MATLAB batch command
     log_path = export_root / "livelink_batch.log"  # 构造批量日志路径 / Build batch log path
-    timeout_s = float(config.get("comsol", {}).get("livelink_timeout_s", 7200))  # 读取 LiveLink 超时 / Read LiveLink timeout
+    timeout_s = float(runtime_config.get("comsol", {}).get("livelink_timeout_s", 7200))  # 读取 LiveLink 超时 / Read LiveLink timeout
     returncode, _output = run_command_streamed(command, log_path, timeout_s=timeout_s)  # 流式运行批量命令 / Run batch command with streamed logging
     if returncode != 0:  # 检查 MATLAB 返回码 / Check MATLAB return code
         raise RuntimeError(f"LiveLink batch simulation failed. See {log_path}. / LiveLink 批量仿真失败，见 {log_path}。")  # 抛出日志指向错误 / Raise log-pointing error

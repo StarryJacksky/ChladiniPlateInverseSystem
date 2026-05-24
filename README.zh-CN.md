@@ -86,6 +86,18 @@ python -m src.main run-workflow --limit 2 --num-modes 20
 python -m src.main diagnose-comsol
 ```
 
+单独查看 COMSOL/MATLAB 自动发现结果：
+
+```powershell
+python -m src.main discover-comsol
+```
+
+把确认后的发现结果写入 `config.yaml`：
+
+```powershell
+python -m src.main apply-comsol-discovery
+```
+
 运行 Python 侧自检：
 
 ```powershell

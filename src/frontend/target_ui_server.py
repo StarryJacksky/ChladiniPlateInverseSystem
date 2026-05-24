@@ -19,6 +19,7 @@ from urllib.parse import urlparse  # 导入 URL 解析工具 / Import URL parser
 
 from PIL import Image  # 导入图像库 / Import image library
 
+from src.config import load_config  # 导入配置读取函数 / Import configuration loader
 from src.target.analyse_target import save_target_analysis  # 导入目标分析保存函数 / Import target-analysis saver
 from src.target.preprocess_target import preprocess_target  # 导入目标预处理函数 / Import target preprocessing function
 
@@ -177,6 +178,18 @@ def validate_artifact_retention_payload(payload: dict) -> dict:  # 校验产物�
     retention["keep_recent_days"] = keep_days  # 保存最近天数 / Store recent-day count
     retention["regenerable_only"] = bool(payload.get("regenerable_only", True))  # 保存可再生成限制 / Store regenerable-only flag
     return retention  # 返回校验后的保留策略 / Return validated retention policy
+
+
+def validate_comsol_paths_payload(payload: dict) -> dict[str, str]:  # 校验 COMSOL/MATLAB 路径输入 / Validate COMSOL/MATLAB path input
+    paths = {}  # 创建路径字典 / Create path dictionary
+    for key in ["comsol_command_path", "matlab_path"]:  # 遍历可写路径字段 / Iterate writable path fields
+        value = str(payload.get(key, "")).strip()  # 读取并清理路径值 / Read and clean path value
+        if not value:  # 检查空路径 / Check empty path
+            raise ValueError(f"Missing path field: {key}")  # 抛出缺失字段错误 / Raise missing field error
+        if len(value) > 1000:  # 检查路径长度 / Check path length
+            raise ValueError(f"Path field is too long: {key}")  # 抛出长度错误 / Raise length error
+        paths[key] = value  # 保存路径字段 / Store path field
+    return paths  # 返回校验后的路径 / Return validated paths
 
 
 def validate_workflow_payload(payload: dict, config: dict) -> dict:  # 校验工作流输入 / Validate workflow input
@@ -884,7 +897,7 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 self.send_bytes(html_path.read_bytes(), "text/html; charset=utf-8")  # 返回 HTML 页面 / Return HTML page
                 return  # 结束请求 / Finish request
             if route == "/api/config":  # 判断是否请求配置 / Check config request
-                self.send_json({"grid_size": int(config["project"]["grid_size"]), "center_clamp_radius_mm": float(config["project"]["center_clamp_radius_mm"]), "plate_length_mm": float(config["project"]["plate_length_mm"]), "target_path": str(target_path), "processed_targets_dir": str(processed_dir), "target_mode": str(config["nodal_extraction"].get("target_mode", "stroke")), "material": config.get("material", {}), "simulation": config.get("simulation", {}), "optimisation": config.get("optimisation", {}), "artifact_retention": artifact_retention_policy(config)})  # 返回前端配置 / Return frontend config
+                self.send_json({"grid_size": int(config["project"]["grid_size"]), "center_clamp_radius_mm": float(config["project"]["center_clamp_radius_mm"]), "plate_length_mm": float(config["project"]["plate_length_mm"]), "target_path": str(target_path), "processed_targets_dir": str(processed_dir), "target_mode": str(config["nodal_extraction"].get("target_mode", "stroke")), "material": config.get("material", {}), "simulation": config.get("simulation", {}), "optimisation": config.get("optimisation", {}), "comsol": config.get("comsol", {}), "artifact_retention": artifact_retention_policy(config)})  # 返回前端配置 / Return frontend config
                 return  # 结束请求 / Finish request
             if route == "/api/ranking":  # 判断是否请求评分排行 / Check ranking request
                 self.send_json({"ranking": load_ranking(config)})  # 返回评分排行 / Return ranking data
@@ -940,6 +953,10 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
             if route == "/api/diagnostics":  # 判断是否请求环境诊断 / Check diagnostics request
                 from src.comsol.diagnostics import diagnose_comsol_environment  # 延迟导入诊断函数 / Lazily import diagnostics function
                 self.send_json(diagnose_comsol_environment(config))  # 返回诊断信息 / Return diagnostics data
+                return  # 结束请求 / Finish request
+            if route == "/api/comsol-discovery":  # 判断是否请求 COMSOL 发现 / Check COMSOL discovery request
+                from src.comsol.discovery import discover_runtime_environment  # 延迟导入发现函数 / Lazily import discovery function
+                self.send_json(discover_runtime_environment())  # 返回发现结果 / Return discovery result
                 return  # 结束请求 / Finish request
             if route == "/api/self-test":  # 判断是否请求部署自检 / Check deployment self-test request
                 from src.comsol.diagnostics import run_deployment_self_test  # 延迟导入自检函数 / Lazily import self-test function
@@ -1014,6 +1031,18 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 except Exception as exc:  # 处理保存异常 / Handle save exception
                     self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
                 return  # 结束请求 / Finish request
+            if route == "/api/comsol-paths":  # 检查 COMSOL 路径保存路由 / Check COMSOL path save route
+                try:  # 捕获路径保存错误 / Catch path save errors
+                    from src.comsol.discovery import write_comsol_paths_to_config  # 延迟导入路径写入函数 / Lazily import path writer
+                    length = int(self.headers.get("Content-Length", "0"))  # 读取请求体长度 / Read request body length
+                    payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 读取并解析 JSON / Read and parse JSON
+                    paths = validate_comsol_paths_payload(payload)  # 校验路径载荷 / Validate path payload
+                    result = write_comsol_paths_to_config(config_path(), paths)  # 写入配置文件 / Write config file
+                    config.update(load_config(config_path()))  # 刷新运行时配置 / Refresh runtime config
+                    self.send_json({"saved_at": datetime.now().isoformat(timespec="seconds"), **result})  # 返回保存结果 / Return save result
+                except Exception as exc:  # 处理路径保存异常 / Handle path save exception
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
+                return  # 结束请求 / Finish request
             if route == "/api/run-workflow":  # 检查自动工作流路由 / Check automatic workflow route
                 try:  # 捕获启动错误 / Catch startup errors
                     if workflow_snapshot().get("running"):  # 检查是否已有工作流运行 / Check existing workflow
@@ -1035,6 +1064,15 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                     payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 读取确认载荷 / Read confirmation payload
                     self.send_json(delete_artifact_cleanup_files(config, bool(payload.get("confirm"))))  # 执行并返回清理结果 / Run and return cleanup result
                 except Exception as exc:  # 处理清理异常 / Handle cleanup exception
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
+                return  # 结束请求 / Finish request
+            if route == "/api/apply-comsol-discovery":  # 检查 COMSOL 发现写入路由 / Check COMSOL discovery apply route
+                try:  # 捕获发现写入错误 / Catch discovery apply errors
+                    from src.comsol.discovery import write_discovered_paths_to_config  # 延迟导入发现写入函数 / Lazily import discovery writer
+                    result = write_discovered_paths_to_config(config_path())  # 写入配置文件 / Write config file
+                    config.update(load_config(config_path()))  # 刷新运行时配置 / Refresh runtime config
+                    self.send_json(result)  # 返回写入结果 / Return apply result
+                except Exception as exc:  # 处理异常 / Handle exception
                     self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
                 return  # 结束请求 / Finish request
             if route != "/api/save-target":  # 检查保存路由 / Check save route

@@ -1668,10 +1668,18 @@
         </section> <!-- 页面结构 / Page structure -->
         <section class="panel"> <!-- 页面结构 / Page structure -->
           <h2>Diagnostics</h2> <!-- 页面结构 / Page structure -->
+          <div class="field-grid"> <!-- 页面结构 / Page structure -->
+            <label class="field"><span>COMSOL path</span><input id="comsolPathInput" type="text" autocomplete="off"></label> <!-- 页面结构 / Page structure -->
+            <label class="field"><span>MATLAB path</span><input id="matlabPathInput" type="text" autocomplete="off"></label> <!-- 页面结构 / Page structure -->
+          </div> <!-- 页面结构 / Page structure -->
           <div id="diagnosticsList" class="diagnostics">Not checked</div> <!-- 页面结构 / Page structure -->
+          <div id="discoveryList" class="diagnostics">Discovery not checked</div> <!-- 页面结构 / Page structure -->
           <div id="selfTestList" class="diagnostics">Self-test not run</div> <!-- 页面结构 / Page structure -->
           <div class="panel-actions"> <!-- 页面结构 / Page structure -->
             <button id="refreshDiagnosticsButton" type="button">Refresh</button> <!-- 页面结构 / Page structure -->
+            <button id="discoverComsolButton" type="button">Discover</button> <!-- 页面结构 / Page structure -->
+            <button id="applyDiscoveryButton" type="button">Apply paths</button> <!-- 页面结构 / Page structure -->
+            <button id="saveComsolPathsButton" type="button">Save paths</button> <!-- 页面结构 / Page structure -->
             <button id="runSelfTestButton" type="button">Self-test</button> <!-- 页面结构 / Page structure -->
           </div> <!-- 页面结构 / Page structure -->
         </section> <!-- 页面结构 / Page structure -->
@@ -1857,11 +1865,23 @@
     // 前端逻辑 / Frontend logic
     const runOverview = document.getElementById("runOverview");
     // 前端逻辑 / Frontend logic
+    const comsolPathInput = document.getElementById("comsolPathInput");
+    // 前端逻辑 / Frontend logic
+    const matlabPathInput = document.getElementById("matlabPathInput");
+    // 前端逻辑 / Frontend logic
     const diagnosticsList = document.getElementById("diagnosticsList");
+    // 前端逻辑 / Frontend logic
+    const discoveryList = document.getElementById("discoveryList");
     // 前端逻辑 / Frontend logic
     const selfTestList = document.getElementById("selfTestList");
     // 前端逻辑 / Frontend logic
     const refreshDiagnosticsButton = document.getElementById("refreshDiagnosticsButton");
+    // 前端逻辑 / Frontend logic
+    const discoverComsolButton = document.getElementById("discoverComsolButton");
+    // 前端逻辑 / Frontend logic
+    const applyDiscoveryButton = document.getElementById("applyDiscoveryButton");
+    // 前端逻辑 / Frontend logic
+    const saveComsolPathsButton = document.getElementById("saveComsolPathsButton");
     // 前端逻辑 / Frontend logic
     const runSelfTestButton = document.getElementById("runSelfTestButton");
     // 前端逻辑 / Frontend logic
@@ -3719,6 +3739,192 @@
     }
 
     // 前端逻辑 / Frontend logic
+    function renderDiscovery(data) {
+      // 前端逻辑 / Frontend logic
+      const summary = data.summary || {};
+      // 前端逻辑 / Frontend logic
+      const suggestions = data.suggestions || {};
+      // 前端逻辑 / Frontend logic
+      const installs = data.install_candidates || {};
+      // 前端逻辑 / Frontend logic
+      const processes = data.processes || [];
+      // 前端逻辑 / Frontend logic
+      const rows = [
+        // 前端逻辑 / Frontend logic
+        renderDiagnosticRow(processes.length ? "ok" : "warn", "Running processes", `${processes.length || 0} detected`, processes.map((item) => `${item.kind}:${item.pid || "?"}`).join(", ")),
+        // 前端逻辑 / Frontend logic
+        renderDiagnosticRow(summary.has_comsol_hint ? "ok" : "warn", "COMSOL suggestion", suggestions.comsol_command_path || "No COMSOL path found", suggestions.comsol_source || ""),
+        // 前端逻辑 / Frontend logic
+        renderDiagnosticRow(summary.has_matlab_hint ? "ok" : "warn", "MATLAB suggestion", suggestions.matlab_path || "No MATLAB path found", suggestions.matlab_source || ""),
+        // 前端逻辑 / Frontend logic
+        renderDiagnosticRow((installs.comsol || []).length || (installs.matlab || []).length ? "ok" : "warn", "Install scan", `COMSOL ${(installs.comsol || []).length || 0}, MATLAB ${(installs.matlab || []).length || 0}`, "")
+      // 前端逻辑 / Frontend logic
+      ];
+      // 前端逻辑 / Frontend logic
+      discoveryList.innerHTML = rows.join("");
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
+    function populateComsolPaths(comsol) {
+      // 前端逻辑 / Frontend logic
+      comsolPathInput.value = (comsol && comsol.comsol_command_path) || "";
+      // 前端逻辑 / Frontend logic
+      matlabPathInput.value = (comsol && comsol.matlab_path) || "";
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
+    function applyDiscoverySuggestions(data) {
+      // 前端逻辑 / Frontend logic
+      const suggestions = data.suggestions || {};
+      // 前端逻辑 / Frontend logic
+      if (suggestions.comsol_command_path) {
+        // 前端逻辑 / Frontend logic
+        comsolPathInput.value = suggestions.comsol_command_path;
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (suggestions.matlab_path) {
+        // 前端逻辑 / Frontend logic
+        matlabPathInput.value = suggestions.matlab_path;
+      // 前端逻辑 / Frontend logic
+      }
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
+    async function loadDiscovery() {
+      // 前端逻辑 / Frontend logic
+      discoveryList.textContent = "Discovering...";
+      // 前端逻辑 / Frontend logic
+      discoverComsolButton.disabled = true;
+      // 前端逻辑 / Frontend logic
+      try {
+        // 前端逻辑 / Frontend logic
+        const response = await fetch(`/api/comsol-discovery?t=${Date.now()}`);
+        // 前端逻辑 / Frontend logic
+        const data = await response.json();
+        // 前端逻辑 / Frontend logic
+        if (!response.ok) {
+          // 前端逻辑 / Frontend logic
+          throw new Error(data.error || "Discovery unavailable");
+        // 前端逻辑 / Frontend logic
+        }
+        // 前端逻辑 / Frontend logic
+        renderDiscovery(data);
+        // 前端逻辑 / Frontend logic
+        applyDiscoverySuggestions(data);
+        // 前端逻辑 / Frontend logic
+        return data;
+      // 前端逻辑 / Frontend logic
+      } catch (error) {
+        // 前端逻辑 / Frontend logic
+        discoveryList.textContent = error.message;
+        // 前端逻辑 / Frontend logic
+        return {};
+      // 前端逻辑 / Frontend logic
+      } finally {
+        // 前端逻辑 / Frontend logic
+        discoverComsolButton.disabled = false;
+      // 前端逻辑 / Frontend logic
+      }
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
+    async function applyDiscovery() {
+      // 前端逻辑 / Frontend logic
+      const accepted = window.confirm("Write discovered COMSOL/MATLAB paths into config.yaml? / 将发现到的 COMSOL/MATLAB 路径写入 config.yaml？");
+      // 前端逻辑 / Frontend logic
+      if (!accepted) {
+        // 前端逻辑 / Frontend logic
+        return;
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      discoveryList.textContent = "Applying discovered paths...";
+      // 前端逻辑 / Frontend logic
+      applyDiscoveryButton.disabled = true;
+      // 前端逻辑 / Frontend logic
+      try {
+        // 前端逻辑 / Frontend logic
+        const response = await fetch("/api/apply-comsol-discovery", { method: "POST" });
+        // 前端逻辑 / Frontend logic
+        const data = await response.json();
+        // 前端逻辑 / Frontend logic
+        if (!response.ok) {
+          // 前端逻辑 / Frontend logic
+          throw new Error(data.error || "Discovery apply failed");
+        // 前端逻辑 / Frontend logic
+        }
+        // 前端逻辑 / Frontend logic
+        renderDiscovery(data.discovery || {});
+        // 前端逻辑 / Frontend logic
+        applyDiscoverySuggestions(data.discovery || {});
+        // 前端逻辑 / Frontend logic
+        await loadConfig();
+        // 前端逻辑 / Frontend logic
+        await loadDiagnostics();
+      // 前端逻辑 / Frontend logic
+      } catch (error) {
+        // 前端逻辑 / Frontend logic
+        discoveryList.textContent = error.message;
+      // 前端逻辑 / Frontend logic
+      } finally {
+        // 前端逻辑 / Frontend logic
+        applyDiscoveryButton.disabled = false;
+      // 前端逻辑 / Frontend logic
+      }
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
+    async function saveComsolPaths() {
+      // 前端逻辑 / Frontend logic
+      saveComsolPathsButton.disabled = true;
+      // 前端逻辑 / Frontend logic
+      discoveryList.textContent = "Saving COMSOL/MATLAB paths...";
+      // 前端逻辑 / Frontend logic
+      try {
+        // 前端逻辑 / Frontend logic
+        const response = await fetch("/api/comsol-paths", {
+          // 前端逻辑 / Frontend logic
+          method: "POST",
+          // 前端逻辑 / Frontend logic
+          headers: { "Content-Type": "application/json" },
+          // 前端逻辑 / Frontend logic
+          body: JSON.stringify({ comsol_command_path: comsolPathInput.value, matlab_path: matlabPathInput.value })
+        // 前端逻辑 / Frontend logic
+        });
+        // 前端逻辑 / Frontend logic
+        const data = await response.json();
+        // 前端逻辑 / Frontend logic
+        if (!response.ok) {
+          // 前端逻辑 / Frontend logic
+          throw new Error(data.error || "Path save failed");
+        // 前端逻辑 / Frontend logic
+        }
+        // 前端逻辑 / Frontend logic
+        discoveryList.innerHTML = renderDiagnosticRow("ok", "Saved paths", `Updated ${Object.keys(data.written || {}).join(", ")}`, data.config_path || "");
+        // 前端逻辑 / Frontend logic
+        await loadConfig();
+        // 前端逻辑 / Frontend logic
+        await loadDiagnostics();
+      // 前端逻辑 / Frontend logic
+      } catch (error) {
+        // 前端逻辑 / Frontend logic
+        discoveryList.textContent = error.message;
+      // 前端逻辑 / Frontend logic
+      } finally {
+        // 前端逻辑 / Frontend logic
+        saveComsolPathsButton.disabled = false;
+      // 前端逻辑 / Frontend logic
+      }
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 前端逻辑 / Frontend logic
     function renderSelfTest(data) {
       // 前端逻辑 / Frontend logic
       const rows = [
@@ -4105,6 +4311,8 @@
       // 前端逻辑 / Frontend logic
       populateRetention(config.artifact_retention || {});
       // 前端逻辑 / Frontend logic
+      populateComsolPaths(config.comsol || {});
+      // 前端逻辑 / Frontend logic
       renderTuneOverview();
       // 前端逻辑 / Frontend logic
       drawOverlay();
@@ -4271,6 +4479,12 @@
     showTimelineLogsToggle.addEventListener("change", () => renderWorkflowTimeline(latestWorkflowEvents));
     // 前端逻辑 / Frontend logic
     refreshDiagnosticsButton.addEventListener("click", loadDiagnostics);
+    // 前端逻辑 / Frontend logic
+    discoverComsolButton.addEventListener("click", loadDiscovery);
+    // 前端逻辑 / Frontend logic
+    applyDiscoveryButton.addEventListener("click", applyDiscovery);
+    // 前端逻辑 / Frontend logic
+    saveComsolPathsButton.addEventListener("click", saveComsolPaths);
     // 前端逻辑 / Frontend logic
     runSelfTestButton.addEventListener("click", runSelfTest);
     // 前端逻辑 / Frontend logic

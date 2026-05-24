@@ -125,7 +125,7 @@ The launcher runs a Python-only self-test, finds an available local port, starts
 
 ## 6. Configure COMSOL and MATLAB
 
-The current development version uses configured executable paths. Running-process detection and automatic discovery of COMSOL/MATLAB installations are planned, but users should still verify or edit `config.yaml` for now.
+The current development version reports running-process detection and common install-path discovery. If configured executable paths are missing, runtime diagnostics and LiveLink runs can temporarily use discovered paths, but users should still verify or edit `config.yaml` until the persistent setup wizard is finished.
 
 Open `config.yaml` and check these fields:
 
@@ -165,6 +165,18 @@ Then run diagnostics:
 
 ```bash
 python -m src.main diagnose-comsol
+```
+
+To inspect only running-process detection and install-path discovery:
+
+```bash
+python -m src.main discover-comsol
+```
+
+After reviewing the discovery output, write accepted paths into `config.yaml`:
+
+```bash
+python -m src.main apply-comsol-discovery
 ```
 
 The important required checks are COMSOL command, MATLAB command, bound MPH model, LiveLink runner, exports directory, and timeout configuration.

@@ -125,7 +125,7 @@ chmod +x scripts/launch_chladni_studio.sh
 
 ## 6. 配置 COMSOL 与 MATLAB
 
-当前开发版使用配置文件中的可执行文件路径。COMSOL/MATLAB 运行进程检测与自动发现已列入后续任务，但现在用户仍应检查或编辑 `config.yaml`。
+当前开发版会报告运行进程检测与常见安装路径发现。如果配置里的可执行文件路径缺失，运行时诊断和 LiveLink 运行可以临时使用发现到的路径；但在持久化安装向导完成前，用户仍应检查或编辑 `config.yaml`。
 
 打开 `config.yaml` 并检查这些字段：
 
@@ -165,6 +165,18 @@ matlab_path: "/usr/local/MATLAB/R2024a/bin/matlab"
 
 ```bash
 python -m src.main diagnose-comsol
+```
+
+如果只想查看运行进程检测与安装路径发现：
+
+```bash
+python -m src.main discover-comsol
+```
+
+查看发现结果后，可以把确认的路径写入 `config.yaml`：
+
+```bash
+python -m src.main apply-comsol-discovery
 ```
 
 关键必需检查包括 COMSOL 命令、MATLAB 命令、绑定 MPH 模型、LiveLink runner、导出目录和超时配置。

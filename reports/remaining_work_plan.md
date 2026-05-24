@@ -49,10 +49,10 @@ Goal: make the Run tab predictable before asking users to trust one-click automa
 Tasks:
 任务：
 
-1. Add automatic COMSOL/MATLAB discovery before manual path configuration.
-   在要求用户手动填写路径前，先自动发现本机 COMSOL/MATLAB。
-2. Detect already-running COMSOL, MATLAB, and mphserver processes before scanning install folders.
-   扫描安装目录前，先检测用户已经启动的 COMSOL、MATLAB 和 mphserver 进程。
+1. Validate COMSOL/MATLAB running-process detection and install-path discovery on clean Windows, macOS, and Linux machines.
+   在干净的 Windows、macOS、Linux 机器上验证 COMSOL/MATLAB 运行进程检测与安装路径发现。
+2. Add a frontend setup wizard around the existing `apply-comsol-discovery` command.
+   围绕现有 `apply-comsol-discovery` 命令增加前端安装向导。
 3. Add deeper model-specific preflight checks after the final COMSOL model is frozen.
    最终 COMSOL 模型冻结后，增加更深入的模型专属运行前检查。
 4. Add a safe cancel/stop pathway for local workflow state.
@@ -74,14 +74,12 @@ Tasks:
    加强路径、模型文件、导出目录和数值范围的配置校验。
 2. Add non-invasive COMSOL/MATLAB version probes where safe.
    在安全的前提下增加非侵入式 COMSOL/MATLAB 版本探测。
-3. Add cross-platform process detection for already-running COMSOL, MATLAB, and mphserver without reading process memory.
-   增加跨平台运行进程检测，识别已启动的 COMSOL、MATLAB 和 mphserver，但不读取进程内存。
-4. Scan common Windows, macOS, and Linux install locations for COMSOL, MATLAB, LiveLink, and mphserver.
-   扫描 Windows、macOS、Linux 常见安装位置，寻找 COMSOL、MATLAB、LiveLink 和 mphserver。
-5. Prefer already-running processes, then known install folders, then manual override in the setup flow.
+3. Expand discovery tests with simulated missing config paths and known install-path fixtures.
+   增加发现逻辑测试，覆盖配置路径缺失和已知安装路径样例。
+4. Prefer already-running processes, then known install folders, then manual override in the setup flow.
    安装流程优先使用已运行进程，其次查找常见安装目录，最后才进入手动覆盖。
-6. Add a setup wizard that writes detected paths into `config.yaml`, with manual override when discovery fails.
-   增加安装向导，把自动发现的路径写入 `config.yaml`；发现失败时允许手动覆盖。
+5. Add manual override fields to the setup wizard when discovery fails.
+   当自动发现失败时，在安装向导中提供手动覆盖字段。
 7. Add clearer authentication/license guidance when diagnostics detect risk.
    当诊断发现风险时，提供更清楚的认证/license 指引。
 8. Keep generated artifacts recoverable and cleanup conservative.

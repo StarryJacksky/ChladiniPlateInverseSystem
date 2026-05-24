@@ -8,6 +8,8 @@ from pathlib import Path  # 导入路径工具 / Import path utilities
 
 import numpy as np  # 导入数值计算库 / Import numerical library
 
+from src.comsol.discovery import discover_runtime_environment  # 导入运行环境发现 / Import runtime environment discovery
+from src.comsol.discovery import config_with_runtime_discovery  # 导入运行时配置补全 / Import runtime config completion
 from src.comsol.export_parameters import export_candidate_for_comsol  # 导入参数导出函数 / Import parameter export helper
 from src.comsol.run_livelink import build_matlab_batch  # 导入 MATLAB batch 构造函数 / Import MATLAB batch builder
 from src.comsol.server import is_server_reachable  # 导入 server 端口检查 / Import server port check
@@ -104,6 +106,28 @@ def check_license_environment() -> dict:  # 检查常见 license 环境变量 / 
     return self_test_item("License environment hint", ok, message, "", False)  # 返回可选 license 检查 / Return optional license check
 
 
+def discovery_check_items(discovery: dict) -> list[dict]:  # 构造自动发现诊断条目 / Build auto-discovery diagnostic items
+    summary = discovery.get("summary", {})  # 读取发现摘要 / Read discovery summary
+    suggestions = discovery.get("suggestions", {})  # 读取路径建议 / Read path suggestions
+    process_count = int(summary.get("process_count", 0))  # 读取进程数量 / Read process count
+    process_status = str(summary.get("process_probe_status", ""))  # 读取进程探测状态 / Read process probe status
+    process_error = str(summary.get("process_probe_error", ""))  # 读取进程探测错误 / Read process probe error
+    comsol_count = int(summary.get("comsol_install_count", 0))  # 读取 COMSOL 候选数 / Read COMSOL candidate count
+    matlab_count = int(summary.get("matlab_install_count", 0))  # 读取 MATLAB 候选数 / Read MATLAB candidate count
+    process_message = f"{process_count} matching process(es) found. / 找到 {process_count} 个相关运行进程。" if process_count else ("Process list unavailable: " + process_error + " / 进程列表不可用：" + process_error if process_status == "unavailable" else "No running COMSOL/MATLAB process detected. / 未检测到正在运行的 COMSOL/MATLAB 进程。")  # 构造进程消息 / Build process message
+    install_message = f"COMSOL candidates={comsol_count}, MATLAB candidates={matlab_count}. / COMSOL 候选={comsol_count}，MATLAB 候选={matlab_count}。"  # 构造安装候选消息 / Build install-candidate message
+    comsol_path = str(suggestions.get("comsol_command_path", ""))  # 读取 COMSOL 建议 / Read COMSOL suggestion
+    matlab_path = str(suggestions.get("matlab_path", ""))  # 读取 MATLAB 建议 / Read MATLAB suggestion
+    suggestion_ok = bool(comsol_path and matlab_path)  # 判断建议是否完整 / Decide whether suggestions are complete
+    suggestion_message = "Suggested COMSOL and MATLAB paths are available. / 已找到 COMSOL 与 MATLAB 路径建议。" if suggestion_ok else "Path suggestions are incomplete; manual config may still be needed. / 路径建议不完整，可能仍需手动配置。"  # 构造建议消息 / Build suggestion message
+    suggestion_path = f"COMSOL={comsol_path or '-'}; MATLAB={matlab_path or '-'}"  # 构造建议路径文本 / Build suggestion path text
+    return [  # 返回诊断条目 / Return diagnostic items
+        self_test_item("Running process discovery", process_count > 0 and process_status != "unavailable", process_message, "", False),  # 添加运行进程发现 / Add running-process discovery
+        self_test_item("Install path discovery", bool(comsol_count or matlab_count), install_message, "", False),  # 添加安装路径发现 / Add install-path discovery
+        self_test_item("Runtime path suggestion", suggestion_ok, suggestion_message, suggestion_path, False),  # 添加路径建议 / Add path suggestion
+    ]  # 结束诊断条目 / End diagnostic items
+
+
 def check_parameter_export(config: dict) -> dict:  # 检查候选参数导出 / Check candidate parameter export
     grid_size = int(config["project"]["grid_size"])  # 读取网格尺寸 / Read grid size
     default_mm = float(config["thickness"]["default_mm"])  # 读取默认厚度 / Read default thickness
@@ -155,8 +179,10 @@ def run_deployment_self_test(config: dict) -> dict:  # 运行部署自检 / Run 
 
 
 def diagnose_comsol_environment(config: dict) -> dict:  # 诊断 COMSOL/MATLAB 环境 / Diagnose COMSOL/MATLAB environment
-    comsol_config = config.get("comsol", {})  # 读取 COMSOL 配置 / Read COMSOL config
-    paths_config = config.get("paths", {})  # 读取路径配置 / Read paths config
+    discovery = discover_runtime_environment()  # 发现运行进程和安装路径 / Discover running processes and install paths
+    runtime_config, applied_paths, discovery = config_with_runtime_discovery(config, discovery)  # 应用运行时发现结果 / Apply runtime discovery result
+    comsol_config = runtime_config.get("comsol", {})  # 读取 COMSOL 配置 / Read COMSOL config
+    paths_config = runtime_config.get("paths", {})  # 读取路径配置 / Read paths config
     checks = [  # 创建路径检查列表 / Create path check list
         check_path("COMSOL command", comsol_config.get("comsol_command_path", ""), True, True),  # 检查 COMSOL 命令 / Check COMSOL command
         infer_comsol_version(comsol_config.get("comsol_command_path", "")),  # 添加 COMSOL 版本提示 / Add COMSOL version hint
@@ -169,6 +195,10 @@ def diagnose_comsol_environment(config: dict) -> dict:  # 诊断 COMSOL/MATLAB �
         check_output_directory("COMSOL exports", paths_config.get("comsol_exports_dir", "data/comsol_exports")),  # 检查导出目录 / Check export directory
         check_timeout_config(config),  # 检查超时配置 / Check timeout configuration
     ]  # 结束路径检查列表 / End path check list
+    checks.extend(discovery_check_items(discovery))  # 加入自动发现提示 / Add auto-discovery hints
+    if applied_paths:  # 检查是否应用运行时补全 / Check whether runtime completion was applied
+        applied_text = ", ".join(f"{key} from {source}" for key, source in applied_paths.items())  # 构造应用说明 / Build applied-path description
+        checks.append(self_test_item("Runtime path auto-fill", True, f"Applied {applied_text}. / 已应用 {applied_text}。", "", False))  # 添加补全提示 / Add completion hint
     host = str(comsol_config.get("server_host", "127.0.0.1"))  # 读取 server 主机 / Read server host
     port = int(comsol_config.get("server_port", 2036))  # 读取 server 端口 / Read server port
     auto_start = bool(comsol_config.get("auto_start_server", True))  # 读取自动启动设置 / Read auto-start setting
@@ -178,4 +208,4 @@ def diagnose_comsol_environment(config: dict) -> dict:  # 诊断 COMSOL/MATLAB �
     server = {"host": host, "port": port, "auto_start": auto_start, "reachable": reachable, "status": server_status, "message": server_message}  # 构造 server 详情 / Build server detail
     required_ok = all(item["status"] == "ok" for item in checks if item.get("required"))  # 检查必需项 / Check required items
     ready_for_auto_run = required_ok and (reachable or auto_start)  # 判断是否可自动运行 / Decide automatic-run readiness
-    return {"ready_for_auto_run": ready_for_auto_run, "checks": checks, "server": server}  # 返回诊断结果 / Return diagnostics
+    return {"ready_for_auto_run": ready_for_auto_run, "checks": checks, "server": server, "discovery": discovery, "applied_runtime_paths": applied_paths}  # 返回诊断结果 / Return diagnostics

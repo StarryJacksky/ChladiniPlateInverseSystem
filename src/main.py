@@ -13,7 +13,7 @@ from src.optimisation.random_search import score_available_candidates  # 导入�
 
 def build_parser() -> argparse.ArgumentParser:  # 创建命令行解析器 / Build command-line parser
     parser = argparse.ArgumentParser(description="Chladni inverse design MVP. / Chladni 逆向设计 MVP。")  # 初始化解析器 / Initialise parser
-    parser.add_argument("command", choices=["prepare-target", "target-ui", "run-workflow", "generate-candidates", "generate-previews", "simulate-candidate", "simulate-batch", "render-mode-previews", "audit-comsol-model", "diagnose-comsol", "self-test", "validate-comsol-exports", "score-candidates"], help="Workflow command. / 工作流命令。")  # 添加命令参数 / Add command argument
+    parser.add_argument("command", choices=["prepare-target", "target-ui", "run-workflow", "generate-candidates", "generate-previews", "simulate-candidate", "simulate-batch", "render-mode-previews", "audit-comsol-model", "discover-comsol", "apply-comsol-discovery", "diagnose-comsol", "self-test", "validate-comsol-exports", "score-candidates"], help="Workflow command. / 工作流命令。")  # 添加命令参数 / Add command argument
     parser.add_argument("--config", default="config.yaml", help="Config file path. / 配置文件路径。")  # 添加配置路径参数 / Add config path argument
     parser.add_argument("--host", default="127.0.0.1", help="Target UI host. / 目标 UI 主机。")  # 添加 UI 主机参数 / Add UI host argument
     parser.add_argument("--port", type=int, default=8765, help="Target UI port. / 目标 UI 端口。")  # 添加 UI 端口参数 / Add UI port argument
@@ -92,6 +92,14 @@ def main() -> None:  # 主程序入口 / Main program entry
         import json  # 延迟导入 JSON / Lazily import JSON
         from src.comsol.diagnostics import diagnose_comsol_environment  # 延迟导入环境诊断 / Lazily import environment diagnostics
         print(json.dumps(diagnose_comsol_environment(config), ensure_ascii=False, indent=2))  # 打印诊断结果 / Print diagnostics result
+    if args.command == "discover-comsol":  # 判断是否发现 COMSOL/MATLAB / Check COMSOL/MATLAB discovery command
+        import json  # 延迟导入 JSON / Lazily import JSON
+        from src.comsol.discovery import discover_runtime_environment  # 延迟导入运行环境发现 / Lazily import runtime discovery
+        print(json.dumps(discover_runtime_environment(), ensure_ascii=False, indent=2))  # 打印发现结果 / Print discovery result
+    if args.command == "apply-comsol-discovery":  # 判断是否写入发现路径 / Check discovery-apply command
+        import json  # 延迟导入 JSON / Lazily import JSON
+        from src.comsol.discovery import write_discovered_paths_to_config  # 延迟导入发现写入函数 / Lazily import discovery writer
+        print(json.dumps(write_discovered_paths_to_config(args.config), ensure_ascii=False, indent=2))  # 写入并打印结果 / Write and print result
     if args.command == "self-test":  # 判断是否运行部署自检 / Check deployment self-test command
         import json  # 延迟导入 JSON / Lazily import JSON
         from src.comsol.diagnostics import run_deployment_self_test  # 延迟导入部署自检 / Lazily import deployment self-test
