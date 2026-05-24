@@ -94,12 +94,10 @@ python -m src.main self-test
 
 ## 文档
 
-```text
-docs/deployment_guide.md   Windows/macOS/Linux 双语部署教程
-docs/user_manual.md        软件使用说明书
-docs/README.md             文档索引
-reports/remaining_work_plan.md 后续任务规划
-```
+- [Windows/macOS/Linux 双语部署教程](./docs/deployment_guide.md)
+- [软件使用说明书](./docs/user_manual.md)
+- [文档索引](./docs/README.md)
+- [后续任务规划](./reports/remaining_work_plan.md)
 
 这些文档目前是开发版。正式发布前还需要加入最终界面截图、真实实验材料参数、实验室 COMSOL/MATLAB 安装路径和授权注意事项。
 

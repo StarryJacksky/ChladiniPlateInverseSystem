@@ -8,12 +8,10 @@ Chladni Studio 是一个用于 Chladni 板的本地逆向设计工具。用户�
 
 ## Start Here / 从这里开始
 
-```text
-docs/deployment_guide.md   Windows/macOS/Linux deployment guide / 三系统部署教程
-docs/user_manual.md        software manual / 软件使用说明书
-docs/README.md             documentation index / 文档索引
-reports/remaining_work_plan.md remaining work plan / 后续任务规划
-```
+- [Deployment Guide / 三系统部署教程](./docs/deployment_guide.md)
+- [User Manual / 软件使用说明书](./docs/user_manual.md)
+- [Documentation Index / 文档索引](./docs/README.md)
+- [Remaining Work Plan / 后续任务规划](./reports/remaining_work_plan.md)
 
 ## What It Does / 它能做什么
 
