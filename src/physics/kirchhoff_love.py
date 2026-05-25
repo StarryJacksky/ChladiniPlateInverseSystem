@@ -4,10 +4,13 @@ import numpy as np  # 导入数值计算库 / Import numerical library
 
 from src.candidate.constraints import center_cells_for_grid  # 导入中心单元工具 / Import centre-cell helper
 from src.scoring.metrics import area_similarity  # 导入面积相似度 / Import area similarity
+from src.scoring.metrics import complexity_similarity  # 导入复杂度相似度 / Import complexity similarity
 from src.scoring.metrics import compute_dice  # 导入 Dice 指标 / Import Dice metric
 from src.scoring.metrics import compute_iou  # 导入 IoU 指标 / Import IoU metric
 from src.scoring.metrics import compute_precision_recall  # 导入精度召回 / Import precision-recall metrics
+from src.scoring.metrics import extent_similarity  # 导入包围盒尺度相似度 / Import extent similarity
 from src.scoring.metrics import layout_similarity  # 导入布局相似度 / Import layout similarity
+from src.scoring.metrics import projection_similarity  # 导入投影相似度 / Import projection similarity
 
 
 def bending_stiffness_pa_m3(H_mm: np.ndarray, youngs_modulus_pa: float, poisson_ratio: float) -> np.ndarray:  # 计算 Kirchhoff-Love 弯曲刚度 / Compute Kirchhoff-Love bending stiffness
@@ -90,7 +93,10 @@ def score_kl_mode(nodal: np.ndarray, target_grid: np.ndarray) -> float:  # 评�
     area = area_similarity(nodal, target)  # 计算面积相似度 / Compute area similarity
     precision, recall = compute_precision_recall(nodal, target)  # 计算精度和召回 / Compute precision and recall
     layout = layout_similarity(nodal, target, cells=min(8, nodal.shape[0]))  # 计算粗布局相似度 / Compute coarse layout similarity
-    return float(0.18 * iou + 0.22 * dice + 0.18 * layout + 0.18 * area + 0.14 * precision + 0.10 * recall)  # 返回代理合成分 / Return proxy combined score
+    projection = projection_similarity(nodal, target)  # 计算投影相似度 / Compute projection similarity
+    extent = extent_similarity(nodal, target)  # 计算尺度相似度 / Compute extent similarity
+    complexity = complexity_similarity(nodal, target)  # 计算复杂度相似度 / Compute complexity similarity
+    return float(0.08 * iou + 0.12 * dice + 0.08 * layout + 0.05 * area + 0.05 * precision + 0.22 * recall + 0.20 * projection + 0.14 * extent + 0.06 * complexity)  # 返回覆盖优先的代理合成分 / Return coverage-first proxy combined score
 
 
 def resize_target_to_grid(target_grid: np.ndarray, grid_size: int) -> np.ndarray:  # 将目标图压缩到代理网格 / Compress target map to proxy grid

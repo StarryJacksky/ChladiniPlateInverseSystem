@@ -5,6 +5,11 @@ from pathlib import Path  # 导入路径工具 / Import path utilities
 
 import numpy as np  # 导入数值计算库 / Import numerical library
 
+try:  # 优先使用 SciPy KDTree 加速插值 / Prefer SciPy KDTree to accelerate interpolation
+    from scipy.spatial import cKDTree as ScipyKDTree  # 导入快速近邻树 / Import fast nearest-neighbour tree
+except Exception:  # 兼容未安装 SciPy 的部署环境 / Support deployments without SciPy
+    ScipyKDTree = None  # 标记不可用并回退暴力插值 / Mark unavailable and fall back to brute-force interpolation
+
 
 def load_mode_csv(path: str | Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:  # 读取模态 CSV / Load mode CSV
     xs = []  # 创建 x 列表 / Create x list
@@ -28,6 +33,21 @@ def interpolate_to_grid(x: np.ndarray, y: np.ndarray, w: np.ndarray, grid_size: 
     points = np.column_stack([x.astype(float), y.astype(float)])  # 合并采样点坐标 / Combine sample coordinates
     queries = np.column_stack([grid_x.ravel(), grid_y.ravel()])  # 合并查询点坐标 / Combine query coordinates
     k = min(max(int(neighbours), 1), len(w))  # 限制近邻数量 / Clamp neighbour count
+    if ScipyKDTree is not None:  # 检查 KDTree 快路径 / Check KDTree fast path
+        tree = ScipyKDTree(points)  # 构建采样点近邻树 / Build sample-point nearest-neighbour tree
+        distances, nearest = tree.query(queries, k=k)  # 查询每个网格点近邻 / Query neighbours for each grid point
+        nearest_dist2 = np.square(np.asarray(distances, dtype=float))  # 转换为平方距离 / Convert to squared distances
+        nearest_index = np.asarray(nearest, dtype=int)  # 转换近邻索引 / Convert neighbour indices
+        if k == 1:  # 处理单近邻形状 / Handle single-neighbour shape
+            nearest_dist2 = nearest_dist2[:, None]  # 增加距离维度 / Add distance dimension
+            nearest_index = nearest_index[:, None]  # 增加索引维度 / Add index dimension
+        nearest_values = w.astype(float)[nearest_index]  # 读取近邻位移 / Gather neighbour displacements
+        exact = nearest_dist2[:, 0] <= 1e-24  # 标记完全重合点 / Mark exact coordinate matches
+        weights = 1.0 / np.maximum(nearest_dist2, 1e-24)  # 计算反距离权重 / Compute inverse-distance weights
+        values = np.sum(weights * nearest_values, axis=1) / np.sum(weights, axis=1)  # 计算加权插值 / Compute weighted interpolation
+        if np.any(exact):  # 检查是否存在重合点 / Check whether exact matches exist
+            values[exact] = nearest_values[exact, 0]  # 重合点直接使用原值 / Use original sample value for exact matches
+        return values.reshape((grid_size, grid_size)).astype(float)  # 返回规则网格 / Return regular grid
     values = np.empty(len(queries), dtype=float)  # 创建插值结果数组 / Create interpolated value array
     sample_values = w.astype(float)  # 转换采样值 / Convert sample values
     for start in range(0, len(queries), chunk_size):  # 分块遍历查询点 / Iterate query points in chunks

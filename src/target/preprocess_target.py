@@ -58,7 +58,53 @@ def extract_target_edges(binary: np.ndarray) -> np.ndarray:  # 提取填充图�
     return edges.astype(bool)  # 返回边界图 / Return edge map
 
 
+def neighbour_values(padded: np.ndarray, row: int, col: int) -> list[bool]:  # 读取八邻域像素 / Read eight-neighbour pixels
+    return [bool(padded[row - 1, col]), bool(padded[row - 1, col + 1]), bool(padded[row, col + 1]), bool(padded[row + 1, col + 1]), bool(padded[row + 1, col]), bool(padded[row + 1, col - 1]), bool(padded[row, col - 1]), bool(padded[row - 1, col - 1])]  # 按顺时针返回邻域 / Return neighbours clockwise
+
+
+def transition_count(neighbours: list[bool]) -> int:  # 计算 0 到 1 跳变次数 / Count zero-to-one transitions
+    return sum(1 for index in range(8) if not neighbours[index] and neighbours[(index + 1) % 8])  # 统计环形邻域跳变 / Count circular-neighbour transitions
+
+
+def thinning_pass(data: np.ndarray, first_step: bool) -> tuple[np.ndarray, bool]:  # 执行一次 Zhang-Suen 细化子步骤 / Run one Zhang-Suen thinning substep
+    padded = np.pad(data.astype(bool), 1, mode="constant", constant_values=False)  # 给图像加背景边框 / Pad image with background
+    removable = []  # 创建待删除像素列表 / Create removable-pixel list
+    rows, cols = data.shape  # 读取图像尺寸 / Read image shape
+    for row in range(1, rows + 1):  # 遍历填充后的行 / Iterate padded rows
+        for col in range(1, cols + 1):  # 遍历填充后的列 / Iterate padded columns
+            if not padded[row, col]:  # 跳过背景像素 / Skip background pixels
+                continue  # 继续下一个像素 / Continue to next pixel
+            neighbours = neighbour_values(padded, row, col)  # 读取八邻域 / Read eight neighbours
+            neighbour_sum = sum(neighbours)  # 统计前景邻居数量 / Count foreground neighbours
+            if neighbour_sum < 2 or neighbour_sum > 6:  # 检查细化邻居数量条件 / Check thinning neighbour-count condition
+                continue  # 不满足则跳过 / Skip when condition fails
+            if transition_count(neighbours) != 1:  # 检查连通性跳变条件 / Check connectivity transition condition
+                continue  # 不满足则跳过 / Skip when condition fails
+            p2, _, p4, _, p6, _, p8, _ = neighbours  # 解包正交邻居 / Unpack orthogonal neighbours
+            if first_step and (p2 and p4 and p6 or p4 and p6 and p8):  # 检查第一子步保形条件 / Check first-substep shape-preserving condition
+                continue  # 不满足则跳过 / Skip when condition fails
+            if not first_step and (p2 and p4 and p8 or p2 and p6 and p8):  # 检查第二子步保形条件 / Check second-substep shape-preserving condition
+                continue  # 不满足则跳过 / Skip when condition fails
+            removable.append((row - 1, col - 1))  # 记录原图坐标 / Record original-image coordinate
+    next_data = data.copy()  # 复制当前图像 / Copy current image
+    for row, col in removable:  # 遍历待删除像素 / Iterate removable pixels
+        next_data[row, col] = False  # 删除边界像素 / Remove boundary pixel
+    return next_data, bool(removable)  # 返回细化结果和是否变化 / Return thinned image and change flag
+
+
+def skeletonize_binary(binary: np.ndarray, max_iterations: int = 128) -> np.ndarray:  # 将填充图案细化为骨架线 / Thin filled pattern into skeleton lines
+    result = binary.astype(bool)  # 转换为布尔图 / Convert to boolean map
+    for _ in range(max_iterations):  # 限制最大迭代次数 / Limit maximum iterations
+        result, changed_first = thinning_pass(result, True)  # 执行第一子步 / Run first substep
+        result, changed_second = thinning_pass(result, False)  # 执行第二子步 / Run second substep
+        if not changed_first and not changed_second:  # 判断是否已收敛 / Check whether thinning converged
+            break  # 收敛后停止 / Stop after convergence
+    return result.astype(bool)  # 返回骨架线 / Return skeleton lines
+
+
 def apply_target_mode(binary: np.ndarray, mode: str) -> np.ndarray:  # 应用目标提取模式 / Apply target extraction mode
+    if mode == "chladni":  # 判断是否使用物理节点线目标 / Check Chladni nodal target mode
+        return skeletonize_binary(binary)  # 返回骨架节点线目标 / Return skeleton nodal target
     if mode == "edge":  # 判断是否提取边界 / Check edge mode
         return extract_target_edges(binary)  # 返回边界目标 / Return edge target
     if mode == "filled":  # 判断是否保留填充区域 / Check filled mode

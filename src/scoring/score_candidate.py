@@ -19,9 +19,12 @@ from src.scoring.metrics import compute_iou  # 导入 IoU 指标 / Import IoU me
 from src.scoring.metrics import compute_overlap_balance  # 导入覆盖平衡分数 / Import overlap balance score
 from src.scoring.metrics import compute_precision_recall  # 导入精度召回指标 / Import precision-recall metrics
 from src.scoring.metrics import chamfer_similarity  # 导入距离相似度 / Import distance similarity
+from src.scoring.metrics import complexity_similarity  # 导入复杂度相似度 / Import complexity similarity
+from src.scoring.metrics import extent_similarity  # 导入包围盒尺度相似度 / Import extent similarity
 from src.scoring.metrics import frequency_penalty  # 导入频率惩罚 / Import frequency penalty
 from src.scoring.metrics import layout_similarity  # 导入布局相似度 / Import layout similarity
 from src.scoring.metrics import pattern_similarity  # 导入相似度合成 / Import similarity combiner
+from src.scoring.metrics import projection_similarity  # 导入投影相似度 / Import projection similarity
 
 
 def resize_binary_to_shape(binary: np.ndarray, shape: tuple[int, int]) -> np.ndarray:  # 缩放二值图到指定尺寸 / Resize binary map to target shape
@@ -33,15 +36,29 @@ def resize_binary_to_shape(binary: np.ndarray, shape: tuple[int, int]) -> np.nda
     return resized.astype(bool)  # 返回布尔结果 / Return boolean result
 
 
+def nodal_cache_path(mode_file: Path, image_size: int, epsilon_ratio: float, center_radius_px: int) -> Path:  # 构造节点线缓存路径 / Build nodal-map cache path
+    epsilon_key = int(round(float(epsilon_ratio) * 10000.0))  # 压缩阈值参数到文件名 / Compress threshold parameter into filename
+    return mode_file.with_name(f"{mode_file.stem}_nodal_{image_size}_{epsilon_key}_{center_radius_px}.npy")  # 返回缓存文件路径 / Return cache file path
+
+
+def load_or_extract_nodal(mode_file: Path, image_size: int, epsilon_ratio: float, center_radius_px: int) -> np.ndarray:  # 读取或提取节点线图 / Load or extract nodal map
+    cache_path = nodal_cache_path(mode_file, image_size, epsilon_ratio, center_radius_px)  # 构造缓存路径 / Build cache path
+    if cache_path.exists() and cache_path.stat().st_mtime >= mode_file.stat().st_mtime:  # 检查缓存是否新鲜 / Check whether cache is fresh
+        return np.load(cache_path).astype(bool)  # 返回缓存节点线图 / Return cached nodal map
+    x, y, w = load_mode_csv(mode_file)  # 读取 COMSOL 位移数据 / Load COMSOL displacement data
+    W = interpolate_to_grid(x, y, w, image_size)  # 插值到统一网格 / Interpolate to unified grid
+    nodal = extract_nodal_region(W, epsilon_ratio)  # 提取节点线 / Extract nodal region
+    nodal = postprocess_nodal_region(nodal)  # 后处理节点线 / Postprocess nodal region
+    nodal = remove_center_region(nodal, center_radius_px) if center_radius_px > 0 else nodal  # 移除中心夹持区 / Remove centre clamp region
+    np.save(cache_path, nodal.astype(np.uint8))  # 保存节点线缓存 / Save nodal-map cache
+    return nodal.astype(bool)  # 返回布尔节点线图 / Return boolean nodal map
+
+
 def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], image_size: int, epsilon_ratio: float, center_radius_px: int = 0) -> dict:  # 对候选所有模态评分 / Score all candidate modes
     best = {"best_mode": None, "best_iou": -1.0, "best_dice": -1.0, "best_similarity": -1.0, "all_modes": []}  # 初始化最佳结果 / Initialise best result
     for mode_file in mode_files:  # 遍历模态文件 / Iterate mode files
         mode_number = int(mode_file.stem.split("_")[-1])  # 从文件名读取模态编号 / Read mode number from filename
-        x, y, w = load_mode_csv(mode_file)  # 读取 COMSOL 位移数据 / Load COMSOL displacement data
-        W = interpolate_to_grid(x, y, w, image_size)  # 插值到统一网格 / Interpolate to unified grid
-        nodal = extract_nodal_region(W, epsilon_ratio)  # 提取节点线 / Extract nodal region
-        nodal = postprocess_nodal_region(nodal)  # 后处理节点线 / Postprocess nodal region
-        nodal = remove_center_region(nodal, center_radius_px) if center_radius_px > 0 else nodal  # 移除中心夹持区 / Remove centre clamp region
+        nodal = load_or_extract_nodal(mode_file, image_size, epsilon_ratio, center_radius_px)  # 读取或生成节点线图 / Load or build nodal map
         target = resize_binary_to_shape(target_binary, nodal.shape)  # 对齐目标图尺寸 / Align target map shape
         iou = compute_iou(nodal, target)  # 计算 IoU / Compute IoU
         dice = compute_dice(nodal, target)  # 计算 Dice / Compute Dice
@@ -50,10 +67,13 @@ def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], ima
         layout = layout_similarity(nodal, target)  # 计算粗布局相似度 / Compute coarse layout similarity
         area = area_similarity(nodal, target)  # 计算面积相似度 / Compute area similarity
         precision, recall = compute_precision_recall(nodal, target)  # 计算精度和召回 / Compute precision and recall
-        similarity = pattern_similarity(iou, dice, distance, overlap, layout, area, precision)  # 合成相似度 / Combine similarity
-        best["all_modes"].append({"mode": mode_number, "iou": iou, "dice": dice, "distance_similarity": distance, "overlap_balance": overlap, "layout_similarity": layout, "area_similarity": area, "precision": precision, "recall": recall, "similarity": similarity})  # 记录该模态结果 / Record this mode result
+        projection = projection_similarity(nodal, target)  # 计算横纵投影相似度 / Compute projection similarity
+        extent = extent_similarity(nodal, target)  # 计算包围盒尺度相似度 / Compute extent similarity
+        complexity = complexity_similarity(nodal, target)  # 计算结构复杂度相似度 / Compute complexity similarity
+        similarity = pattern_similarity(iou, dice, distance, overlap, layout, area, precision, recall, projection, extent, complexity)  # 合成相似度 / Combine similarity
+        best["all_modes"].append({"mode": mode_number, "iou": iou, "dice": dice, "distance_similarity": distance, "overlap_balance": overlap, "layout_similarity": layout, "area_similarity": area, "precision": precision, "recall": recall, "projection_similarity": projection, "extent_similarity": extent, "complexity_similarity": complexity, "similarity": similarity})  # 记录该模态结果 / Record this mode result
         if similarity > best["best_similarity"]:  # 检查是否是新最佳 / Check whether this is new best
-            best.update({"best_mode": mode_number, "best_iou": iou, "best_dice": dice, "best_distance_similarity": distance, "best_overlap_balance": overlap, "best_layout_similarity": layout, "best_area_similarity": area, "best_precision": precision, "best_recall": recall, "best_similarity": similarity})  # 更新最佳结果 / Update best result
+            best.update({"best_mode": mode_number, "best_iou": iou, "best_dice": dice, "best_distance_similarity": distance, "best_overlap_balance": overlap, "best_layout_similarity": layout, "best_area_similarity": area, "best_precision": precision, "best_recall": recall, "best_projection_similarity": projection, "best_extent_similarity": extent, "best_complexity_similarity": complexity, "best_similarity": similarity})  # 更新最佳结果 / Update best result
     return best  # 返回评分结果 / Return scoring result
 
 

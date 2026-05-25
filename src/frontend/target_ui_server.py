@@ -1003,8 +1003,8 @@ def normalise_target_image(raw_png: bytes, output_path: Path) -> None:  # 保存
 def prepare_target_outputs(config: dict, target_mode_override: str | None = None) -> dict:  # 按配置处理目标图 / Prepare target using config
     image_size = int(config["nodal_extraction"]["image_size"])  # 读取内部图像尺寸 / Read internal image size
     line_width = int(config["nodal_extraction"]["target_line_width_px"])  # 读取目标线宽 / Read target line width
-    target_mode = target_mode_override or str(config["nodal_extraction"].get("target_mode", "stroke"))  # 读取目标模式 / Read target mode
-    if target_mode not in {"stroke", "edge", "filled"}:  # 检查目标模式是否合法 / Check target mode validity
+    target_mode = target_mode_override or str(config["nodal_extraction"].get("target_mode", "chladni"))  # 读取目标模式 / Read target mode
+    if target_mode not in {"chladni", "stroke", "edge", "filled"}:  # 检查目标模式是否合法 / Check target mode validity
         raise ValueError("Unsupported target mode. / 不支持的目标模式。")  # 抛出模式错误 / Raise mode error
     plate_radius_px = int(image_size * float(config["project"]["center_clamp_radius_mm"]) / float(config["project"]["plate_length_mm"]))  # 计算夹持区像素半径 / Compute clamp radius in pixels
     binary = preprocess_target(config["paths"]["target_pattern"], image_size, line_width, plate_radius_px, config["paths"]["processed_targets_dir"], target_mode)  # 运行目标预处理 / Run target preprocessing
@@ -1071,7 +1071,7 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 self.send_bytes(html_path.read_bytes(), "text/html; charset=utf-8")  # 返回 HTML 页面 / Return HTML page
                 return  # 结束请求 / Finish request
             if route == "/api/config":  # 判断是否请求配置 / Check config request
-                self.send_json({"grid_size": int(config["project"]["grid_size"]), "center_clamp_radius_mm": float(config["project"]["center_clamp_radius_mm"]), "plate_length_mm": float(config["project"]["plate_length_mm"]), "target_path": str(target_path), "processed_targets_dir": str(processed_dir), "target_mode": str(config["nodal_extraction"].get("target_mode", "stroke")), "material": config.get("material", {}), "simulation": config.get("simulation", {}), "optimisation": config.get("optimisation", {}), "comsol": config.get("comsol", {}), "artifact_retention": artifact_retention_policy(config)})  # 返回前端配置 / Return frontend config
+                self.send_json({"grid_size": int(config["project"]["grid_size"]), "center_clamp_radius_mm": float(config["project"]["center_clamp_radius_mm"]), "plate_length_mm": float(config["project"]["plate_length_mm"]), "target_path": str(target_path), "processed_targets_dir": str(processed_dir), "target_mode": str(config["nodal_extraction"].get("target_mode", "chladni")), "material": config.get("material", {}), "simulation": config.get("simulation", {}), "optimisation": config.get("optimisation", {}), "comsol": config.get("comsol", {}), "artifact_retention": artifact_retention_policy(config)})  # 返回前端配置 / Return frontend config
                 return  # 结束请求 / Finish request
             if route == "/api/ranking":  # 判断是否请求评分排行 / Check ranking request
                 self.send_json({"ranking": load_ranking(config)})  # 返回评分排行 / Return ranking data
@@ -1272,7 +1272,7 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 payload = json.loads(self.rfile.read(length).decode("utf-8"))  # 读取并解析 JSON / Read and parse JSON
                 raw_png = decode_data_url(str(payload.get("image", "")))  # 解码上传图像 / Decode uploaded image
                 normalise_target_image(raw_png, target_path)  # 保存规范化目标图 / Save normalised target image
-                target_mode = str(payload.get("target_mode", config["nodal_extraction"].get("target_mode", "stroke")))  # 读取保存时目标模式 / Read save-time target mode
+                target_mode = str(payload.get("target_mode", config["nodal_extraction"].get("target_mode", "chladni")))  # 读取保存时目标模式 / Read save-time target mode
                 analysis = prepare_target_outputs(config, target_mode) if payload.get("preprocess", True) else {}  # 可选运行预处理 / Optionally run preprocessing
                 self.send_json({"saved_at": datetime.now().isoformat(timespec="seconds"), "target_path": str(target_path), "processed_targets_dir": str(processed_dir), "analysis": analysis})  # 返回保存结果 / Return save result
             except Exception as exc:  # 处理异常 / Handle exception

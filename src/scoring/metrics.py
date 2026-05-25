@@ -2,6 +2,11 @@ from __future__ import annotations  # 启用现代类型注解 / Enable modern t
 
 import numpy as np  # 导入数值计算库 / Import numerical library
 
+try:  # 优先使用 SciPy 加速距离变换 / Prefer SciPy to accelerate distance transforms
+    from scipy.ndimage import distance_transform_edt as scipy_distance_transform_edt  # 导入欧氏距离变换 / Import Euclidean distance transform
+except Exception:  # 兼容未安装 SciPy 的部署环境 / Support deployments without SciPy
+    scipy_distance_transform_edt = None  # 标记不可用并回退纯 NumPy / Mark unavailable and fall back to pure NumPy
+
 
 def compute_iou(A: np.ndarray, B: np.ndarray) -> float:  # 计算 IoU / Compute IoU
     intersection = np.logical_and(A, B).sum()  # 计算交集像素数 / Count intersection pixels
@@ -71,8 +76,82 @@ def layout_similarity(A: np.ndarray, B: np.ndarray, cells: int = 16) -> float:  
     return float(np.dot(left, right) / (left_norm * right_norm))  # 返回余弦相似度 / Return cosine similarity
 
 
+def profile_similarity(left_profile: np.ndarray, right_profile: np.ndarray) -> float:  # 计算一维投影相似度 / Compute one-dimensional projection similarity
+    left_sum = float(left_profile.sum())  # 计算左侧投影总量 / Compute left projection total
+    right_sum = float(right_profile.sum())  # 计算右侧投影总量 / Compute right projection total
+    if left_sum <= 0.0 or right_sum <= 0.0:  # 检查空投影 / Check empty projections
+        return 0.0  # 空投影返回零 / Return zero for empty projections
+    left = left_profile.astype(float) / left_sum  # 归一化左侧投影 / Normalize left projection
+    right = right_profile.astype(float) / right_sum  # 归一化右侧投影 / Normalize right projection
+    left_norm = float(np.linalg.norm(left))  # 计算左侧范数 / Compute left norm
+    right_norm = float(np.linalg.norm(right))  # 计算右侧范数 / Compute right norm
+    cosine = float(np.dot(left, right) / max(left_norm * right_norm, 1.0e-9))  # 计算余弦相似度 / Compute cosine similarity
+    l1_similarity = float(max(0.0, 1.0 - 0.5 * np.abs(left - right).sum()))  # 计算归一化 L1 相似度 / Compute normalized L1 similarity
+    return float(0.45 * cosine + 0.55 * l1_similarity)  # 返回混合投影分数 / Return blended projection score
+
+
+def projection_similarity(A: np.ndarray, B: np.ndarray) -> float:  # 计算横纵投影相似度 / Compute horizontal and vertical projection similarity
+    left = A.astype(bool)  # 转换第一张图 / Convert first map
+    right = B.astype(bool)  # 转换第二张图 / Convert second map
+    x_score = profile_similarity(left.sum(axis=0), right.sum(axis=0))  # 计算水平投影分数 / Compute x-projection score
+    y_score = profile_similarity(left.sum(axis=1), right.sum(axis=1))  # 计算垂直投影分数 / Compute y-projection score
+    return float(0.58 * x_score + 0.42 * y_score)  # 横向结构更重要 / Weight horizontal structure more strongly
+
+
+def foreground_extent(binary: np.ndarray) -> tuple[float, float, float, float, float]:  # 计算前景包围盒特征 / Compute foreground bounding-box features
+    data = binary.astype(bool)  # 转换布尔图 / Convert to boolean map
+    coords = np.argwhere(data)  # 获取前景坐标 / Read foreground coordinates
+    if coords.size == 0:  # 检查空前景 / Check empty foreground
+        return 0.0, 0.0, 0.5, 0.5, 1.0  # 返回中性空特征 / Return neutral empty features
+    rows, cols = data.shape  # 读取图像尺寸 / Read image shape
+    row_min, col_min = coords.min(axis=0)  # 读取最小坐标 / Read minimum coordinates
+    row_max, col_max = coords.max(axis=0)  # 读取最大坐标 / Read maximum coordinates
+    width = float((col_max - col_min + 1) / max(cols, 1))  # 计算归一化宽度 / Compute normalized width
+    height = float((row_max - row_min + 1) / max(rows, 1))  # 计算归一化高度 / Compute normalized height
+    center_x = float((col_min + col_max + 1) / (2.0 * max(cols, 1)))  # 计算归一化中心 x / Compute normalized centre x
+    center_y = float((row_min + row_max + 1) / (2.0 * max(rows, 1)))  # 计算归一化中心 y / Compute normalized centre y
+    aspect = float(width / max(height, 1.0e-9))  # 计算宽高比 / Compute aspect ratio
+    return width, height, center_x, center_y, aspect  # 返回包围盒特征 / Return bounding-box features
+
+
+def ratio_similarity(left_value: float, right_value: float) -> float:  # 计算比例相似度 / Compute ratio similarity
+    denominator = max(abs(left_value), abs(right_value), 1.0e-9)  # 计算稳定分母 / Compute stable denominator
+    return float(max(0.0, 1.0 - abs(left_value - right_value) / denominator))  # 返回比例分数 / Return ratio score
+
+
+def extent_similarity(A: np.ndarray, B: np.ndarray) -> float:  # 计算包围盒尺度相似度 / Compute bounding-box extent similarity
+    left_width, left_height, left_x, left_y, left_aspect = foreground_extent(A)  # 读取第一张图特征 / Read first-map features
+    right_width, right_height, right_x, right_y, right_aspect = foreground_extent(B)  # 读取第二张图特征 / Read second-map features
+    width_score = ratio_similarity(left_width, right_width)  # 计算宽度相似 / Compute width similarity
+    height_score = ratio_similarity(left_height, right_height)  # 计算高度相似 / Compute height similarity
+    aspect_score = ratio_similarity(left_aspect, right_aspect)  # 计算宽高比相似 / Compute aspect similarity
+    center_distance = float(np.hypot(left_x - right_x, left_y - right_y))  # 计算中心距离 / Compute centre distance
+    center_score = float(max(0.0, 1.0 - center_distance / 0.70710678118))  # 归一化中心分数 / Normalize centre score
+    return float(0.32 * width_score + 0.24 * height_score + 0.24 * center_score + 0.20 * aspect_score)  # 返回尺度结构分数 / Return extent structure score
+
+
+def boundary_complexity(binary: np.ndarray) -> float:  # 计算边界复杂度 / Compute boundary complexity
+    data = binary.astype(bool)  # 转换布尔图 / Convert to boolean map
+    foreground = int(data.sum())  # 计算前景数量 / Count foreground pixels
+    if foreground == 0:  # 检查空前景 / Check empty foreground
+        return 0.0  # 空前景复杂度为零 / Empty foreground has zero complexity
+    padded = np.pad(data, ((1, 1), (1, 1)), mode="constant", constant_values=False)  # 填充边界 / Pad boundaries
+    center = padded[1:-1, 1:-1]  # 读取中心区域 / Read centre region
+    interior = center & padded[:-2, 1:-1] & padded[2:, 1:-1] & padded[1:-1, :-2] & padded[1:-1, 2:]  # 判断四邻域内部点 / Detect four-neighbour interior pixels
+    boundary = center & ~interior  # 提取边界像素 / Extract boundary pixels
+    return float(boundary.sum() / foreground)  # 返回边界占前景比例 / Return boundary-to-foreground ratio
+
+
+def complexity_similarity(A: np.ndarray, B: np.ndarray) -> float:  # 计算结构复杂度相似度 / Compute structural complexity similarity
+    left_complexity = boundary_complexity(A)  # 计算第一张图复杂度 / Compute first-map complexity
+    right_complexity = boundary_complexity(B)  # 计算第二张图复杂度 / Compute second-map complexity
+    return ratio_similarity(left_complexity, right_complexity)  # 返回复杂度比例相似 / Return complexity ratio similarity
+
+
 def chamfer_distance(binary: np.ndarray) -> np.ndarray:  # 计算到最近前景像素的近似距离 / Compute approximate distance to nearest foreground pixel
     data = binary.astype(bool)  # 转为布尔图 / Convert to boolean map
+    if scipy_distance_transform_edt is not None:  # 检查 SciPy 快路径 / Check SciPy fast path
+        return scipy_distance_transform_edt(~data)  # 返回到最近前景的欧氏距离 / Return Euclidean distance to nearest foreground
     height, width = data.shape  # 读取图像尺寸 / Read image shape
     large = float(height + width + 1)  # 设置足够大的初始距离 / Set sufficiently large initial distance
     distances = np.where(data, 0.0, large)  # 前景距离为零，背景为大值 / Set foreground distance zero and background large
@@ -126,5 +205,5 @@ def frequency_penalty(frequency: float, f_min: float, f_max: float) -> float:  #
     return float((frequency - f_max) / max(f_max, 1.0))  # 返回高频惩罚 / Return high-frequency penalty
 
 
-def pattern_similarity(iou: float, dice: float, distance_similarity: float = 0.0, overlap_balance: float = 0.0, layout: float = 0.0, area: float = 0.0, precision: float = 0.0) -> float:  # 合成图案相似度 / Combine pattern similarity
-    return float(0.14 * iou + 0.18 * dice + 0.14 * distance_similarity + 0.16 * overlap_balance + 0.14 * layout + 0.14 * area + 0.10 * precision)  # 返回加权相似度 / Return weighted similarity
+def pattern_similarity(iou: float, dice: float, distance_similarity: float = 0.0, overlap_balance: float = 0.0, layout: float = 0.0, area: float = 0.0, precision: float = 0.0, recall: float = 0.0, projection: float = 0.0, extent: float = 0.0, complexity: float = 0.0) -> float:  # 合成图案相似度 / Combine pattern similarity
+    return float(0.08 * iou + 0.12 * dice + 0.06 * distance_similarity + 0.08 * overlap_balance + 0.08 * layout + 0.05 * area + 0.05 * precision + 0.20 * recall + 0.16 * projection + 0.08 * extent + 0.04 * complexity)  # 返回偏重完整覆盖的加权相似度 / Return coverage-weighted similarity

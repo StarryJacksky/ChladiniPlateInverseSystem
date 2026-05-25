@@ -156,7 +156,7 @@ def check_runtime_config_contract(config: dict) -> list[dict]:  # 检查运行�
     comsol_config = config.get("comsol", {})  # 读取 COMSOL 配置 / Read COMSOL config
     paths_config = config.get("paths", {})  # 读取路径配置 / Read paths config
     target_mode = str(section_value(config, "nodal_extraction", "target_mode", ""))  # 读取目标模式 / Read target mode
-    target_mode_ok = target_mode in {"stroke", "edge", "filled"}  # 检查目标模式 / Check target mode
+    target_mode_ok = target_mode in {"chladni", "stroke", "edge", "filled"}  # 检查目标模式 / Check target mode
     path_keys_ok = all(paths_config.get(key) for key in ["target_pattern", "processed_targets_dir", "candidates_dir", "comsol_exports_dir"])  # 检查路径键 / Check path keys
     return [  # 返回运行时检查 / Return runtime checks
         self_test_item("Target mode contract", target_mode_ok, f"target_mode={target_mode}. / 目标模式={target_mode}。"),  # 添加目标模式检查 / Add target mode check

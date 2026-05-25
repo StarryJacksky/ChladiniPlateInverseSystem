@@ -1655,6 +1655,7 @@
           <input id="widthRange" type="range" min="2" max="40" value="12" aria-label="Stroke width"> <!-- 页面结构 / Page structure -->
         </div> <!-- 页面结构 / Page structure -->
         <div class="group" role="group" aria-label="target mode"> <!-- 页面结构 / Page structure -->
+          <button id="chladniMode" type="button" title="Chladni target" aria-label="Chladni target">Chladni</button> <!-- 页面结构 / Page structure -->
           <button id="strokeMode" type="button" title="Stroke target" aria-label="Stroke target">Stroke</button> <!-- 页面结构 / Page structure -->
           <button id="edgeMode" type="button" title="Edge target" aria-label="Edge target">Edge</button> <!-- 页面结构 / Page structure -->
           <button id="filledMode" type="button" title="Filled target" aria-label="Filled target">Filled</button> <!-- 页面结构 / Page structure -->
@@ -1776,7 +1777,7 @@
           <h2>Results</h2> <!-- 页面结构 / Page structure -->
           <div class="result-filter"> <!-- 页面结构 / Page structure -->
             <label class="field"><span>Find</span><input id="resultSearchInput" type="search" placeholder="candidate id"></label> <!-- 页面结构 / Page structure -->
-            <label class="field"><span>Sort</span><select id="resultSortSelect"><option value="rank">Rank</option><option value="score">Score</option><option value="iou">IoU</option><option value="dice">Dice</option><option value="frequency">Frequency</option></select></label> <!-- 页面结构 / Page structure -->
+            <label class="field"><span>Sort</span><select id="resultSortSelect"><option value="rank">Rank</option><option value="score">Score</option><option value="coverage">Coverage</option><option value="shape">Shape</option><option value="iou">IoU</option><option value="dice">Dice</option><option value="frequency">Frequency</option></select></label> <!-- 页面结构 / Page structure -->
             <label class="field"><span>Min IoU</span><input id="resultMinIouInput" type="number" min="0" max="1" step="0.01" placeholder="0"></label> <!-- 页面结构 / Page structure -->
             <button id="resetResultFiltersButton" type="button">Reset</button> <!-- 页面结构 / Page structure -->
           </div> <!-- 页面结构 / Page structure -->
@@ -1918,6 +1919,8 @@
     const saveButton = document.getElementById("saveButton");
     // 前端逻辑 / Frontend logic
     const importInput = document.getElementById("importInput");
+    // 前端逻辑 / Frontend logic
+    const chladniMode = document.getElementById("chladniMode");
     // 前端逻辑 / Frontend logic
     const strokeMode = document.getElementById("strokeMode");
     // 前端逻辑 / Frontend logic
@@ -2094,7 +2097,7 @@
     // 前端逻辑 / Frontend logic
     let tool = "brush";
     // 前端逻辑 / Frontend logic
-    let targetMode = "stroke";
+    let targetMode = "chladni";
     // 前端逻辑 / Frontend logic
     let activeCandidateId = "";
     // 前端逻辑 / Frontend logic
@@ -2338,6 +2341,8 @@
     function selectTargetMode(nextMode) {
       // 前端逻辑 / Frontend logic
       targetMode = nextMode;
+      // 前端逻辑 / Frontend logic
+      chladniMode.classList.toggle("active", targetMode === "chladni");
       // 前端逻辑 / Frontend logic
       strokeMode.classList.toggle("active", targetMode === "stroke");
       // 前端逻辑 / Frontend logic
@@ -3062,6 +3067,14 @@
         // 前端逻辑 / Frontend logic
         rows.sort((a, b) => Number(b.best_dice || 0) - Number(a.best_dice || 0));
       // 前端逻辑 / Frontend logic
+      } else if (sortValue === "coverage") {
+        // 前端逻辑 / Frontend logic
+        rows.sort((a, b) => Number(b.best_recall || 0) - Number(a.best_recall || 0));
+      // 前端逻辑 / Frontend logic
+      } else if (sortValue === "shape") {
+        // 前端逻辑 / Frontend logic
+        rows.sort((a, b) => Number(b.best_projection_similarity || 0) - Number(a.best_projection_similarity || 0));
+      // 前端逻辑 / Frontend logic
       } else if (sortValue === "frequency") {
         // 前端逻辑 / Frontend logic
         rows.sort((a, b) => Number(a.frequency_hz || 0) - Number(b.frequency_hz || 0));
@@ -3113,7 +3126,8 @@
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.best_dice)}</strong><span>Dice</span></div>
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.best_overlap_balance)}</strong><span>Balance</span></div>
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.best_layout_similarity)}</strong><span>Layout</span></div>
-          <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.best_area_similarity)}</strong><span>Area Fit</span></div>
+          <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.best_recall)}</strong><span>Coverage</span></div>
+          <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.best_projection_similarity)}</strong><span>Shape</span></div>
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.final_score)}</strong><span>Score</span></div>
         <!-- 模板内容 / Template content --></div>
         <!-- 模板内容 / Template content --><div class="result-note">${rankingExplanation(best, rows)}</div>
@@ -3122,7 +3136,7 @@
       // 前端逻辑 / Frontend logic
       resultsList.innerHTML = rows.slice(0, 10).map((row, index) => `
         <!-- 模板内容 / Template content --><button class="result-row" type="button" data-candidate-id="${escapeText(row.candidate_id)}">
-          <!-- 模板内容 / Template content --><div><strong>${index + 1}. ${escapeText(row.candidate_id)}</strong><br>mode ${escapeText(row.best_mode)} · IoU ${formatScore(row.best_iou)} · Dice ${formatScore(row.best_dice)} · Bal ${formatScore(row.best_overlap_balance)} · Lay ${formatScore(row.best_layout_similarity)} · Area ${formatScore(row.best_area_similarity)}</div>
+          <!-- 模板内容 / Template content --><div><strong>${index + 1}. ${escapeText(row.candidate_id)}</strong><br>mode ${escapeText(row.best_mode)} · IoU ${formatScore(row.best_iou)} · Dice ${formatScore(row.best_dice)} · Cov ${formatScore(row.best_recall)} · Shape ${formatScore(row.best_projection_similarity)} · Ext ${formatScore(row.best_extent_similarity)}</div>
           <!-- 模板内容 / Template content --><div>${formatFrequency(row.frequency_hz)} Hz<br>${formatScore(row.final_score)}</div>
         <!-- 模板内容 / Template content --></button>
       <!-- 模板内容 / Template content -->`).join("");
@@ -3164,7 +3178,7 @@
       // 前端逻辑 / Frontend logic
       const bestFrequency = formatFrequency(best.frequency_hz);
       // 前端逻辑 / Frontend logic
-      return `Ranking prioritises target overlap first, then keeps the result useful by applying the configured roughness, mass, and frequency penalties. The current leader is compared against ${candidateCount} visible candidates, with best mode ${escapeText(best.best_mode)} at ${bestFrequency} Hz.`;
+      return `Ranking now prioritises full target coverage and projected shape before applying roughness, mass, and frequency penalties. The current leader is compared against ${candidateCount} visible candidates, with best mode ${escapeText(best.best_mode)} at ${bestFrequency} Hz.`;
     // 前端逻辑 / Frontend logic
     }
 
@@ -4789,7 +4803,7 @@
       // 前端逻辑 / Frontend logic
       gridValue.textContent = `${config.grid_size} x ${config.grid_size}`;
       // 前端逻辑 / Frontend logic
-      selectTargetMode(config.target_mode || "stroke");
+      selectTargetMode(config.target_mode || "chladni");
       // 前端逻辑 / Frontend logic
       populateMaterial(config.material || {});
       // 前端逻辑 / Frontend logic
@@ -4881,6 +4895,8 @@
     brushTool.addEventListener("click", () => selectTool("brush"));
     // 前端逻辑 / Frontend logic
     eraserTool.addEventListener("click", () => selectTool("eraser"));
+    // 前端逻辑 / Frontend logic
+    chladniMode.addEventListener("click", () => selectTargetMode("chladni"));
     // 前端逻辑 / Frontend logic
     strokeMode.addEventListener("click", () => selectTargetMode("stroke"));
     // 前端逻辑 / Frontend logic
