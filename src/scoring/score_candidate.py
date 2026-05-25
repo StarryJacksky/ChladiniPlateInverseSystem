@@ -19,12 +19,14 @@ from src.scoring.metrics import compute_iou  # 导入 IoU 指标 / Import IoU me
 from src.scoring.metrics import compute_overlap_balance  # 导入覆盖平衡分数 / Import overlap balance score
 from src.scoring.metrics import compute_precision_recall  # 导入精度召回指标 / Import precision-recall metrics
 from src.scoring.metrics import chamfer_similarity  # 导入距离相似度 / Import distance similarity
+from src.scoring.metrics import component_similarity  # 导入连通拓扑相似度 / Import connected-topology similarity
 from src.scoring.metrics import complexity_similarity  # 导入复杂度相似度 / Import complexity similarity
 from src.scoring.metrics import extent_similarity  # 导入包围盒尺度相似度 / Import extent similarity
 from src.scoring.metrics import frequency_penalty  # 导入频率惩罚 / Import frequency penalty
 from src.scoring.metrics import layout_similarity  # 导入布局相似度 / Import layout similarity
 from src.scoring.metrics import pattern_similarity  # 导入相似度合成 / Import similarity combiner
 from src.scoring.metrics import projection_similarity  # 导入投影相似度 / Import projection similarity
+from src.scoring.metrics import SCORING_VERSION  # 导入评分版本号 / Import scoring version
 
 
 def resize_binary_to_shape(binary: np.ndarray, shape: tuple[int, int]) -> np.ndarray:  # 缩放二值图到指定尺寸 / Resize binary map to target shape
@@ -70,10 +72,11 @@ def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], ima
         projection = projection_similarity(nodal, target)  # 计算横纵投影相似度 / Compute projection similarity
         extent = extent_similarity(nodal, target)  # 计算包围盒尺度相似度 / Compute extent similarity
         complexity = complexity_similarity(nodal, target)  # 计算结构复杂度相似度 / Compute complexity similarity
-        similarity = pattern_similarity(iou, dice, distance, overlap, layout, area, precision, recall, projection, extent, complexity)  # 合成相似度 / Combine similarity
-        best["all_modes"].append({"mode": mode_number, "iou": iou, "dice": dice, "distance_similarity": distance, "overlap_balance": overlap, "layout_similarity": layout, "area_similarity": area, "precision": precision, "recall": recall, "projection_similarity": projection, "extent_similarity": extent, "complexity_similarity": complexity, "similarity": similarity})  # 记录该模态结果 / Record this mode result
+        topology = component_similarity(nodal, target)  # 计算连通拓扑相似度 / Compute connected-topology similarity
+        similarity = pattern_similarity(iou, dice, distance, overlap, layout, area, precision, recall, projection, extent, complexity, topology)  # 合成相似度 / Combine similarity
+        best["all_modes"].append({"mode": mode_number, "iou": iou, "dice": dice, "distance_similarity": distance, "overlap_balance": overlap, "layout_similarity": layout, "area_similarity": area, "precision": precision, "recall": recall, "projection_similarity": projection, "extent_similarity": extent, "complexity_similarity": complexity, "component_similarity": topology, "similarity": similarity})  # 记录该模态结果 / Record this mode result
         if similarity > best["best_similarity"]:  # 检查是否是新最佳 / Check whether this is new best
-            best.update({"best_mode": mode_number, "best_iou": iou, "best_dice": dice, "best_distance_similarity": distance, "best_overlap_balance": overlap, "best_layout_similarity": layout, "best_area_similarity": area, "best_precision": precision, "best_recall": recall, "best_projection_similarity": projection, "best_extent_similarity": extent, "best_complexity_similarity": complexity, "best_similarity": similarity})  # 更新最佳结果 / Update best result
+            best.update({"best_mode": mode_number, "best_iou": iou, "best_dice": dice, "best_distance_similarity": distance, "best_overlap_balance": overlap, "best_layout_similarity": layout, "best_area_similarity": area, "best_precision": precision, "best_recall": recall, "best_projection_similarity": projection, "best_extent_similarity": extent, "best_complexity_similarity": complexity, "best_component_similarity": topology, "best_similarity": similarity})  # 更新最佳结果 / Update best result
     return best  # 返回评分结果 / Return scoring result
 
 
@@ -98,7 +101,7 @@ def score_candidate(candidate_dir: str | Path, export_dir: str | Path, target_bi
     mode_score = score_candidate_modes(target_binary, mode_files, int(config["nodal_extraction"]["image_size"]), float(config["nodal_extraction"]["epsilon_ratio"]), center_radius_px)  # 计算模态评分 / Compute mode scores
     best_frequency = frequencies.get(int(mode_score["best_mode"]), 0.0)  # 获取最佳模态频率 / Get best-mode frequency
     final_score = compute_final_score(H, mode_score, best_frequency, config)  # 计算最终分数 / Compute final score
-    result = {**mode_score, "frequency_hz": best_frequency, **final_score}  # 合并结果 / Merge results
+    result = {**mode_score, "frequency_hz": best_frequency, "scoring_version": SCORING_VERSION, **final_score}  # 合并结果和评分版本 / Merge result and scoring version
     with (candidate_path / "score.json").open("w", encoding="utf-8") as file_obj:  # 打开评分文件 / Open score file
         json.dump(result, file_obj, indent=2, ensure_ascii=False)  # 写入评分结果 / Write score result
     return result  # 返回结果 / Return result

@@ -20,12 +20,15 @@ except Exception:  # 兼容无 SciPy 稀疏模块环境 / Support environments w
 
 from src.candidate.constraints import center_cells_for_grid  # 导入中心单元工具 / Import centre-cell helper
 from src.scoring.metrics import area_similarity  # 导入面积相似度 / Import area similarity
+from src.scoring.metrics import component_similarity  # 导入连通拓扑相似度 / Import connected-topology similarity
 from src.scoring.metrics import complexity_similarity  # 导入复杂度相似度 / Import complexity similarity
 from src.scoring.metrics import compute_dice  # 导入 Dice 指标 / Import Dice metric
 from src.scoring.metrics import compute_iou  # 导入 IoU 指标 / Import IoU metric
+from src.scoring.metrics import compute_overlap_balance  # 导入覆盖平衡分 / Import overlap balance score
 from src.scoring.metrics import compute_precision_recall  # 导入精度召回 / Import precision-recall metrics
 from src.scoring.metrics import extent_similarity  # 导入包围盒尺度相似度 / Import extent similarity
 from src.scoring.metrics import layout_similarity  # 导入布局相似度 / Import layout similarity
+from src.scoring.metrics import pattern_similarity  # 导入统一图案相似度 / Import unified pattern similarity
 from src.scoring.metrics import projection_similarity  # 导入投影相似度 / Import projection similarity
 
 
@@ -161,9 +164,18 @@ def solve_kl_modes(H_mm: np.ndarray, plate_length_mm: float, plate_width_mm: flo
 
 
 def nodal_map_from_mode(mode: np.ndarray, epsilon_ratio: float = 0.12) -> np.ndarray:  # 从代理模态提取节点线 / Extract nodal map from proxy mode
-    amplitude = np.abs(mode)  # 计算振幅绝对值 / Compute absolute amplitude
+    values = mode.astype(float)  # 转换模态为浮点矩阵 / Convert mode to float matrix
+    amplitude = np.abs(values)  # 计算振幅绝对值 / Compute absolute amplitude
     threshold = float(epsilon_ratio) * max(float(amplitude.max()), 1.0e-9)  # 计算节点阈值 / Compute nodal threshold
     nodal = amplitude <= threshold  # 提取近零位移区域 / Extract near-zero displacement area
+    vertical_change = values[:-1, :] * values[1:, :] <= 0.0  # 检测纵向符号翻转 / Detect vertical sign changes
+    horizontal_change = values[:, :-1] * values[:, 1:] <= 0.0  # 检测横向符号翻转 / Detect horizontal sign changes
+    nodal[:-1, :] |= vertical_change  # 标记纵向翻转上侧 / Mark upper side of vertical changes
+    nodal[1:, :] |= vertical_change  # 标记纵向翻转下侧 / Mark lower side of vertical changes
+    nodal[:, :-1] |= horizontal_change  # 标记横向翻转左侧 / Mark left side of horizontal changes
+    nodal[:, 1:] |= horizontal_change  # 标记横向翻转右侧 / Mark right side of horizontal changes
+    padded = np.pad(nodal, 1, mode="constant", constant_values=False)  # 填充节点图用于加粗 / Pad nodal map for line thickening
+    nodal = padded[1:-1, 1:-1] | padded[:-2, 1:-1] | padded[2:, 1:-1] | padded[1:-1, :-2] | padded[1:-1, 2:]  # 加粗一格代理节点线 / Thicken proxy nodal lines by one cell
     for row, col in center_cells_for_grid(mode.shape[0]):  # 遍历中心固定单元 / Iterate centre fixed cells
         nodal[row, col] = False  # 移除中心夹持点 / Remove centre clamp point
     return nodal.astype(bool)  # 返回布尔节点图 / Return boolean nodal map
@@ -174,12 +186,14 @@ def score_kl_mode(nodal: np.ndarray, target_grid: np.ndarray) -> float:  # 评�
     iou = compute_iou(nodal, target)  # 计算 IoU / Compute IoU
     dice = compute_dice(nodal, target)  # 计算 Dice / Compute Dice
     area = area_similarity(nodal, target)  # 计算面积相似度 / Compute area similarity
+    overlap = compute_overlap_balance(nodal, target)  # 计算覆盖平衡 / Compute overlap balance
     precision, recall = compute_precision_recall(nodal, target)  # 计算精度和召回 / Compute precision and recall
     layout = layout_similarity(nodal, target, cells=min(8, nodal.shape[0]))  # 计算粗布局相似度 / Compute coarse layout similarity
     projection = projection_similarity(nodal, target)  # 计算投影相似度 / Compute projection similarity
     extent = extent_similarity(nodal, target)  # 计算尺度相似度 / Compute extent similarity
     complexity = complexity_similarity(nodal, target)  # 计算复杂度相似度 / Compute complexity similarity
-    return float(0.08 * iou + 0.12 * dice + 0.08 * layout + 0.05 * area + 0.05 * precision + 0.22 * recall + 0.20 * projection + 0.14 * extent + 0.06 * complexity)  # 返回覆盖优先的代理合成分 / Return coverage-first proxy combined score
+    topology = component_similarity(nodal, target)  # 计算连通拓扑相似度 / Compute connected-topology similarity
+    return pattern_similarity(iou, dice, 0.0, overlap, layout, area, precision, recall, projection, extent, complexity, topology)  # 返回统一口径的代理合成分 / Return unified proxy combined score
 
 
 def resize_target_to_grid(target_grid: np.ndarray, grid_size: int) -> np.ndarray:  # 将目标图压缩到代理网格 / Compress target map to proxy grid

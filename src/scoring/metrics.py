@@ -2,6 +2,8 @@ from __future__ import annotations  # 启用现代类型注解 / Enable modern t
 
 import numpy as np  # 导入数值计算库 / Import numerical library
 
+SCORING_VERSION = "precision_topology_v3"  # 记录当前评分口径版本 / Record current scoring-rule version
+
 try:  # 优先使用 SciPy 加速距离变换 / Prefer SciPy to accelerate distance transforms
     from scipy.ndimage import distance_transform_edt as scipy_distance_transform_edt  # 导入欧氏距离变换 / Import Euclidean distance transform
 except Exception:  # 兼容未安装 SciPy 的部署环境 / Support deployments without SciPy
@@ -148,6 +150,39 @@ def complexity_similarity(A: np.ndarray, B: np.ndarray) -> float:  # 计算结�
     return ratio_similarity(left_complexity, right_complexity)  # 返回复杂度比例相似 / Return complexity ratio similarity
 
 
+def connected_component_count(binary: np.ndarray, min_pixels: int = 4) -> int:  # 计算前景连通块数量 / Count foreground connected components
+    data = binary.astype(bool)  # 转换布尔图 / Convert to boolean map
+    visited = np.zeros(data.shape, dtype=bool)  # 创建访问标记 / Create visited flags
+    rows, cols = data.shape  # 读取图像尺寸 / Read image shape
+    count = 0  # 初始化连通块计数 / Initialize component count
+    for start_row, start_col in np.argwhere(data):  # 遍历所有前景像素 / Iterate all foreground pixels
+        start = (int(start_row), int(start_col))  # 转换起点坐标 / Convert start coordinate
+        if visited[start]:  # 检查是否已访问 / Check whether already visited
+            continue  # 跳过已访问像素 / Skip visited pixel
+        visited[start] = True  # 标记起点已访问 / Mark start visited
+        stack = [start]  # 创建深度搜索栈 / Create depth-first stack
+        size = 0  # 初始化当前块大小 / Initialize current component size
+        while stack:  # 遍历当前连通块 / Traverse current component
+            row, col = stack.pop()  # 取出一个像素 / Pop one pixel
+            size += 1  # 累加块大小 / Increase component size
+            for next_row, next_col in ((row - 1, col), (row + 1, col), (row, col - 1), (row, col + 1)):  # 遍历四邻域 / Iterate four-neighbourhood
+                if 0 <= next_row < rows and 0 <= next_col < cols and data[next_row, next_col] and not visited[next_row, next_col]:  # 检查邻居是否可加入 / Check whether neighbour can join
+                    visited[next_row, next_col] = True  # 标记邻居已访问 / Mark neighbour visited
+                    stack.append((next_row, next_col))  # 加入搜索栈 / Add neighbour to stack
+        if size >= min_pixels:  # 忽略极小噪声块 / Ignore tiny noise components
+            count += 1  # 记录有效连通块 / Count valid component
+    return count  # 返回连通块数量 / Return component count
+
+
+def component_similarity(A: np.ndarray, B: np.ndarray) -> float:  # 计算连通拓扑相似度 / Compute connected-topology similarity
+    left_count = connected_component_count(A)  # 计算第一张图连通块 / Count first-map components
+    right_count = connected_component_count(B)  # 计算第二张图连通块 / Count second-map components
+    if left_count == 0 and right_count == 0:  # 检查双空图 / Check both-empty maps
+        return 1.0  # 双空拓扑一致 / Both empty maps match topologically
+    denominator = max(left_count, right_count, 1)  # 计算归一化分母 / Compute normalization denominator
+    return float(max(0.0, 1.0 - abs(left_count - right_count) / denominator))  # 返回连通块数量相似度 / Return component-count similarity
+
+
 def chamfer_distance(binary: np.ndarray) -> np.ndarray:  # 计算到最近前景像素的近似距离 / Compute approximate distance to nearest foreground pixel
     data = binary.astype(bool)  # 转为布尔图 / Convert to boolean map
     if scipy_distance_transform_edt is not None:  # 检查 SciPy 快路径 / Check SciPy fast path
@@ -205,5 +240,21 @@ def frequency_penalty(frequency: float, f_min: float, f_max: float) -> float:  #
     return float((frequency - f_max) / max(f_max, 1.0))  # 返回高频惩罚 / Return high-frequency penalty
 
 
-def pattern_similarity(iou: float, dice: float, distance_similarity: float = 0.0, overlap_balance: float = 0.0, layout: float = 0.0, area: float = 0.0, precision: float = 0.0, recall: float = 0.0, projection: float = 0.0, extent: float = 0.0, complexity: float = 0.0) -> float:  # 合成图案相似度 / Combine pattern similarity
-    return float(0.08 * iou + 0.12 * dice + 0.06 * distance_similarity + 0.08 * overlap_balance + 0.08 * layout + 0.05 * area + 0.05 * precision + 0.20 * recall + 0.16 * projection + 0.08 * extent + 0.04 * complexity)  # 返回偏重完整覆盖的加权相似度 / Return coverage-weighted similarity
+def coverage_f_score(precision: float, recall: float) -> float:  # 计算覆盖 F 分数 / Compute coverage F-score
+    denominator = precision + recall  # 计算调和均值分母 / Compute harmonic-mean denominator
+    if denominator <= 1.0e-12:  # 检查空精度召回 / Check empty precision-recall pair
+        return 0.0  # 返回零分 / Return zero score
+    return float(2.0 * precision * recall / denominator)  # 返回 F1 覆盖分 / Return F1 coverage score
+
+
+def overcoverage_penalty(precision: float, recall: float, area: float) -> float:  # 计算过覆盖惩罚 / Compute overcoverage penalty
+    recall_precision_gap = max(0.0, recall - precision)  # 读取只靠召回撑分的差距 / Read recall-over-precision gap
+    area_gap = max(0.0, 1.0 - area)  # 读取面积不匹配程度 / Read area mismatch level
+    return float(0.70 * recall_precision_gap + 0.30 * area_gap * recall_precision_gap)  # 返回过覆盖惩罚 / Return overcoverage penalty
+
+
+def pattern_similarity(iou: float, dice: float, distance_similarity: float = 0.0, overlap_balance: float = 0.0, layout: float = 0.0, area: float = 0.0, precision: float = 0.0, recall: float = 0.0, projection: float = 0.0, extent: float = 0.0, complexity: float = 0.0, topology: float = 0.0) -> float:  # 合成图案相似度 / Combine pattern similarity
+    balance = coverage_f_score(precision, recall)  # 计算精度召回平衡分 / Compute precision-recall balance score
+    raw = 0.10 * iou + 0.15 * dice + 0.06 * distance_similarity + 0.15 * overlap_balance + 0.06 * layout + 0.03 * area + 0.16 * precision + 0.04 * recall + 0.10 * projection + 0.04 * extent + 0.03 * complexity + 0.04 * balance + 0.04 * topology  # 合成偏精确和拓扑的基础分 / Combine precision-and-topology-biased base score
+    penalty = overcoverage_penalty(precision, recall, area)  # 计算多余响应惩罚 / Compute extra-response penalty
+    return float(max(0.0, raw - 0.18 * penalty))  # 返回抑制过覆盖后的相似度 / Return overcoverage-suppressed similarity

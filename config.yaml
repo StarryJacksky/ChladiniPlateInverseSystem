@@ -27,7 +27,7 @@ material:
 
 # COMSOL 仿真设置 / COMSOL simulation settings
 simulation:
-  num_modes: 40 # 导出模态数量 / Number of exported modes
+  num_modes: 80 # 导出模态数量 / Number of exported modes
   frequency_min_hz: 0 # 最小目标频率 / Minimum target frequency
   frequency_max_hz: 3000 # 最大目标频率 / Maximum target frequency
 
@@ -66,15 +66,15 @@ optimisation:
   bayesian_ensemble_size: 16 # 贝叶斯代理集成数量 / Bayesian surrogate ensemble size
   bayesian_ucb_beta: 0.42 # 贝叶斯 UCB 探索强度 / Bayesian UCB exploration strength
   bayesian_expected_improvement_weight: 0.30 # 期望改进权重 / Expected improvement weight
-  kl_proxy_weight: 0.50 # KL 物理代理权重 / KL physics proxy weight
-  kl_proxy_grid_size: 23 # KL 代理高分辨率求解网格 / High-resolution solve grid for KL proxy
-  kl_proxy_num_modes: 8 # KL 代理参与匹配的模态数量 / Number of KL proxy modes used for matching
-  kl_proxy_optimised_count: 4 # KL 直接优化候选数量 / Number of directly KL-optimised candidates
-  kl_proxy_local_steps: 8 # KL 直接优化局部搜索步数 / Local search steps for direct KL optimisation
-  kl_proxy_pool_stride: 12 # 贝叶斯候选池 KL 精算间隔 / KL exact-scoring interval for Bayesian pool
-  kl_proxy_start_temperature: 0.035 # KL 退火初始温度 / Initial KL annealing temperature
-  kl_proxy_end_temperature: 0.004 # KL 退火结束温度 / Final KL annealing temperature
-  novelty_weight: 0.24 # 新颖度探索权重 / Novelty exploration weight
+  kl_proxy_weight: 0.28 # KL 物理代理权重 / KL physics proxy weight
+  kl_proxy_grid_size: 31 # KL 代理高分辨率求解网格 / High-resolution solve grid for KL proxy
+  kl_proxy_num_modes: 32 # KL 代理参与匹配的模态数量 / Number of KL proxy modes used for matching
+  kl_proxy_optimised_count: 6 # KL 直接优化候选数量 / Number of directly KL-optimised candidates
+  kl_proxy_local_steps: 14 # KL 直接优化局部搜索步数 / Local search steps for direct KL optimisation
+  kl_proxy_pool_stride: 6 # 贝叶斯候选池 KL 精算间隔 / KL exact-scoring interval for Bayesian pool
+  kl_proxy_start_temperature: 0.080 # KL 退火初始温度 / Initial KL annealing temperature
+  kl_proxy_end_temperature: 0.006 # KL 退火结束温度 / Final KL annealing temperature
+  novelty_weight: 0.30 # 新颖度探索权重 / Novelty exploration weight
   roughness_weight: 0.15 # 归一化粗糙度惩罚权重 / Normalized roughness penalty weight
   mass_weight: 0.01 # 质量惩罚权重 / Mass penalty weight
   frequency_weight: 0.01 # 频率惩罚权重 / Frequency penalty weight
