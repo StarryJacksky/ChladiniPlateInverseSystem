@@ -55,15 +55,18 @@ def write_livelink_log(log_path: Path, command: list[str], output: str, returnco
         file_obj.write(output or "")  # 写入 MATLAB 输出 / Write MATLAB output
 
 
-def run_command_streamed(command: list[str], log_path: Path, progress=None, event_base: dict | None = None, timeout_s: float | None = None) -> tuple[int, str]:  # 流式运行命令并写日志 / Run command with streamed logging
+def run_command_streamed(command: list[str], log_path: Path, progress=None, event_base: dict | None = None, timeout_s: float | None = None, append: bool = False) -> tuple[int, str]:  # 流式运行命令并写日志 / Run command with streamed logging
     log_path.parent.mkdir(parents=True, exist_ok=True)  # 确保日志目录存在 / Ensure log directory exists
     output_lines = []  # 创建输出缓存 / Create output cache
     base = event_base or {}  # 读取事件基础字段 / Read base event fields
-    with log_path.open("w", encoding="utf-8") as file_obj:  # 打开日志文件 / Open log file
+    mode = "a" if append else "w"  # 选择写入模式 / Choose write mode
+    with log_path.open(mode, encoding="utf-8") as file_obj:  # 打开日志文件 / Open log file
+        if append:  # 检查是否追加重试日志 / Check whether appending retry log
+            file_obj.write("\n--- retry / 重试 ---\n")  # 写入重试分隔线 / Write retry separator
         file_obj.write(f"started_at={datetime.now().isoformat(timespec='seconds')}\n")  # 写入开始时间 / Write start time
         file_obj.write(f"timeout_s={timeout_s or ''}\n")  # 写入超时设置 / Write timeout setting
         file_obj.write("command=" + " ".join(command) + "\n\n")  # 写入命令 / Write command
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)  # 启动子进程并合并输出 / Start subprocess with merged output
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1)  # 启动子进程并合并输出 / Start subprocess with merged output
         assert process.stdout is not None  # 帮助类型检查确认输出存在 / Help type checking confirm stdout exists
         def read_output() -> None:  # 定义输出读取线程 / Define output-reader thread
             for line in process.stdout:  # 逐行读取输出 / Read output line by line
@@ -89,6 +92,12 @@ def run_command_streamed(command: list[str], log_path: Path, progress=None, even
     return returncode, "".join(output_lines)  # 返回返回码和输出 / Return return code and output
 
 
+def is_livelink_connection_failure(output: str) -> bool:  # 判断是否 LiveLink 连接失败 / Decide whether output is a LiveLink connection failure
+    lowered = output.lower()  # 转为小写便于匹配 / Lowercase for matching
+    tokens = ["mphstart", "connection refused", "failed to connect to server", "could not be established"]  # 定义连接失败关键词 / Define connection-failure tokens
+    return any(token in lowered for token in tokens)  # 返回是否命中关键词 / Return whether any token matched
+
+
 def run_livelink_candidate(config: dict, candidate_id: str, num_modes: int | None = None, model_path: str | Path | None = None, matlab_path: str | Path | None = None, runner_path: str | Path | None = None, progress=None) -> dict:  # 运行单个候选 / Run one candidate
     runtime_config, _applied, _discovery = config_with_runtime_discovery(config)  # 应用运行时路径发现 / Apply runtime path discovery
     if not ensure_comsol_server(runtime_config):  # 确保 COMSOL server 可用 / Ensure COMSOL server availability
@@ -106,7 +115,12 @@ def run_livelink_candidate(config: dict, candidate_id: str, num_modes: int | Non
     command = [matlab, "-batch", batch]  # 构造命令列表 / Build command list
     log_path = export_dir / "livelink.log"  # 构造候选日志路径 / Build candidate log path
     timeout_s = float(runtime_config.get("comsol", {}).get("livelink_timeout_s", 7200))  # 读取 LiveLink 超时 / Read LiveLink timeout
-    returncode, _output = run_command_streamed(command, log_path, progress, {"current_candidate": candidate_id}, timeout_s)  # 流式运行并记录日志 / Run with streamed logging
+    returncode, output = run_command_streamed(command, log_path, progress, {"current_candidate": candidate_id}, timeout_s)  # 流式运行并记录日志 / Run with streamed logging
+    if returncode != 0 and is_livelink_connection_failure(output):  # 检查是否可重试的连接错误 / Check retryable connection error
+        if progress is not None:  # 检查是否有进度回调 / Check progress callback
+            progress({"current_candidate": candidate_id, "stage": "retry", "message": "LiveLink connection failed once; restarting COMSOL server and retrying. / LiveLink 首次连接失败，正在重启 COMSOL server 并重试。", "log_path": str(log_path)})  # 发送重试进度 / Emit retry progress
+        ensure_comsol_server(runtime_config, wait_s=float(runtime_config.get("comsol", {}).get("server_start_timeout_s", 30.0)))  # 重新确保 server 可用 / Ensure server again
+        returncode, output = run_command_streamed(command, log_path, progress, {"current_candidate": candidate_id}, timeout_s, append=True)  # 追加日志并重试一次 / Append log and retry once
     if returncode != 0:  # 检查 MATLAB 返回码 / Check MATLAB return code
         raise RuntimeError(f"LiveLink simulation failed for {candidate_id}. See {log_path}. / {candidate_id} 的 LiveLink 仿真失败，见 {log_path}。")  # 抛出日志指向错误 / Raise log-pointing error
     return {"candidate_id": candidate_id, "export_dir": str(export_dir), "num_modes": modes, "returncode": returncode, "log_path": str(log_path)}  # 返回运行结果 / Return run result
