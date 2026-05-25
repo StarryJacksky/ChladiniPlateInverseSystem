@@ -2,6 +2,7 @@ from __future__ import annotations  # 启用现代类型注解 / Enable modern t
 
 import json  # 导入 JSON 工具 / Import JSON utilities
 import csv  # 导入 CSV 工具 / Import CSV utilities
+import math  # 导入数学函数 / Import math functions
 from pathlib import Path  # 导入路径工具 / Import path utilities
 
 import numpy as np  # 导入数值计算库 / Import numerical library
@@ -52,14 +53,13 @@ def repair_candidate_matrix(H: np.ndarray, levels: list[float], max_neighbor_dif
     return repair_continuous_neighbor_constraint(H, float(min(levels)), float(max(levels)), max_neighbor_diff, passes=passes, fixed_cells=fixed_cells)  # 调用连续约束修复 / Call continuous constraint repair
 
 
-def generate_evolutionary_H(parents: list[np.ndarray], levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator) -> np.ndarray:  # 生成进化候选矩阵 / Generate evolutionary candidate matrix
+def generate_evolutionary_H(parents: list[np.ndarray], levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator, mutation_rate: float = 0.10) -> np.ndarray:  # 生成遗传算法候选矩阵 / Generate genetic algorithm candidate matrix
     if len(parents) < 2:  # 检查父代是否足够 / Check whether enough parents exist
         return generate_random_H(parents[0].shape[0], levels, default_thickness, max_neighbor_diff, rng) if parents else generate_random_H(15, levels, default_thickness, max_neighbor_diff, rng)  # 退回随机生成 / Fall back to random generation
     first = parents[int(rng.integers(0, len(parents)))]  # 随机选择第一父代 / Choose first parent randomly
     second = parents[int(rng.integers(0, len(parents)))]  # 随机选择第二父代 / Choose second parent randomly
     mask = rng.random(first.shape) < 0.5  # 创建交叉掩膜 / Build crossover mask
     child = np.where(mask, first, second).astype(float)  # 交叉生成子代 / Build child by crossover
-    mutation_rate = 0.10  # 设置变异率 / Set mutation rate
     mutation_mask = rng.random(child.shape) < mutation_rate  # 创建变异掩膜 / Build mutation mask
     for row, col in np.argwhere(mutation_mask):  # 遍历变异单元 / Iterate mutated cells
         child[row, col] = random_continuous_near(float(child[row, col]), levels, rng)  # 设置连续邻近变异厚度 / Set nearby continuous mutated thickness
@@ -319,10 +319,41 @@ def fit_score_surrogate(history: list[dict], levels: list[float]) -> dict | None
     return {"x_mean": x_mean, "y_mean": y_mean, "y_min": float(y.min()), "y_max": float(y.max()), "coef": coef, "history_vectors": X, "history": history}  # 返回代理模型 / Return surrogate model
 
 
+def fit_bayesian_surrogate_ensemble(history: list[dict], levels: list[float], ensemble_size: int, rng: np.random.Generator) -> list[dict]:  # 拟合贝叶斯式自助集成代理 / Fit Bayesian-style bootstrap surrogate ensemble
+    if len(history) < 6:  # 检查历史样本数量 / Check historical sample count
+        return []  # 样本太少则返回空集成 / Return empty ensemble with too few samples
+    ensemble = []  # 创建代理模型集成 / Create surrogate-model ensemble
+    base = fit_score_surrogate(history, levels)  # 拟合全量基准代理 / Fit full-data baseline surrogate
+    if base is not None:  # 检查基准模型是否可用 / Check whether baseline model is usable
+        ensemble.append(base)  # 加入基准模型 / Add baseline model
+    for _ in range(max(0, ensemble_size - len(ensemble))):  # 生成自助采样模型 / Generate bootstrap models
+        sample = [history[int(rng.integers(0, len(history)))] for _ in range(len(history))]  # 有放回采样历史 / Sample history with replacement
+        model = fit_score_surrogate(sample, levels)  # 拟合采样代理模型 / Fit sampled surrogate model
+        if model is not None:  # 检查模型是否有效 / Check whether model is valid
+            ensemble.append(model)  # 加入集成 / Add to ensemble
+    return ensemble  # 返回集成代理 / Return surrogate ensemble
+
+
 def predict_surrogate_score(surrogate: dict, H: np.ndarray, levels: list[float]) -> float:  # 预测代理评分 / Predict surrogate score
     vector = surrogate_vector(H, levels)  # 构建候选向量 / Build candidate vector
     raw = float(surrogate["y_mean"] + np.dot(vector - surrogate["x_mean"], surrogate["coef"]))  # 计算原始预测 / Compute raw prediction
     return float(np.clip(raw, surrogate["y_min"] - 0.15, surrogate["y_max"] + 0.15))  # 裁剪到合理外推范围 / Clip to reasonable extrapolation range
+
+
+def predict_bayesian_surrogate_stats(ensemble: list[dict], H: np.ndarray, levels: list[float]) -> tuple[float, float]:  # 预测贝叶斯集成均值和不确定性 / Predict Bayesian ensemble mean and uncertainty
+    predictions = np.asarray([predict_surrogate_score(model, H, levels) for model in ensemble], dtype=float)  # 计算所有代理预测 / Compute all surrogate predictions
+    if predictions.size == 0:  # 检查是否无预测 / Check whether predictions are empty
+        return 0.0, 0.0  # 无代理时返回零 / Return zeros without surrogate
+    return float(predictions.mean()), float(predictions.std())  # 返回均值和标准差 / Return mean and standard deviation
+
+
+def expected_improvement(mean: float, std: float, best_score: float) -> float:  # 计算贝叶斯期望改进 / Compute Bayesian expected improvement
+    if std < 1.0e-9:  # 检查不确定性是否过小 / Check whether uncertainty is tiny
+        return max(0.0, mean - best_score)  # 退化为正改进 / Fall back to positive improvement
+    z_value = (mean - best_score) / std  # 计算标准化改进 / Compute normalized improvement
+    cdf = 0.5 * (1.0 + math.erf(z_value / math.sqrt(2.0)))  # 计算标准正态 CDF / Compute standard normal CDF
+    pdf = math.exp(-0.5 * z_value * z_value) / math.sqrt(2.0 * math.pi)  # 计算标准正态 PDF / Compute standard normal PDF
+    return float((mean - best_score) * cdf + std * pdf)  # 返回期望改进 / Return expected improvement
 
 
 def surrogate_novelty(surrogate: dict, H: np.ndarray, levels: list[float]) -> float:  # 计算候选新颖度 / Compute candidate novelty
@@ -363,7 +394,7 @@ def choose_pool_parent(history: list[dict], parents: list[np.ndarray], rng: np.r
     return generate_random_H(15, levels=[0.6, 0.8, 0.9, 1.0, 1.3, 1.4, 1.8, 2.0], default_thickness=1.0, max_neighbor_diff=0.7, rng=rng)  # 返回兜底随机矩阵 / Return fallback random matrix
 
 
-def build_surrogate_pool_candidate(pool_index: int, surrogate: dict, history: list[dict], response_records: list[dict], parents: list[np.ndarray], target_grid: np.ndarray, levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 构建代理候选池成员 / Build one surrogate candidate-pool member
+def build_surrogate_pool_candidate(pool_index: int, surrogate: dict, history: list[dict], response_records: list[dict], parents: list[np.ndarray], target_grid: np.ndarray, levels: list[float], default_thickness: float, max_neighbor_diff: float, mutation_rate: float, rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 构建代理候选池成员 / Build one surrogate candidate-pool member
     kind = pool_index % 6  # 选择候选来源类型 / Select candidate source type
     if response_records and kind in {0, 1}:  # 优先使用真实响应闭环候选 / Prefer real-response closed-loop candidates
         return generate_response_guided_H(response_records, pool_index, levels, default_thickness, max_neighbor_diff, rng)  # 返回闭环候选 / Return closed-loop candidate
@@ -371,7 +402,7 @@ def build_surrogate_pool_candidate(pool_index: int, surrogate: dict, history: li
         return generate_target_guided_H(target_grid, pool_index, parents, levels, default_thickness, max_neighbor_diff, rng)  # 返回目标感知候选 / Return target-aware candidate
     if kind in {3, 4}:  # 使用代理梯度候选 / Use surrogate-gradient candidate
         return surrogate_gradient_candidate(choose_pool_parent(history, parents, rng), surrogate, levels, default_thickness, max_neighbor_diff, rng)  # 返回代理梯度候选 / Return surrogate-gradient candidate
-    return generate_evolutionary_H([item["H"] for item in history[:8]], levels, default_thickness, max_neighbor_diff, rng), "surrogate_evolutionary_pool"  # 返回代理池进化候选 / Return surrogate-pool evolutionary candidate
+    return generate_evolutionary_H([item["H"] for item in history[:8]], levels, default_thickness, max_neighbor_diff, rng, mutation_rate), "surrogate_genetic_pool"  # 返回代理池遗传候选 / Return surrogate-pool genetic candidate
 
 
 def is_diverse_candidate(H: np.ndarray, selected: list[tuple[np.ndarray, str]], levels: list[float], threshold: float = 0.055) -> bool:  # 判断候选是否足够多样 / Decide whether candidate is diverse enough
@@ -394,33 +425,44 @@ def kl_proxy_candidate_score(H: np.ndarray, target_grid: np.ndarray, config: dic
 def generate_surrogate_proposals(config: dict, candidates_dir: Path, target_grid: np.ndarray | None, response_records: list[dict], parents: list[np.ndarray], levels: list[float], default_thickness: float, max_neighbor_diff: float, population: int, rng: np.random.Generator) -> list[tuple[np.ndarray, str]]:  # 生成代理优化提案 / Generate surrogate-optimised proposals
     if target_grid is None:  # 检查目标网格是否存在 / Check whether target grid exists
         return []  # 无目标则不使用代理 / Do not use surrogate without target
+    optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation config
     history = load_surrogate_history(candidates_dir)  # 读取历史评分样本 / Load historical scored samples
     surrogate = fit_score_surrogate(history, levels)  # 拟合代理模型 / Fit surrogate model
     if surrogate is None:  # 检查代理模型是否可用 / Check whether surrogate is available
         return []  # 样本不足则返回空 / Return empty when samples are insufficient
+    ensemble = fit_bayesian_surrogate_ensemble(history, levels, int(optimisation.get("bayesian_ensemble_size", 12)), rng)  # 拟合贝叶斯式代理集成 / Fit Bayesian-style surrogate ensemble
+    if not ensemble:  # 检查集成是否可用 / Check whether ensemble is usable
+        return []  # 无集成则返回空 / Return empty without ensemble
+    best_score = float(max(item["score"] for item in history))  # 读取历史最佳分 / Read historical best score
     pool = []  # 创建候选池 / Create candidate pool
-    pool_size = max(72, population * 28)  # 设置虚拟候选池大小 / Set virtual candidate-pool size
+    pool_size = int(optimisation.get("bayesian_virtual_pool_size", max(72, population * 28)))  # 设置贝叶斯虚拟候选池大小 / Set Bayesian virtual candidate-pool size
+    beta = float(optimisation.get("bayesian_ucb_beta", 0.35))  # 读取 UCB 探索强度 / Read UCB exploration strength
+    ei_weight = float(optimisation.get("bayesian_expected_improvement_weight", 0.25))  # 读取期望改进权重 / Read expected-improvement weight
+    kl_weight = float(optimisation.get("kl_proxy_weight", 0.35))  # 读取 KL 代理权重 / Read KL proxy weight
+    novelty_weight = float(optimisation.get("novelty_weight", 0.18))  # 读取新颖度权重 / Read novelty weight
+    mutation_rate = float(optimisation.get("genetic_mutation_rate", 0.12))  # 读取遗传算法变异率 / Read genetic algorithm mutation rate
     for pool_index in range(pool_size):  # 遍历虚拟候选 / Iterate virtual candidates
-        H, name = build_surrogate_pool_candidate(pool_index, surrogate, history, response_records, parents, target_grid, levels, default_thickness, max_neighbor_diff, rng)  # 生成池候选 / Generate pool candidate
-        predicted = predict_surrogate_score(surrogate, H, levels)  # 预测候选分数 / Predict candidate score
+        H, name = build_surrogate_pool_candidate(pool_index, surrogate, history, response_records, parents, target_grid, levels, default_thickness, max_neighbor_diff, mutation_rate, rng)  # 生成池候选 / Generate pool candidate
+        predicted, uncertainty = predict_bayesian_surrogate_stats(ensemble, H, levels)  # 预测贝叶斯均值和不确定性 / Predict Bayesian mean and uncertainty
+        improvement = expected_improvement(predicted, uncertainty, best_score)  # 计算期望改进 / Compute expected improvement
         novelty = surrogate_novelty(surrogate, H, levels)  # 计算候选新颖度 / Compute candidate novelty
         alignment = target_alignment_score(H, target_grid, levels)  # 计算弱目标对齐 / Compute weak target alignment
         kl_score = kl_proxy_candidate_score(H, target_grid, config)  # 计算 KL 离散特征代理分 / Compute KL discrete-eigen proxy score
-        acquisition = predicted + 0.18 * novelty + 0.04 * alignment + 0.35 * kl_score  # 合成采集函数 / Combine acquisition function
-        pool.append((acquisition, predicted, novelty, kl_score, H, name))  # 保存池候选 / Store pool candidate
+        acquisition = predicted + beta * uncertainty + ei_weight * improvement + novelty_weight * novelty + 0.04 * alignment + kl_weight * kl_score  # 合成贝叶斯采集函数 / Combine Bayesian acquisition function
+        pool.append((acquisition, predicted, uncertainty, improvement, novelty, kl_score, H, name))  # 保存池候选 / Store pool candidate
     selected = []  # 创建已选提案列表 / Create selected proposal list
     source_counts = {}  # 创建来源计数字典 / Create source-count dictionary
     source_limit = max(1, population // 2)  # 设置单一来源上限 / Set per-source limit
-    for acquisition, predicted, novelty, kl_score, H, name in sorted(pool, key=lambda item: item[0], reverse=True):  # 按采集函数排序 / Sort by acquisition value
+    for acquisition, predicted, uncertainty, improvement, novelty, kl_score, H, name in sorted(pool, key=lambda item: item[0], reverse=True):  # 按采集函数排序 / Sort by acquisition value
         source = proposal_source_key(name)  # 提取提案来源 / Extract proposal source
         if source_counts.get(source, 0) >= source_limit:  # 检查来源是否过度集中 / Check whether one source is overused
             continue  # 跳过过度集中的来源 / Skip overused source
         if is_diverse_candidate(H, selected, levels):  # 检查候选多样性 / Check candidate diversity
-            selected.append((H, f"{name}_pred_{predicted:.3f}_kl_{kl_score:.3f}_novel_{novelty:.2f}"))  # 保存多样候选 / Store diverse candidate
+            selected.append((H, f"{name}_mean_{predicted:.3f}_std_{uncertainty:.3f}_ei_{improvement:.3f}_kl_{kl_score:.3f}_novel_{novelty:.2f}"))  # 保存多样候选 / Store diverse candidate
             source_counts[source] = source_counts.get(source, 0) + 1  # 更新来源计数 / Update source count
         if len(selected) >= population:  # 检查是否已满足数量 / Check whether enough proposals are selected
             break  # 停止选择 / Stop selecting
-    return selected if len(selected) >= population else [(item[4], f"{item[5]}_fallback") for item in sorted(pool, key=lambda row: row[0], reverse=True)[:population]]  # 返回提案或兜底高分池 / Return proposals or fallback top pool
+    return selected if len(selected) >= population else [(item[6], f"{item[7]}_bayesian_fallback") for item in sorted(pool, key=lambda row: row[0], reverse=True)[:population]]  # 返回提案或兜底高分池 / Return proposals or fallback top pool
 
 
 def save_H_csv(H: np.ndarray, path: str | Path) -> None:  # 保存厚度矩阵 CSV / Save thickness matrix CSV
@@ -446,7 +488,8 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
     method = str(config.get("optimisation", {}).get("method", "random_search"))  # 读取搜索方法 / Read search method
     candidates_dir = Path(config["paths"]["candidates_dir"])  # 读取候选目录 / Read candidate directory
     rng = np.random.default_rng(generation)  # 创建可复现随机源 / Create reproducible random source
-    parents = load_parent_matrices(candidates_dir) if method == "evolutionary_search" and generation > 0 else []  # 读取进化父代 / Load evolutionary parents
+    parent_limit = int(config.get("optimisation", {}).get("genetic_parent_count", 8))  # 读取遗传算法父代数量 / Read genetic algorithm parent count
+    parents = load_parent_matrices(candidates_dir, parent_limit) if ("evolutionary" in method or "genetic" in method or "ga" in method) and generation > 0 else []  # 读取遗传算法父代 / Load genetic algorithm parents
     target_grid = load_target_binary_grid(config, grid_size)  # 读取目标感知网格 / Load target-aware grid
     response_records = load_response_guidance_records(config, candidates_dir, target_grid) if target_grid is not None else []  # 读取真实响应闭环记录 / Load real-response closed-loop records
     surrogate_proposals = generate_surrogate_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成代理模型优化提案 / Generate surrogate-model optimized proposals
@@ -465,9 +508,10 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
             H, variant_name = generate_target_guided_H(target_grid, index, parents, levels, default, max_diff, rng)  # 生成目标感知矩阵 / Generate target-aware matrix
             created_by = "target_guided_evolutionary_search" if parents else "target_guided_initial_search"  # 设置生成来源 / Set creation source
         else:  # 保留一部分探索候选 / Keep some exploration candidates
-            H = generate_evolutionary_H(parents, levels, default, max_diff, rng) if parents else generate_random_H(grid_size, levels, default, max_diff, rng)  # 生成探索矩阵 / Generate exploration matrix
-            variant_name = "evolutionary_explorer" if parents else "random_explorer"  # 设置探索变体名 / Set explorer variant name
-            created_by = "evolutionary_search" if parents else "random_search"  # 设置生成来源 / Set creation source
+            mutation_rate = float(config.get("optimisation", {}).get("genetic_mutation_rate", 0.12))  # 读取遗传变异率 / Read genetic mutation rate
+            H = generate_evolutionary_H(parents, levels, default, max_diff, rng, mutation_rate) if parents else generate_random_H(grid_size, levels, default, max_diff, rng)  # 生成探索矩阵 / Generate exploration matrix
+            variant_name = "genetic_explorer" if parents else "random_explorer"  # 设置探索变体名 / Set explorer variant name
+            created_by = "genetic_search" if parents else "random_search"  # 设置生成来源 / Set creation source
         metadata = {"candidate_id": candidate_id, "generation": generation, "grid_size": grid_size, "thickness_mode": "continuous", "thickness_bounds_mm": levels, "center_fixed": True, "created_by": created_by, "target_guidance_variant": variant_name, "target_guided": target_grid is not None}  # 记录元数据 / Record metadata
         save_candidate(candidates_dir / candidate_id, H, metadata)  # 保存候选 / Save candidate
         candidate_ids.append(candidate_id)  # 添加候选编号 / Add candidate id

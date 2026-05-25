@@ -27,7 +27,7 @@ material:
 
 # COMSOL 仿真设置 / COMSOL simulation settings
 simulation:
-  num_modes: 20 # 导出模态数量 / Number of exported modes
+  num_modes: 40 # 导出模态数量 / Number of exported modes
   frequency_min_hz: 0 # 最小目标频率 / Minimum target frequency
   frequency_max_hz: 3000 # 最大目标频率 / Maximum target frequency
 
@@ -57,9 +57,17 @@ nodal_extraction:
 
 # 优化设置 / Optimisation settings
 optimisation:
-  method: "evolutionary_search" # 搜索方法 / Search method
-  population_size: 20 # 每批候选数量 / Candidates per batch
-  num_iterations: 3 # 默认优化代数 / Default optimisation generations
+  method: "hybrid_ga_bayesian_kl_search" # 搜索方法 / Search method
+  population_size: 24 # 每批候选数量 / Candidates per batch
+  num_iterations: 8 # 默认优化代数 / Default optimisation generations
+  genetic_parent_count: 12 # 遗传算法父代数量 / Genetic algorithm parent count
+  genetic_mutation_rate: 0.18 # 遗传算法变异率 / Genetic algorithm mutation rate
+  bayesian_virtual_pool_size: 360 # 贝叶斯虚拟候选池大小 / Bayesian virtual candidate-pool size
+  bayesian_ensemble_size: 16 # 贝叶斯代理集成数量 / Bayesian surrogate ensemble size
+  bayesian_ucb_beta: 0.42 # 贝叶斯 UCB 探索强度 / Bayesian UCB exploration strength
+  bayesian_expected_improvement_weight: 0.30 # 期望改进权重 / Expected improvement weight
+  kl_proxy_weight: 0.50 # KL 物理代理权重 / KL physics proxy weight
+  novelty_weight: 0.24 # 新颖度探索权重 / Novelty exploration weight
   roughness_weight: 0.15 # 归一化粗糙度惩罚权重 / Normalized roughness penalty weight
   mass_weight: 0.01 # 质量惩罚权重 / Mass penalty weight
   frequency_weight: 0.01 # 频率惩罚权重 / Frequency penalty weight
