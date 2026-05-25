@@ -99,3 +99,10 @@ Hand-written source code should keep bilingual Chinese/English comments for non-
 ```powershell
 python scripts/check_bilingual_comments.py
 ```
+
+Check documentation links after editing README or docs:
+修改 README 或文档后检查链接：
+
+```powershell
+python scripts/check_docs_links.py
+```

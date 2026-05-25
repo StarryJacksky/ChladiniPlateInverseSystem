@@ -78,6 +78,10 @@ Tasks:
 3. Maintain the software user manual in `docs/user_manual.md`.
 4. Add final screenshots later after UI stops moving.
 
+Recently completed:
+
+- Added a documentation link checker so README and guide entry links can be validated automatically.
+
 ### 6. Python-Only Smoke Test Path
 
 Goal: let new users verify the app without COMSOL first.

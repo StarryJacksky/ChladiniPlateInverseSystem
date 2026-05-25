@@ -118,6 +118,12 @@ Tasks:
 4. Add final screenshots later after UI stops moving.
    等 UI 稳定后再补最终截图。
 
+Recently completed:
+最近完成：
+
+- Added a documentation link checker so README and guide entry links can be validated automatically.
+  已新增文档链接检查脚本，可自动验证 README 和指南入口链接。
+
 ### 6. Python-Only Smoke Test Path / 无 COMSOL 烟测路径
 
 Goal: let new users verify the app without COMSOL first.
