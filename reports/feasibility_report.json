@@ -12,12 +12,12 @@
     "support_position",
     "actuator_position_phase"
   ],
-  "real_candidate_count": 7,
+  "real_candidate_count": 8,
   "best_candidate": "candidate_159_0000",
   "best_final_score": 0.016091261708721605,
   "best_precision": 0.05972515856236787,
   "best_recall": 0.15081748415081747,
-  "mean_centerline_penalty": 0.1096465729403543,
+  "mean_centerline_penalty": 0.11569209528455734,
   "records": [
     {
       "candidate_id": "candidate_159_0000",
@@ -78,6 +78,16 @@
       "recall": 0.0980980980980981,
       "centerline_penalty": 0.45118656871296986,
       "frequency_hz": 150.123391913
+    },
+    {
+      "candidate_id": "candidate_162_0005",
+      "score_path": "candidates/candidate_162_0005/score.json",
+      "best_mode": 8,
+      "final_score": -0.009778418893747975,
+      "precision": 0.04041666666666666,
+      "recall": 0.0647313980647314,
+      "centerline_penalty": 0.1580107516939786,
+      "frequency_hz": 210.51039913
     },
     {
       "candidate_id": "candidate_156_0002",

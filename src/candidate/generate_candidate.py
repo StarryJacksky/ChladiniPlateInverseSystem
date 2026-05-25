@@ -2,6 +2,7 @@ from __future__ import annotations  # 启用现代类型注解 / Enable modern t
 
 import json  # 导入 JSON 工具 / Import JSON utilities
 import csv  # 导入 CSV 工具 / Import CSV utilities
+import hashlib  # 导入稳定哈希工具 / Import stable hashing helper
 import math  # 导入数学函数 / Import math functions
 from pathlib import Path  # 导入路径工具 / Import path utilities
 
@@ -417,7 +418,26 @@ def generate_target_guided_H(target_grid: np.ndarray, index: int, parents: list[
     return H, variant_name  # 返回矩阵和变体名 / Return matrix and variant name
 
 
-def load_surrogate_history(candidates_dir: Path, limit: int = 120) -> list[dict]:  # 读取历史评分样本 / Load historical scored samples
+def auxiliary_bounds(config: dict | None) -> dict[str, tuple[float, float, float]]:  # 读取辅助变量边界 / Read auxiliary-variable bounds
+    settings = (config or {}).get("design_variables", {})  # 读取配置分区 / Read config section
+    return {"density_scale": (float(settings.get("density_scale_min", 0.85)), float(settings.get("density_scale_max", 1.25)), 1.0), "loss_factor": (float(settings.get("loss_factor_min", 0.0)), float(settings.get("loss_factor_max", 0.08)), 0.0)}  # 返回边界和默认值 / Return bounds and defaults
+
+
+def load_auxiliary_field(candidate_path: Path, name: str, shape: tuple[int, int], config: dict | None) -> np.ndarray:  # 读取或补齐辅助场 / Load or fill an auxiliary field
+    low, high, default = auxiliary_bounds(config)[name]  # 读取字段边界 / Read field bounds
+    path = candidate_path / f"{name}.csv"  # 构造字段路径 / Build field path
+    if path.exists():  # 检查字段文件是否存在 / Check whether field file exists
+        values = np.loadtxt(path, delimiter=",").astype(float)  # 读取字段矩阵 / Load field matrix
+        if tuple(values.shape) == tuple(shape):  # 检查形状匹配 / Check shape match
+            return np.clip(values, low, high)  # 返回裁剪字段 / Return clipped field
+    return np.full(shape, default, dtype=float)  # 返回默认字段 / Return default field
+
+
+def load_auxiliary_fields(candidate_path: Path, shape: tuple[int, int], config: dict | None) -> dict[str, np.ndarray]:  # 读取辅助变量集合 / Load auxiliary-variable set
+    return {name: load_auxiliary_field(candidate_path, name, shape, config) for name in auxiliary_bounds(config)}  # 返回字段字典 / Return field dictionary
+
+
+def load_surrogate_history(candidates_dir: Path, config: dict | None = None, limit: int = 120) -> list[dict]:  # 读取历史评分样本 / Load historical scored samples
     history = []  # 创建历史样本列表 / Create history sample list
     for score_path in sorted(candidates_dir.glob("candidate_*_*/score.json")):  # 遍历候选评分文件 / Iterate candidate score files
         matrix_path = score_path.parent / "H.csv"  # 构造厚度矩阵路径 / Build thickness matrix path
@@ -431,7 +451,9 @@ def load_surrogate_history(candidates_dir: Path, limit: int = 120) -> list[dict]
             continue  # 跳过旧评分样本 / Skip old-score samples
         final_score = float(score.get("final_score", -999.0))  # 读取最终评分 / Read final score
         if np.isfinite(final_score):  # 检查评分是否有效 / Check whether score is finite
-            history.append({"candidate_id": score_path.parent.name, "H": np.loadtxt(matrix_path, delimiter=","), "score": final_score})  # 保存历史样本 / Store historical sample
+            H = np.loadtxt(matrix_path, delimiter=",")  # 读取厚度矩阵 / Load thickness matrix
+            auxiliary_fields = load_auxiliary_fields(score_path.parent, tuple(H.shape), config)  # 读取辅助物理场 / Load auxiliary physical fields
+            history.append({"candidate_id": score_path.parent.name, "H": H, "auxiliary_fields": auxiliary_fields, "score": final_score})  # 保存历史样本 / Store historical sample
     return sorted(history, key=lambda item: item["score"], reverse=True)[:limit]  # 返回高分优先历史 / Return high-score-first history
 
 
@@ -439,14 +461,24 @@ def filter_history_by_shape(history: list[dict], shape: tuple[int, int]) -> list
     return [item for item in history if tuple(item["H"].shape) == tuple(shape)]  # 只保留当前网格样本 / Keep only current-grid samples
 
 
-def surrogate_vector(H: np.ndarray, levels: list[float]) -> np.ndarray:  # 构建代理模型输入向量 / Build surrogate-model input vector
-    return matrix_to_guidance(H, levels).ravel()  # 返回归一化厚度向量 / Return normalized thickness vector
+def normalise_auxiliary_field(values: np.ndarray, name: str, config: dict | None) -> np.ndarray:  # 归一化辅助变量场 / Normalize auxiliary-variable field
+    low, high, default = auxiliary_bounds(config)[name]  # 读取字段边界 / Read field bounds
+    if high - low < 1.0e-9:  # 检查范围是否退化 / Check degenerate range
+        return np.full_like(values, default, dtype=float)  # 返回默认归一化场 / Return default normalized field
+    return np.clip((values.astype(float) - low) / (high - low), 0.0, 1.0)  # 返回归一化字段 / Return normalized field
 
 
-def fit_score_surrogate(history: list[dict], levels: list[float]) -> dict | None:  # 拟合轻量岭回归代理模型 / Fit lightweight ridge-regression surrogate model
+def surrogate_vector(H: np.ndarray, levels: list[float], auxiliary_fields: dict[str, np.ndarray] | None = None, config: dict | None = None) -> np.ndarray:  # 构建代理模型输入向量 / Build surrogate-model input vector
+    fields = auxiliary_fields or {name: np.full(H.shape, default, dtype=float) for name, (_low, _high, default) in auxiliary_bounds(config).items()}  # 补齐辅助场 / Fill auxiliary fields
+    parts = [matrix_to_guidance(H, levels).ravel()]  # 创建厚度向量部分 / Create thickness vector part
+    parts.extend(normalise_auxiliary_field(fields[name], name, config).ravel() for name in ("density_scale", "loss_factor"))  # 添加辅助变量部分 / Add auxiliary-variable parts
+    return np.concatenate(parts)  # 返回联合设计向量 / Return joint design vector
+
+
+def fit_score_surrogate(history: list[dict], levels: list[float], config: dict | None = None) -> dict | None:  # 拟合轻量岭回归代理模型 / Fit lightweight ridge-regression surrogate model
     if len(history) < 6:  # 检查样本数量是否足够 / Check whether enough samples exist
         return None  # 样本太少时不使用代理 / Do not use surrogate with too few samples
-    X = np.vstack([surrogate_vector(item["H"], levels) for item in history])  # 构建输入矩阵 / Build input matrix
+    X = np.vstack([surrogate_vector(item["H"], levels, item.get("auxiliary_fields"), config) for item in history])  # 构建输入矩阵 / Build input matrix
     y = np.asarray([float(item["score"]) for item in history], dtype=float)  # 构建评分向量 / Build score vector
     x_mean = X.mean(axis=0)  # 计算输入均值 / Compute input mean
     y_mean = float(y.mean())  # 计算评分均值 / Compute score mean
@@ -459,29 +491,29 @@ def fit_score_surrogate(history: list[dict], levels: list[float]) -> dict | None
     return {"x_mean": x_mean, "y_mean": y_mean, "y_min": float(y.min()), "y_max": float(y.max()), "coef": coef, "history_vectors": X, "history": history}  # 返回代理模型 / Return surrogate model
 
 
-def fit_bayesian_surrogate_ensemble(history: list[dict], levels: list[float], ensemble_size: int, rng: np.random.Generator) -> list[dict]:  # 拟合贝叶斯式自助集成代理 / Fit Bayesian-style bootstrap surrogate ensemble
+def fit_bayesian_surrogate_ensemble(history: list[dict], levels: list[float], ensemble_size: int, rng: np.random.Generator, config: dict | None = None) -> list[dict]:  # 拟合贝叶斯式自助集成代理 / Fit Bayesian-style bootstrap surrogate ensemble
     if len(history) < 6:  # 检查历史样本数量 / Check historical sample count
         return []  # 样本太少则返回空集成 / Return empty ensemble with too few samples
     ensemble = []  # 创建代理模型集成 / Create surrogate-model ensemble
-    base = fit_score_surrogate(history, levels)  # 拟合全量基准代理 / Fit full-data baseline surrogate
+    base = fit_score_surrogate(history, levels, config)  # 拟合全量基准代理 / Fit full-data baseline surrogate
     if base is not None:  # 检查基准模型是否可用 / Check whether baseline model is usable
         ensemble.append(base)  # 加入基准模型 / Add baseline model
     for _ in range(max(0, ensemble_size - len(ensemble))):  # 生成自助采样模型 / Generate bootstrap models
         sample = [history[int(rng.integers(0, len(history)))] for _ in range(len(history))]  # 有放回采样历史 / Sample history with replacement
-        model = fit_score_surrogate(sample, levels)  # 拟合采样代理模型 / Fit sampled surrogate model
+        model = fit_score_surrogate(sample, levels, config)  # 拟合采样代理模型 / Fit sampled surrogate model
         if model is not None:  # 检查模型是否有效 / Check whether model is valid
             ensemble.append(model)  # 加入集成 / Add to ensemble
     return ensemble  # 返回集成代理 / Return surrogate ensemble
 
 
-def predict_surrogate_score(surrogate: dict, H: np.ndarray, levels: list[float]) -> float:  # 预测代理评分 / Predict surrogate score
-    vector = surrogate_vector(H, levels)  # 构建候选向量 / Build candidate vector
+def predict_surrogate_score(surrogate: dict, H: np.ndarray, levels: list[float], auxiliary_fields: dict[str, np.ndarray] | None = None, config: dict | None = None) -> float:  # 预测代理评分 / Predict surrogate score
+    vector = surrogate_vector(H, levels, auxiliary_fields, config)  # 构建候选向量 / Build candidate vector
     raw = float(surrogate["y_mean"] + np.dot(vector - surrogate["x_mean"], surrogate["coef"]))  # 计算原始预测 / Compute raw prediction
     return float(np.clip(raw, surrogate["y_min"] - 0.15, surrogate["y_max"] + 0.15))  # 裁剪到合理外推范围 / Clip to reasonable extrapolation range
 
 
-def predict_bayesian_surrogate_stats(ensemble: list[dict], H: np.ndarray, levels: list[float]) -> tuple[float, float]:  # 预测贝叶斯集成均值和不确定性 / Predict Bayesian ensemble mean and uncertainty
-    predictions = np.asarray([predict_surrogate_score(model, H, levels) for model in ensemble], dtype=float)  # 计算所有代理预测 / Compute all surrogate predictions
+def predict_bayesian_surrogate_stats(ensemble: list[dict], H: np.ndarray, levels: list[float], auxiliary_fields: dict[str, np.ndarray] | None = None, config: dict | None = None) -> tuple[float, float]:  # 预测贝叶斯集成均值和不确定性 / Predict Bayesian ensemble mean and uncertainty
+    predictions = np.asarray([predict_surrogate_score(model, H, levels, auxiliary_fields, config) for model in ensemble], dtype=float)  # 计算所有代理预测 / Compute all surrogate predictions
     if predictions.size == 0:  # 检查是否无预测 / Check whether predictions are empty
         return 0.0, 0.0  # 无代理时返回零 / Return zeros without surrogate
     return float(predictions.mean()), float(predictions.std())  # 返回均值和标准差 / Return mean and standard deviation
@@ -496,8 +528,8 @@ def expected_improvement(mean: float, std: float, best_score: float) -> float:  
     return float((mean - best_score) * cdf + std * pdf)  # 返回期望改进 / Return expected improvement
 
 
-def surrogate_novelty(surrogate: dict, H: np.ndarray, levels: list[float]) -> float:  # 计算候选新颖度 / Compute candidate novelty
-    vector = surrogate_vector(H, levels)  # 构建候选向量 / Build candidate vector
+def surrogate_novelty(surrogate: dict, H: np.ndarray, levels: list[float], auxiliary_fields: dict[str, np.ndarray] | None = None, config: dict | None = None) -> float:  # 计算候选新颖度 / Compute candidate novelty
+    vector = surrogate_vector(H, levels, auxiliary_fields, config)  # 构建候选向量 / Build candidate vector
     distances = np.sqrt(np.mean(np.square(surrogate["history_vectors"] - vector), axis=1))  # 计算到历史样本距离 / Compute distances to history samples
     return float(np.clip(distances.min() / 0.35, 0.0, 1.0))  # 返回归一化新颖度 / Return normalized novelty
 
@@ -512,9 +544,19 @@ def target_alignment_score(H: np.ndarray, target_grid: np.ndarray, levels: list[
     return max(target_score, inverse_score)  # 返回两者较好值 / Return better alignment
 
 
+def auxiliary_alignment_score(auxiliary_fields: dict[str, np.ndarray], target_grid: np.ndarray, config: dict | None = None) -> float:  # 计算辅助变量目标对齐 / Compute auxiliary-variable target alignment
+    target = normalise_design_map(target_grid)  # 归一化目标图 / Normalize target map
+    edge = target_edge_guidance(target)  # 计算目标边缘 / Compute target edge
+    density = normalise_auxiliary_field(auxiliary_fields["density_scale"], "density_scale", config)  # 归一化密度倍率 / Normalize density scale
+    loss = normalise_auxiliary_field(auxiliary_fields["loss_factor"], "loss_factor", config)  # 归一化损耗因子 / Normalize loss factor
+    density_score = float(np.mean(density * target + (1.0 - density) * (1.0 - target)))  # 计算密度目标同向分 / Compute density-target agreement
+    loss_score = float(np.mean(loss * edge + (1.0 - loss) * (1.0 - edge)))  # 计算损耗边缘同向分 / Compute loss-edge agreement
+    return float(np.clip(0.55 * density_score + 0.45 * loss_score, 0.0, 1.0))  # 返回辅助变量对齐分 / Return auxiliary alignment score
+
+
 def surrogate_gradient_candidate(parent: np.ndarray, surrogate: dict, levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 沿代理模型梯度生成候选 / Generate candidate along surrogate-model gradient
     guidance = matrix_to_guidance(parent, levels)  # 读取父代厚度引导 / Read parent thickness guidance
-    gradient = surrogate["coef"].reshape(parent.shape)  # 读取代理模型空间梯度 / Read surrogate spatial gradient
+    gradient = surrogate["coef"][: parent.size].reshape(parent.shape)  # 读取厚度部分代理梯度 / Read thickness part of surrogate gradient
     gradient = normalise_design_map(gradient) - 0.5  # 归一化梯度到正负范围 / Normalize gradient to signed range
     signed = 1.0 if rng.random() < 0.65 else -1.0  # 随机选择正向或反向探索 / Randomly choose forward or reverse exploration
     guidance = normalise_design_map(guidance + signed * rng.uniform(0.25, 0.55) * gradient + rng.normal(0.0, 0.08, size=parent.shape))  # 合成代理梯度引导 / Combine surrogate-gradient guidance
@@ -548,8 +590,8 @@ def build_surrogate_pool_candidate(pool_index: int, surrogate: dict, history: li
 def is_diverse_candidate(H: np.ndarray, selected: list[tuple[np.ndarray, str]], levels: list[float], threshold: float = 0.055) -> bool:  # 判断候选是否足够多样 / Decide whether candidate is diverse enough
     if not selected:  # 检查是否尚无已选候选 / Check whether no candidates are selected yet
         return True  # 第一个候选总是保留 / Always keep first candidate
-    vector = surrogate_vector(H, levels)  # 构建候选向量 / Build candidate vector
-    distances = [float(np.sqrt(np.mean(np.square(vector - surrogate_vector(other, levels))))) for other, _ in selected]  # 计算到已选候选距离 / Compute distances to selected candidates
+    vector = matrix_to_guidance(H, levels).ravel()  # 构建厚度多样性向量 / Build thickness diversity vector
+    distances = [float(np.sqrt(np.mean(np.square(vector - matrix_to_guidance(other, levels).ravel())))) for other, _ in selected]  # 计算到已选候选距离 / Compute distances to selected candidates
     return min(distances) >= threshold  # 返回是否超过阈值 / Return whether distance exceeds threshold
 
 
@@ -631,7 +673,7 @@ def generate_kl_proxy_optimised_proposals(config: dict, candidates_dir: Path, ta
         return []  # 无目标则无法直接优化 / Cannot directly optimise without target
     optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation config
     proposal_count = min(population, int(optimisation.get("kl_proxy_optimised_count", max(4, population // 3))))  # 读取 KL 优化候选数量 / Read KL-optimised proposal count
-    history = filter_history_by_shape(load_surrogate_history(candidates_dir, limit=80), target_grid.shape)  # 读取并过滤历史真实评分样本 / Load and filter historical real-score samples
+    history = filter_history_by_shape(load_surrogate_history(candidates_dir, config, limit=80), target_grid.shape)  # 读取并过滤历史真实评分样本 / Load and filter historical real-score samples
     reference_designs = [(item["H"], item["candidate_id"]) for item in history[:24]] + [(record["H"], record["candidate_id"]) for record in response_records]  # 汇总历史参考矩阵 / Collect historical reference matrices
     proposals = []  # 创建提案列表 / Create proposal list
     for index in range(max(0, proposal_count)):  # 遍历 KL 优化候选 / Iterate KL-optimised proposals
@@ -647,11 +689,11 @@ def generate_surrogate_proposals(config: dict, candidates_dir: Path, target_grid
     if target_grid is None:  # 检查目标网格是否存在 / Check whether target grid exists
         return []  # 无目标则不使用代理 / Do not use surrogate without target
     optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation config
-    history = filter_history_by_shape(load_surrogate_history(candidates_dir), target_grid.shape)  # 读取并过滤历史评分样本 / Load and filter historical scored samples
-    surrogate = fit_score_surrogate(history, levels)  # 拟合代理模型 / Fit surrogate model
+    history = filter_history_by_shape(load_surrogate_history(candidates_dir, config), target_grid.shape)  # 读取并过滤历史评分样本 / Load and filter historical scored samples
+    surrogate = fit_score_surrogate(history, levels, config)  # 拟合代理模型 / Fit surrogate model
     if surrogate is None:  # 检查代理模型是否可用 / Check whether surrogate is available
         return []  # 样本不足则返回空 / Return empty when samples are insufficient
-    ensemble = fit_bayesian_surrogate_ensemble(history, levels, int(optimisation.get("bayesian_ensemble_size", 12)), rng)  # 拟合贝叶斯式代理集成 / Fit Bayesian-style surrogate ensemble
+    ensemble = fit_bayesian_surrogate_ensemble(history, levels, int(optimisation.get("bayesian_ensemble_size", 12)), rng, config)  # 拟合贝叶斯式代理集成 / Fit Bayesian-style surrogate ensemble
     if not ensemble:  # 检查集成是否可用 / Check whether ensemble is usable
         return []  # 无集成则返回空 / Return empty without ensemble
     best_score = float(max(item["score"] for item in history))  # 读取历史最佳分 / Read historical best score
@@ -661,31 +703,48 @@ def generate_surrogate_proposals(config: dict, candidates_dir: Path, target_grid
     beta = float(optimisation.get("bayesian_ucb_beta", 0.35))  # 读取 UCB 探索强度 / Read UCB exploration strength
     ei_weight = float(optimisation.get("bayesian_expected_improvement_weight", 0.25))  # 读取期望改进权重 / Read expected-improvement weight
     kl_weight = float(optimisation.get("kl_proxy_weight", 0.35))  # 读取 KL 代理权重 / Read KL proxy weight
+    kl_cap = float(optimisation.get("kl_proxy_surrogate_cap", 0.20))  # 读取 KL 校准增益上限 / Read KL calibration-gain cap
     kl_pool_stride = max(1, int(optimisation.get("kl_proxy_pool_stride", 4)))  # 读取候选池 KL 精算步长 / Read pool KL exact-scoring stride
     novelty_weight = float(optimisation.get("novelty_weight", 0.18))  # 读取新颖度权重 / Read novelty weight
     mutation_rate = float(optimisation.get("genetic_mutation_rate", 0.12))  # 读取遗传算法变异率 / Read genetic algorithm mutation rate
     for pool_index in range(pool_size):  # 遍历虚拟候选 / Iterate virtual candidates
         H, name = build_surrogate_pool_candidate(pool_index, surrogate, history, response_records, parents, target_grid, levels, default_thickness, max_neighbor_diff, mutation_rate, rng)  # 生成池候选 / Generate pool candidate
-        predicted, uncertainty = predict_bayesian_surrogate_stats(ensemble, H, levels)  # 预测贝叶斯均值和不确定性 / Predict Bayesian mean and uncertainty
+        auxiliary_fields = build_auxiliary_design_fields(H, levels, target_grid, config, None, name)  # 构建确定性辅助物理场 / Build deterministic auxiliary physical fields
+        predicted, uncertainty = predict_bayesian_surrogate_stats(ensemble, H, levels, auxiliary_fields, config)  # 预测贝叶斯均值和不确定性 / Predict Bayesian mean and uncertainty
         improvement = expected_improvement(predicted, uncertainty, best_score)  # 计算期望改进 / Compute expected improvement
-        novelty = surrogate_novelty(surrogate, H, levels)  # 计算候选新颖度 / Compute candidate novelty
+        novelty = surrogate_novelty(surrogate, H, levels, auxiliary_fields, config)  # 计算候选新颖度 / Compute candidate novelty
         alignment = target_alignment_score(H, target_grid, levels)  # 计算弱目标对齐 / Compute weak target alignment
+        auxiliary_alignment = auxiliary_alignment_score(auxiliary_fields, target_grid, config)  # 计算辅助变量对齐 / Compute auxiliary-variable alignment
         kl_score = kl_proxy_candidate_score(H, target_grid, config) if pool_index % kl_pool_stride == 0 else alignment  # 间隔执行昂贵 KL 精算 / Run expensive KL exact scoring at intervals
-        acquisition = predicted + beta * uncertainty + ei_weight * improvement + novelty_weight * novelty + 0.04 * alignment + kl_weight * kl_score  # 合成贝叶斯采集函数 / Combine Bayesian acquisition function
-        pool.append((acquisition, predicted, uncertainty, improvement, novelty, kl_score, H, name))  # 保存池候选 / Store pool candidate
+        kl_anchor = min(alignment, auxiliary_alignment)  # 使用保守对齐锚点 / Use conservative alignment anchor
+        calibrated_kl = min(kl_score, kl_anchor + kl_cap)  # 校准 KL 代理避免压过真实历史 / Calibrate KL proxy so it cannot overpower real history
+        acquisition = predicted + beta * uncertainty + ei_weight * improvement + novelty_weight * novelty + 0.04 * alignment + 0.035 * auxiliary_alignment + kl_weight * calibrated_kl  # 合成贝叶斯采集函数 / Combine Bayesian acquisition function
+        pool.append((acquisition, predicted, uncertainty, improvement, novelty, kl_score, H, name, alignment, auxiliary_alignment, calibrated_kl))  # 保存池候选 / Store pool candidate
     selected = []  # 创建已选提案列表 / Create selected proposal list
     source_counts = {}  # 创建来源计数字典 / Create source-count dictionary
     source_limit = max(1, population // 2)  # 设置单一来源上限 / Set per-source limit
-    for acquisition, predicted, uncertainty, improvement, novelty, kl_score, H, name in sorted(pool, key=lambda item: item[0], reverse=True):  # 按采集函数排序 / Sort by acquisition value
+    for acquisition, predicted, uncertainty, improvement, novelty, kl_score, H, name, alignment, auxiliary_alignment, calibrated_kl in sorted(pool, key=lambda item: item[0], reverse=True):  # 按采集函数排序 / Sort by acquisition value
         source = proposal_source_key(name)  # 提取提案来源 / Extract proposal source
         if source_counts.get(source, 0) >= source_limit:  # 检查来源是否过度集中 / Check whether one source is overused
             continue  # 跳过过度集中的来源 / Skip overused source
         if is_diverse_candidate(H, selected, levels):  # 检查候选多样性 / Check candidate diversity
-            selected.append((H, f"{name}_mean_{predicted:.3f}_std_{uncertainty:.3f}_ei_{improvement:.3f}_kl_{kl_score:.3f}_novel_{novelty:.2f}"))  # 保存多样候选 / Store diverse candidate
+            selected.append((H, f"{name}_mean_{predicted:.3f}_std_{uncertainty:.3f}_ei_{improvement:.3f}_kl_{kl_score:.3f}_ckl_{calibrated_kl:.3f}_ta_{alignment:.2f}_aux_{auxiliary_alignment:.2f}_novel_{novelty:.2f}"))  # 保存多样候选 / Store diverse candidate
             source_counts[source] = source_counts.get(source, 0) + 1  # 更新来源计数 / Update source count
         if len(selected) >= population:  # 检查是否已满足数量 / Check whether enough proposals are selected
             break  # 停止选择 / Stop selecting
-    return selected if len(selected) >= population else [(item[6], f"{item[7]}_bayesian_fallback") for item in sorted(pool, key=lambda row: row[0], reverse=True)[:population]]  # 返回提案或兜底高分池 / Return proposals or fallback top pool
+    return selected if len(selected) >= population else [(item[6], f"{item[7]}_ta_{item[8]:.2f}_aux_{item[9]:.2f}_ckl_{item[10]:.3f}_bayesian_fallback") for item in sorted(pool, key=lambda row: row[0], reverse=True)[:population]]  # 返回提案或兜底高分池 / Return proposals or fallback top pool
+
+
+def interleave_proposal_groups(groups: list[list[tuple[np.ndarray, str]]], population: int) -> list[tuple[np.ndarray, str]]:  # 交错合并候选家族 / Interleave candidate proposal families
+    output = []  # 创建输出列表 / Create output list
+    max_length = max((len(group) for group in groups), default=0)  # 读取最长家族长度 / Read longest family length
+    for index in range(max_length):  # 遍历家族内部序号 / Iterate index within families
+        for group in groups:  # 遍历候选家族 / Iterate proposal families
+            if index < len(group):  # 检查当前家族是否有该序号 / Check whether family has this index
+                output.append(group[index])  # 添加交错候选 / Add interleaved proposal
+            if len(output) >= population:  # 检查是否达到人口数量 / Check whether population is reached
+                return output  # 提前返回结果 / Return result early
+    return output  # 返回交错结果 / Return interleaved result
 
 
 def save_H_csv(H: np.ndarray, path: str | Path) -> None:  # 保存厚度矩阵 CSV / Save thickness matrix CSV
@@ -698,6 +757,14 @@ def scale_field(values: np.ndarray, low: float, high: float) -> np.ndarray:  # �
     return low + normalise_design_map(values) * (high - low)  # 返回缩放场 / Return scaled field
 
 
+def stable_auxiliary_rng(H: np.ndarray, variant_name: str) -> np.random.Generator:  # 构建稳定辅助变量随机源 / Build stable auxiliary-variable random generator
+    rounded = np.ascontiguousarray(np.round(H.astype(float), 4))  # 压缩厚度矩阵用于哈希 / Compress thickness matrix for hashing
+    payload = rounded.tobytes() + variant_name.encode("utf-8", errors="ignore")  # 构造哈希载荷 / Build hash payload
+    digest = hashlib.blake2b(payload, digest_size=8).digest()  # 计算稳定摘要 / Compute stable digest
+    seed = int.from_bytes(digest, "little", signed=False)  # 转换为随机种子 / Convert digest to random seed
+    return np.random.default_rng(seed)  # 返回随机源 / Return random generator
+
+
 def build_auxiliary_noise(shape: tuple[int, int], rng: np.random.Generator | None) -> np.ndarray:  # 构建辅助变量探索噪声 / Build auxiliary-variable exploration noise
     random_gen = rng or np.random.default_rng(0)  # 读取随机源 / Read random generator
     noise = random_gen.normal(0.0, 1.0, size=shape)  # 生成高斯噪声 / Generate Gaussian noise
@@ -706,11 +773,12 @@ def build_auxiliary_noise(shape: tuple[int, int], rng: np.random.Generator | Non
 
 def build_auxiliary_design_fields(H: np.ndarray, levels: list[float], target_grid: np.ndarray | None, config: dict, rng: np.random.Generator | None = None, variant_name: str = "") -> dict[str, np.ndarray]:  # 构建辅助设计变量场 / Build auxiliary design-variable fields
     settings = config.get("design_variables", {})  # 读取辅助变量配置 / Read auxiliary-variable config
+    random_gen = rng or stable_auxiliary_rng(H, variant_name)  # 构建可复现辅助随机源 / Build reproducible auxiliary random generator
     thickness = matrix_to_guidance(H, levels)  # 归一化厚度场 / Normalize thickness field
     target = normalise_design_map(target_grid) if target_grid is not None else thickness  # 读取目标引导图 / Read target guidance map
     edge = target_edge_guidance(target) if target_grid is not None else radial_design_bias(H.shape[0])  # 构造边缘或径向引导 / Build edge or radial guidance
-    density_noise = build_auxiliary_noise(H.shape, rng)  # 构造密度探索噪声 / Build density exploration noise
-    loss_noise = build_auxiliary_noise(H.shape, rng)  # 构造损耗探索噪声 / Build loss exploration noise
+    density_noise = build_auxiliary_noise(H.shape, random_gen)  # 构造密度探索噪声 / Build density exploration noise
+    loss_noise = build_auxiliary_noise(H.shape, random_gen)  # 构造损耗探索噪声 / Build loss exploration noise
     density_low = float(settings.get("density_scale_min", 0.90))  # 读取密度倍率下限 / Read density-scale lower bound
     density_high = float(settings.get("density_scale_max", 1.15))  # 读取密度倍率上限 / Read density-scale upper bound
     loss_low = float(settings.get("loss_factor_min", 0.00))  # 读取损耗因子下限 / Read loss-factor lower bound
@@ -758,7 +826,7 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
     modal_compiler_proposals = generate_modal_compiler_proposals(config, target_grid, parents, levels, default, max_diff, population, rng)  # 生成目标模态编译提案 / Generate target-modal compiler proposals
     kl_proxy_proposals = generate_kl_proxy_optimised_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成 KL 直接优化提案 / Generate directly KL-optimised proposals
     surrogate_proposals = generate_surrogate_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成代理模型优化提案 / Generate surrogate-model optimized proposals
-    inverse_proposals = modal_compiler_proposals + kl_proxy_proposals + surrogate_proposals  # 合并模态编译、直接物理优化和代理提案 / Combine modal compiler, direct physics, and surrogate proposals
+    inverse_proposals = interleave_proposal_groups([modal_compiler_proposals, kl_proxy_proposals, surrogate_proposals], population)  # 交错合并模态编译、直接物理优化和代理提案 / Interleave modal compiler, direct physics, and surrogate proposals
     response_count = max(min(population, len(response_records) * 2), int(population * 0.75)) if response_records else 0  # 计算闭环响应候选数量 / Compute response-guided candidate count
     target_count = max(response_count, max(min(population, 6), int(population * 0.90 if response_records else population * 0.75))) if target_grid is not None else 0  # 计算目标感知候选数量 / Compute target-aware candidate count
     candidate_ids = []  # 创建候选编号列表 / Create candidate id list
@@ -778,7 +846,7 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
             H = generate_evolutionary_H(parents, levels, default, max_diff, rng, mutation_rate) if parents else generate_random_H(grid_size, levels, default, max_diff, rng)  # 生成探索矩阵 / Generate exploration matrix
             variant_name = "genetic_explorer" if parents else "random_explorer"  # 设置探索变体名 / Set explorer variant name
             created_by = "genetic_search" if parents else "random_search"  # 设置生成来源 / Set creation source
-        auxiliary_fields = build_auxiliary_design_fields(H, levels, target_grid, config, rng, variant_name) if config.get("design_variables", {}).get("export_auxiliary_fields", True) else {}  # 构建辅助物理场 / Build auxiliary physical fields
+        auxiliary_fields = build_auxiliary_design_fields(H, levels, target_grid, config, None, variant_name) if config.get("design_variables", {}).get("export_auxiliary_fields", True) else {}  # 构建辅助物理场 / Build auxiliary physical fields
         metadata = {"candidate_id": candidate_id, "generation": generation, "grid_size": grid_size, "thickness_mode": "continuous", "thickness_bounds_mm": levels, "center_fixed": True, "created_by": created_by, "target_guidance_variant": variant_name, "target_guided": target_grid is not None, "auxiliary_fields": sorted(auxiliary_fields.keys())}  # 记录元数据 / Record metadata
         save_candidate(candidates_dir / candidate_id, H, metadata, auxiliary_fields)  # 保存候选 / Save candidate
         candidate_ids.append(candidate_id)  # 添加候选编号 / Add candidate id

@@ -84,7 +84,8 @@ optimisation:
   feasibility_min_real_candidates: 4 # 可行性诊断最少真实候选数 / Minimum real candidates for feasibility diagnosis
   feasibility_score_floor: 0.08 # 厚度单变量可接受分数下限 / Acceptable score floor for thickness-only search
   feasibility_precision_floor: 0.20 # 厚度单变量可接受精度下限 / Acceptable precision floor for thickness-only search
-  kl_proxy_weight: 0.28 # KL 物理代理权重 / KL physics proxy weight
+  kl_proxy_weight: 0.12 # KL 物理代理权重 / KL physics proxy weight
+  kl_proxy_surrogate_cap: 0.10 # 代理采集中的 KL 可信增益上限 / Trusted KL gain cap inside surrogate acquisition
   kl_proxy_objective: "search_soft" # KL 代理搜索目标 / KL proxy search objective
   kl_proxy_grid_size: 31 # KL 代理高分辨率求解网格 / High-resolution solve grid for KL proxy
   kl_proxy_num_modes: 32 # KL 代理参与匹配的模态数量 / Number of KL proxy modes used for matching
