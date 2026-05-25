@@ -130,6 +130,78 @@ def angular_design_bias(grid_size: int, phase: float) -> np.ndarray:  # 生成�
     return normalise_design_map(np.sin(3.0 * angle + phase))  # 返回三瓣角向图 / Return three-lobed angular map
 
 
+def laplacian_design_map(values: np.ndarray) -> np.ndarray:  # 计算设计图拉普拉斯 / Compute design-map Laplacian
+    padded = np.pad(values.astype(float), 1, mode="edge")  # 边缘复制填充 / Pad by edge values
+    return padded[:-2, 1:-1] + padded[2:, 1:-1] + padded[1:-1, :-2] + padded[1:-1, 2:] - 4.0 * padded[1:-1, 1:-1]  # 返回五点拉普拉斯 / Return five-point Laplacian
+
+
+def target_crossing_sign_field(target_grid: np.ndarray, axis: int) -> np.ndarray:  # 根据目标笔画构造符号翻转场 / Build sign-flip field from target strokes
+    stroke = target_grid > 0.12  # 二值化目标笔画 / Binarize target strokes
+    transitions = np.cumsum(stroke.astype(int), axis=axis) % 2  # 沿指定方向累积穿越次数 / Accumulate crossing parity along chosen axis
+    return np.where(transitions == 0, 1.0, -1.0)  # 返回正负符号场 / Return signed parity field
+
+
+def desired_modal_field(target_grid: np.ndarray, variant_index: int, rng: np.random.Generator) -> np.ndarray:  # 将目标编译为期望模态场 / Compile target into desired modal field
+    from src.scoring.metrics import chamfer_distance  # 局部导入距离场工具 / Locally import distance-field helper
+    stroke = target_grid > 0.12  # 二值化目标线 / Binarize target line
+    distance = chamfer_distance(stroke)  # 计算到目标线的距离 / Compute distance to target line
+    x_sign = target_crossing_sign_field(target_grid, axis=1)  # 构造横向穿越符号 / Build horizontal-crossing sign
+    y_sign = target_crossing_sign_field(target_grid, axis=0)  # 构造纵向穿越符号 / Build vertical-crossing sign
+    radial = 2.0 * radial_design_bias(target_grid.shape[0]) - 1.0  # 构造有符号径向场 / Build signed radial field
+    angular = 2.0 * angular_design_bias(target_grid.shape[0], float(rng.uniform(0.0, 2.0 * np.pi))) - 1.0  # 构造有符号角向场 / Build signed angular field
+    sign_variants = [x_sign, y_sign, x_sign * y_sign, np.sign(0.65 * x_sign + 0.35 * angular), np.sign(0.65 * y_sign + 0.35 * radial), np.sign(x_sign * y_sign + 0.45 * angular)]  # 组合多种符号翻转假设 / Combine sign-flip hypotheses
+    sign = np.where(sign_variants[variant_index % len(sign_variants)] >= 0.0, 1.0, -1.0)  # 选择当前符号场 / Select current sign field
+    field = sign * np.tanh(distance / 1.6)  # 让目标线成为期望零线 / Make target line the desired zero contour
+    field = field + 0.16 * radial + 0.10 * angular  # 注入非对称低频背景 / Inject asymmetric low-frequency background
+    field[stroke] = 0.0  # 强制目标笔画处为零位移 / Force zero displacement on target strokes
+    return field - float(field.mean())  # 去除常量漂移 / Remove constant drift
+
+
+def inverse_pde_thickness_guidance(mode_field: np.ndarray, target_grid: np.ndarray, variant_index: int) -> np.ndarray:  # 从期望模态反推厚度引导 / Infer thickness guidance from desired mode
+    laplacian = laplacian_design_map(mode_field)  # 计算一阶曲率近似 / Compute curvature proxy
+    bilaplacian = laplacian_design_map(laplacian)  # 计算双调和项近似 / Compute biharmonic proxy
+    modal_mass = np.abs(mode_field) + 0.08  # 构造模态质量项 / Build modal mass term
+    curvature = np.abs(bilaplacian) + 0.08 * np.abs(laplacian) + 0.03  # 构造曲率需求项 / Build curvature-demand term
+    inferred = np.sqrt(modal_mass / curvature)  # 根据 h^2 近似反推厚度趋势 / Infer thickness trend from h-squared proxy
+    stroke = normalise_design_map(target_grid)  # 归一化目标笔画 / Normalize target strokes
+    edge = target_edge_guidance(stroke)  # 计算目标边缘引导 / Compute target-edge guidance
+    channel = smooth_design_map(stroke, 2)  # 平滑目标通道 / Smooth target channel
+    if variant_index % 4 == 0:  # 变体一：目标线附近变薄 / Variant one: thin around target line
+        guidance = normalise_design_map(inferred) - 0.55 * channel + 0.25 * edge  # 合成薄节点引导 / Combine thin-node guidance
+    elif variant_index % 4 == 1:  # 变体二：目标线附近变厚 / Variant two: thicken around target line
+        guidance = normalise_design_map(inferred) + 0.50 * channel - 0.15 * edge  # 合成厚节点引导 / Combine thick-node guidance
+    elif variant_index % 4 == 2:  # 变体三：反曲率场 / Variant three: inverse curvature field
+        guidance = 1.0 - normalise_design_map(inferred) + 0.35 * edge - 0.25 * channel  # 合成反曲率引导 / Combine inverse-curvature guidance
+    else:  # 变体四：曲率和目标双通道 / Variant four: curvature-plus-target dual channel
+        guidance = 0.55 * normalise_design_map(curvature) + 0.25 * edge + 0.20 * (1.0 - channel)  # 合成双通道引导 / Combine dual-channel guidance
+    return normalise_design_map(guidance)  # 返回归一化厚度引导 / Return normalized thickness guidance
+
+
+def generate_modal_compiler_H(target_grid: np.ndarray, index: int, parents: list[np.ndarray], levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 生成模态编译器候选 / Generate modal-compiler candidate
+    field = desired_modal_field(target_grid, index, rng)  # 构造期望模态场 / Build desired modal field
+    guidance = inverse_pde_thickness_guidance(field, target_grid, index)  # 反推厚度引导 / Infer thickness guidance
+    if parents and index % 3 == 2:  # 周期性混合真实高分父代 / Periodically blend real high-score parent
+        guidance = normalise_design_map(0.58 * guidance + 0.42 * matrix_to_guidance(parents[int(rng.integers(0, len(parents)))], levels))  # 混合父代和编译器引导 / Blend parent and compiler guidance
+    H = guidance_to_continuous_thickness(guidance, levels)  # 映射为连续厚度 / Map to continuous thicknesses
+    center_cells = center_cells_for_grid(H.shape[0])  # 获取中心固定单元 / Get centre fixed cells
+    H = enforce_center_constraint(H, center_cells, default_thickness)  # 固定中心厚度 / Fix centre thickness
+    H = repair_candidate_matrix(H, levels, max_neighbor_diff, center_cells, passes=40)  # 强化修复制造约束 / Strongly repair manufacturing constraints
+    H = enforce_center_constraint(H, center_cells, default_thickness)  # 再次固定中心 / Fix centre again
+    return H, f"modal_compiler_inverse_pde_{index % 8}"  # 返回候选和来源 / Return candidate and source
+
+
+def generate_modal_compiler_proposals(config: dict, target_grid: np.ndarray | None, parents: list[np.ndarray], levels: list[float], default_thickness: float, max_neighbor_diff: float, population: int, rng: np.random.Generator) -> list[tuple[np.ndarray, str]]:  # 生成目标模态编译提案 / Generate target-modal compiler proposals
+    if target_grid is None:  # 检查目标是否存在 / Check whether target exists
+        return []  # 无目标时返回空 / Return empty without target
+    count = min(population, int(config.get("optimisation", {}).get("modal_compiler_count", 4)))  # 读取编译器候选数量 / Read compiler proposal count
+    proposals = []  # 创建提案列表 / Create proposal list
+    for index in range(max(0, count)):  # 遍历编译器变体 / Iterate compiler variants
+        H, name = generate_modal_compiler_H(target_grid, index, parents, levels, default_thickness, max_neighbor_diff, rng)  # 生成一个编译器候选 / Generate one compiler candidate
+        if is_diverse_candidate(H, proposals, levels, threshold=0.030):  # 检查本批多样性 / Check batch diversity
+            proposals.append((H, name))  # 保存提案 / Store proposal
+    return proposals  # 返回编译器提案 / Return compiler proposals
+
+
 def guidance_to_continuous_thickness(guidance: np.ndarray, levels: list[float]) -> np.ndarray:  # 将引导图映射为连续厚度 / Map guidance map to continuous thicknesses
     low = float(min(levels))  # 读取最小厚度 / Read minimum thickness
     high = float(max(levels))  # 读取最大厚度 / Read maximum thickness
@@ -586,9 +658,10 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
     parents = [parent for parent in parents if tuple(parent.shape) == (grid_size, grid_size)]  # 过滤旧网格父代 / Filter old-grid parents
     target_grid = load_target_binary_grid(config, grid_size)  # 读取目标感知网格 / Load target-aware grid
     response_records = load_response_guidance_records(config, candidates_dir, target_grid) if target_grid is not None else []  # 读取真实响应闭环记录 / Load real-response closed-loop records
+    modal_compiler_proposals = generate_modal_compiler_proposals(config, target_grid, parents, levels, default, max_diff, population, rng)  # 生成目标模态编译提案 / Generate target-modal compiler proposals
     kl_proxy_proposals = generate_kl_proxy_optimised_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成 KL 直接优化提案 / Generate directly KL-optimised proposals
     surrogate_proposals = generate_surrogate_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成代理模型优化提案 / Generate surrogate-model optimized proposals
-    inverse_proposals = kl_proxy_proposals + surrogate_proposals  # 合并直接物理优化和代理提案 / Combine direct physics and surrogate proposals
+    inverse_proposals = modal_compiler_proposals + kl_proxy_proposals + surrogate_proposals  # 合并模态编译、直接物理优化和代理提案 / Combine modal compiler, direct physics, and surrogate proposals
     response_count = max(min(population, len(response_records) * 2), int(population * 0.75)) if response_records else 0  # 计算闭环响应候选数量 / Compute response-guided candidate count
     target_count = max(response_count, max(min(population, 6), int(population * 0.90 if response_records else population * 0.75))) if target_grid is not None else 0  # 计算目标感知候选数量 / Compute target-aware candidate count
     candidate_ids = []  # 创建候选编号列表 / Create candidate id list
@@ -596,7 +669,7 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
         candidate_id = f"candidate_{generation:03d}_{index:04d}"  # 构造候选编号 / Build candidate id
         if index < len(inverse_proposals):  # 优先使用逆向优化提案 / Prefer inverse-optimised proposals
             H, variant_name = inverse_proposals[index]  # 读取逆向提案 / Read inverse proposal
-            created_by = "kl_proxy_direct_inverse_search" if variant_name.startswith("kl_proxy_optimised") else "surrogate_guided_inverse_search"  # 设置生成来源 / Set creation source
+            created_by = "modal_pde_inverse_compiler" if variant_name.startswith("modal_compiler") else ("kl_proxy_direct_inverse_search" if variant_name.startswith("kl_proxy_optimised") else "surrogate_guided_inverse_search")  # 设置生成来源 / Set creation source
         elif response_records and index < response_count:  # 其次生成闭环响应引导候选 / Then generate closed-loop response-guided candidates
             H, variant_name = generate_response_guided_H(response_records, index, levels, default, max_diff, rng)  # 生成闭环响应引导矩阵 / Generate response-guided matrix
             created_by = "response_guided_inverse_search"  # 设置生成来源 / Set creation source

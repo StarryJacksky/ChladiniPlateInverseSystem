@@ -56,10 +56,12 @@ def load_or_extract_nodal(mode_file: Path, image_size: int, epsilon_ratio: float
     return nodal.astype(bool)  # 返回布尔节点线图 / Return boolean nodal map
 
 
-def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], image_size: int, epsilon_ratio: float, center_radius_px: int = 0) -> dict:  # 对候选所有模态评分 / Score all candidate modes
+def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], image_size: int, epsilon_ratio: float, center_radius_px: int = 0, min_mode: int = 1) -> dict:  # 对候选所有模态评分 / Score all candidate modes
     best = {"best_mode": None, "best_iou": -1.0, "best_dice": -1.0, "best_similarity": -1.0, "all_modes": []}  # 初始化最佳结果 / Initialise best result
     for mode_file in mode_files:  # 遍历模态文件 / Iterate mode files
         mode_number = int(mode_file.stem.split("_")[-1])  # 从文件名读取模态编号 / Read mode number from filename
+        if mode_number < int(min_mode):  # 跳过过低阶模态 / Skip modes below target order
+            continue  # 继续检查下一阶 / Continue to next mode
         nodal = load_or_extract_nodal(mode_file, image_size, epsilon_ratio, center_radius_px)  # 读取或生成节点线图 / Load or build nodal map
         target = resize_binary_to_shape(target_binary, nodal.shape)  # 对齐目标图尺寸 / Align target map shape
         iou = compute_iou(nodal, target)  # 计算 IoU / Compute IoU
@@ -77,6 +79,10 @@ def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], ima
         best["all_modes"].append({"mode": mode_number, "iou": iou, "dice": dice, "distance_similarity": distance, "overlap_balance": overlap, "layout_similarity": layout, "area_similarity": area, "precision": precision, "recall": recall, "projection_similarity": projection, "extent_similarity": extent, "complexity_similarity": complexity, "component_similarity": topology, "similarity": similarity})  # 记录该模态结果 / Record this mode result
         if similarity > best["best_similarity"]:  # 检查是否是新最佳 / Check whether this is new best
             best.update({"best_mode": mode_number, "best_iou": iou, "best_dice": dice, "best_distance_similarity": distance, "best_overlap_balance": overlap, "best_layout_similarity": layout, "best_area_similarity": area, "best_precision": precision, "best_recall": recall, "best_projection_similarity": projection, "best_extent_similarity": extent, "best_complexity_similarity": complexity, "best_component_similarity": topology, "best_similarity": similarity})  # 更新最佳结果 / Update best result
+    if best["best_mode"] is None and int(min_mode) > 1:  # 检查旧导出是否缺少高阶模态 / Check whether old export lacks high-order modes
+        return score_candidate_modes(target_binary, mode_files, image_size, epsilon_ratio, center_radius_px, 1)  # 旧导出回退全模态评分 / Fall back to all modes for old exports
+    if best["best_mode"] is None:  # 检查是否没有可评分模态 / Check whether no mode was scored
+        raise ValueError("No mode files can be scored. / 没有可评分的模态文件。")  # 抛出配置错误 / Raise configuration error
     return best  # 返回评分结果 / Return scoring result
 
 
@@ -98,7 +104,8 @@ def score_candidate(candidate_dir: str | Path, export_dir: str | Path, target_bi
         raise FileNotFoundError(f"No mode_*.csv files found in {export_path}. / 未找到模态文件。")  # 抛出缺失文件错误 / Raise missing-file error
     frequencies = load_frequencies(export_path / "frequencies.csv")  # 读取频率文件 / Load frequency file
     center_radius_px = int(int(config["nodal_extraction"]["image_size"]) * float(config["project"]["center_clamp_radius_mm"]) / float(config["project"]["plate_length_mm"])) if config["nodal_extraction"].get("remove_center_region", True) else 0  # 计算中心掩膜半径 / Compute centre mask radius
-    mode_score = score_candidate_modes(target_binary, mode_files, int(config["nodal_extraction"]["image_size"]), float(config["nodal_extraction"]["epsilon_ratio"]), center_radius_px)  # 计算模态评分 / Compute mode scores
+    min_mode = int(config.get("optimisation", {}).get("target_min_mode", 1))  # 读取目标匹配最低模态 / Read minimum target-matching mode
+    mode_score = score_candidate_modes(target_binary, mode_files, int(config["nodal_extraction"]["image_size"]), float(config["nodal_extraction"]["epsilon_ratio"]), center_radius_px, min_mode)  # 计算模态评分 / Compute mode scores
     best_frequency = frequencies.get(int(mode_score["best_mode"]), 0.0)  # 获取最佳模态频率 / Get best-mode frequency
     final_score = compute_final_score(H, mode_score, best_frequency, config)  # 计算最终分数 / Compute final score
     result = {**mode_score, "frequency_hz": best_frequency, "scoring_version": SCORING_VERSION, **final_score}  # 合并结果和评分版本 / Merge result and scoring version

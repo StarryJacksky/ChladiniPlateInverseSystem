@@ -9,6 +9,12 @@ def extract_nodal_region(W: np.ndarray, epsilon_ratio: float = 0.05) -> np.ndarr
         return np.zeros_like(W, dtype=bool)  # 返回空节点图 / Return empty nodal map
     W_norm = W / max_abs  # 归一化位移场 / Normalise displacement field
     nodal = np.abs(W_norm) < epsilon_ratio  # 提取接近零位移区域 / Extract near-zero displacement region
+    vertical_change = W_norm[:-1, :] * W_norm[1:, :] <= 0.0  # 检测纵向符号翻转 / Detect vertical sign crossings
+    horizontal_change = W_norm[:, :-1] * W_norm[:, 1:] <= 0.0  # 检测横向符号翻转 / Detect horizontal sign crossings
+    nodal[:-1, :] |= vertical_change  # 标记纵向交界上侧 / Mark upper side of vertical crossing
+    nodal[1:, :] |= vertical_change  # 标记纵向交界下侧 / Mark lower side of vertical crossing
+    nodal[:, :-1] |= horizontal_change  # 标记横向交界左侧 / Mark left side of horizontal crossing
+    nodal[:, 1:] |= horizontal_change  # 标记横向交界右侧 / Mark right side of horizontal crossing
     return nodal.astype(bool)  # 返回布尔节点图 / Return boolean nodal map
 
 

@@ -20,14 +20,19 @@ except Exception:  # 兼容无 SciPy 稀疏模块环境 / Support environments w
 
 from src.candidate.constraints import center_cells_for_grid  # 导入中心单元工具 / Import centre-cell helper
 from src.scoring.metrics import area_similarity  # 导入面积相似度 / Import area similarity
+from src.scoring.metrics import chamfer_distance  # 导入倒角距离场 / Import chamfer distance field
+from src.scoring.metrics import chamfer_similarity  # 导入倒角距离相似度 / Import chamfer-distance similarity
 from src.scoring.metrics import component_similarity  # 导入连通拓扑相似度 / Import connected-topology similarity
 from src.scoring.metrics import complexity_similarity  # 导入复杂度相似度 / Import complexity similarity
+from src.scoring.metrics import coverage_f_score  # 导入覆盖 F 分数 / Import coverage F-score
 from src.scoring.metrics import compute_dice  # 导入 Dice 指标 / Import Dice metric
 from src.scoring.metrics import compute_iou  # 导入 IoU 指标 / Import IoU metric
 from src.scoring.metrics import compute_overlap_balance  # 导入覆盖平衡分 / Import overlap balance score
 from src.scoring.metrics import compute_precision_recall  # 导入精度召回 / Import precision-recall metrics
 from src.scoring.metrics import extent_similarity  # 导入包围盒尺度相似度 / Import extent similarity
+from src.scoring.metrics import foreground_extent  # 导入前景包围盒特征 / Import foreground extent features
 from src.scoring.metrics import layout_similarity  # 导入布局相似度 / Import layout similarity
+from src.scoring.metrics import overcoverage_penalty  # 导入过覆盖惩罚 / Import overcoverage penalty
 from src.scoring.metrics import pattern_similarity  # 导入统一图案相似度 / Import unified pattern similarity
 from src.scoring.metrics import projection_similarity  # 导入投影相似度 / Import projection similarity
 
@@ -196,6 +201,98 @@ def score_kl_mode(nodal: np.ndarray, target_grid: np.ndarray) -> float:  # 评�
     return pattern_similarity(iou, dice, 0.0, overlap, layout, area, precision, recall, projection, extent, complexity, topology)  # 返回统一口径的代理合成分 / Return unified proxy combined score
 
 
+def compact_center_trap_penalty(nodal: np.ndarray, target_grid: np.ndarray) -> float:  # 惩罚中心小团陷阱 / Penalize compact-centre traps
+    mode = nodal.astype(bool)  # 转换代理模态节点图 / Convert proxy nodal map
+    target = target_grid > 0.15  # 二值化目标图案 / Binarize target pattern
+    if not mode.any() or not target.any():  # 检查空图案 / Check empty maps
+        return 1.0  # 空响应视为严重陷阱 / Treat empty response as severe trap
+    mode_width, mode_height, mode_x, mode_y, _ = foreground_extent(mode)  # 读取模态包围盒 / Read mode bounding box
+    target_width, target_height, _, _, _ = foreground_extent(target)  # 读取目标包围盒 / Read target bounding box
+    mode_extent = 0.5 * (mode_width + mode_height)  # 计算模态平均尺度 / Compute average mode extent
+    target_extent = max(0.5 * (target_width + target_height), 1.0e-9)  # 计算目标平均尺度 / Compute average target extent
+    missing_extent = max(0.0, target_extent - mode_extent) / target_extent  # 计算模态尺度不足 / Compute missing extent
+    mode_area = float(mode.mean())  # 计算模态面积比例 / Compute mode area ratio
+    target_area = max(float(target.mean()), 1.0e-9)  # 计算目标面积比例 / Compute target area ratio
+    undersize = max(0.0, target_area - mode_area) / target_area  # 计算面积不足 / Compute area undersize
+    center_distance = float(np.hypot(mode_x - 0.5, mode_y - 0.5))  # 计算模态中心偏移 / Compute mode centre offset
+    centered = float(np.clip(1.0 - center_distance / 0.42, 0.0, 1.0))  # 计算中心陷阱权重 / Compute centre-trap weight
+    return float(np.clip(centered * (0.65 * missing_extent + 0.35 * undersize), 0.0, 1.0))  # 返回陷阱惩罚 / Return trap penalty
+
+
+def radial_spoke_trap_penalty(nodal: np.ndarray, target_grid: np.ndarray) -> float:  # 惩罚中心辐射骨架陷阱 / Penalize centre-radiating spoke traps
+    mode = nodal.astype(bool)  # 转换代理模态节点图 / Convert proxy nodal map
+    target = target_grid > 0.15  # 二值化目标图案 / Binarize target pattern
+    rows, cols = mode.shape  # 读取图像尺寸 / Read map shape
+    yy, xx = np.meshgrid(np.linspace(-1.0, 1.0, rows), np.linspace(-1.0, 1.0, cols), indexing="ij")  # 构建归一化坐标 / Build normalized coordinates
+    radius = np.sqrt(xx * xx + yy * yy)  # 计算归一化半径 / Compute normalized radius
+    central = radius < 0.30  # 定义中心影响区域 / Define centre-influence zone
+    edge_band = (np.abs(xx) > 0.78) | (np.abs(yy) > 0.78)  # 定义边缘触达区域 / Define edge-touch zone
+    mode_central = float(mode[central].mean()) if central.any() else 0.0  # 计算模态中心占用 / Compute mode centre occupancy
+    target_central = float(target[central].mean()) if central.any() else 0.0  # 计算目标中心占用 / Compute target centre occupancy
+    mode_edge = float(mode[edge_band].mean()) if edge_band.any() else 0.0  # 计算模态边缘占用 / Compute mode edge occupancy
+    target_edge = float(target[edge_band].mean()) if edge_band.any() else 0.0  # 计算目标边缘占用 / Compute target edge occupancy
+    center_excess = float(np.clip((mode_central - target_central - 0.04) / 0.28, 0.0, 1.0))  # 计算中心过量占用 / Compute excessive centre occupancy
+    edge_excess = float(np.clip((mode_edge - target_edge - 0.03) / 0.24, 0.0, 1.0))  # 计算边缘过量触达 / Compute excessive edge touch
+    return float(np.clip(0.60 * center_excess + 0.40 * center_excess * edge_excess, 0.0, 1.0))  # 返回辐射骨架惩罚 / Return spoke-trap penalty
+
+
+def target_crossing_sign_field(target_grid: np.ndarray, axis: int) -> np.ndarray:  # 根据目标笔画构造穿越符号场 / Build crossing sign field from target strokes
+    stroke = target_grid > 0.15  # 二值化目标笔画 / Binarize target strokes
+    transitions = np.cumsum(stroke.astype(int), axis=axis) % 2  # 统计沿轴穿越目标的奇偶性 / Count crossing parity along axis
+    return np.where(transitions == 0, 1.0, -1.0)  # 返回正负符号图 / Return signed field
+
+
+def target_modal_field_variants(target_grid: np.ndarray) -> list[np.ndarray]:  # 构造期望模态符号场变体 / Build desired modal sign-field variants
+    stroke = target_grid > 0.15  # 二值化目标笔画 / Binarize target strokes
+    distance = chamfer_distance(stroke)  # 计算到目标笔画的距离 / Compute distance to target strokes
+    envelope = np.tanh(distance / 1.8)  # 构造离开零线后的幅值包络 / Build amplitude envelope away from zero line
+    x_sign = target_crossing_sign_field(target_grid, axis=1)  # 构造横向穿越符号 / Build horizontal crossing sign
+    y_sign = target_crossing_sign_field(target_grid, axis=0)  # 构造纵向穿越符号 / Build vertical crossing sign
+    variants = [x_sign, y_sign, x_sign * y_sign, np.sign(0.70 * x_sign + 0.30 * y_sign), np.sign(0.35 * x_sign + 0.65 * y_sign)]  # 组合多种符号假设 / Combine multiple sign hypotheses
+    fields = []  # 创建期望场列表 / Create desired-field list
+    for sign in variants:  # 遍历符号假设 / Iterate sign hypotheses
+        field = sign.astype(float) * envelope  # 生成目标零线模态场 / Build target-zero modal field
+        field[stroke] = 0.0  # 强制目标线为零位移 / Force target strokes to zero displacement
+        field = field - float(field.mean())  # 去除常量偏置 / Remove constant bias
+        fields.append(field)  # 保存期望场 / Store desired field
+    return fields  # 返回期望场变体 / Return desired field variants
+
+
+def normalised_field_correlation(left: np.ndarray, right: np.ndarray) -> float:  # 计算两个场的归一化相关 / Compute normalized field correlation
+    left_vec = (left.astype(float) - float(left.mean())).ravel()  # 展平并去均值左场 / Flatten and center left field
+    right_vec = (right.astype(float) - float(right.mean())).ravel()  # 展平并去均值右场 / Flatten and center right field
+    denominator = max(float(np.linalg.norm(left_vec) * np.linalg.norm(right_vec)), 1.0e-9)  # 计算稳定分母 / Compute stable denominator
+    return float(abs(np.dot(left_vec, right_vec)) / denominator)  # 返回翻转不变相关 / Return sign-flip-invariant correlation
+
+
+def modal_field_alignment(mode: np.ndarray, target_grid: np.ndarray) -> float:  # 计算模态场与目标符号场的一致性 / Compute alignment between mode field and target sign fields
+    variants = target_modal_field_variants(target_grid)  # 构造目标模态场变体 / Build target modal-field variants
+    return max(normalised_field_correlation(mode, variant) for variant in variants) if variants else 0.0  # 返回最佳符号场相关 / Return best sign-field correlation
+
+
+def score_kl_mode_search(mode: np.ndarray, nodal: np.ndarray, target_grid: np.ndarray) -> float:  # 给搜索用的连续软评分 / Score one KL mode with a continuous search objective
+    target = target_grid > 0.15  # 二值化目标网格 / Binarize target grid
+    iou = compute_iou(nodal, target)  # 计算 IoU / Compute IoU
+    dice = compute_dice(nodal, target)  # 计算 Dice / Compute Dice
+    area = area_similarity(nodal, target)  # 计算面积相似度 / Compute area similarity
+    overlap = compute_overlap_balance(nodal, target)  # 计算覆盖平衡 / Compute overlap balance
+    precision, recall = compute_precision_recall(nodal, target)  # 计算精度召回 / Compute precision and recall
+    layout = layout_similarity(nodal, target, cells=min(8, nodal.shape[0]))  # 计算粗布局相似度 / Compute coarse layout similarity
+    projection = projection_similarity(nodal, target)  # 计算投影相似度 / Compute projection similarity
+    extent = extent_similarity(nodal, target)  # 计算包围盒尺度相似度 / Compute extent similarity
+    complexity = complexity_similarity(nodal, target)  # 计算复杂度相似度 / Compute complexity similarity
+    topology = component_similarity(nodal, target)  # 计算连通拓扑相似度 / Compute connected topology similarity
+    chamfer = chamfer_similarity(nodal, target)  # 计算距离场软相似度 / Compute distance-field soft similarity
+    balance = coverage_f_score(precision, recall)  # 计算精度召回 F 分数 / Compute precision-recall F-score
+    signed = modal_field_alignment(mode, target_grid)  # 计算符号场相关分 / Compute signed-field alignment score
+    soft = 0.05 * iou + 0.06 * dice + 0.14 * chamfer + 0.08 * overlap + 0.10 * layout + 0.10 * projection + 0.10 * extent + 0.05 * area + 0.03 * complexity + 0.03 * topology + 0.03 * balance + 0.23 * signed  # 合成搜索软分 / Combine search soft score
+    penalty = overcoverage_penalty(precision, recall, area)  # 计算过覆盖惩罚 / Compute overcoverage penalty
+    trap = compact_center_trap_penalty(nodal, target)  # 计算中心小团陷阱惩罚 / Compute compact-centre trap penalty
+    spoke = radial_spoke_trap_penalty(nodal, target)  # 计算中心辐射骨架惩罚 / Compute centre-spoke trap penalty
+    precision_shortfall = float(np.clip((0.22 - precision) / 0.22, 0.0, 1.0))  # 计算精度不足惩罚 / Compute precision-shortfall penalty
+    return float(max(0.0, soft - 0.16 * penalty - 0.22 * trap - 0.18 * spoke - 0.12 * precision_shortfall))  # 返回连续搜索评分 / Return continuous search score
+
+
 def resize_target_to_grid(target_grid: np.ndarray, grid_size: int) -> np.ndarray:  # 将目标图压缩到代理网格 / Compress target map to proxy grid
     if target_grid.shape == (grid_size, grid_size):  # 检查尺寸是否已匹配 / Check whether shape already matches
         return target_grid.astype(float)  # 返回浮点目标 / Return float target
@@ -229,6 +326,13 @@ def score_thickness_with_kl_proxy(H_mm: np.ndarray, target_grid: np.ndarray, con
     proxy_H = upsample_thickness_nearest(H_mm, proxy_grid_size)  # 上采样厚度到代理网格 / Upsample thickness to proxy grid
     modes = solve_kl_modes(proxy_H, float(config["project"]["plate_length_mm"]), float(config["project"]["plate_width_mm"]), config.get("material", {}), num_modes=num_modes)  # 求解代理模态 / Solve proxy modes
     target = proxy_target_for_grid(target_grid, config, proxy_H.shape[0])  # 对齐完整目标到代理网格 / Align full target to proxy grid
-    scores = [score_kl_mode(nodal_map_from_mode(mode), target) for mode in modes]  # 计算各阶代理评分 / Compute per-mode proxy scores
-    best_index = int(np.argmax(scores)) if scores else 0  # 找最佳模态索引 / Find best mode index
-    return {"kl_proxy_score": float(scores[best_index] if scores else 0.0), "kl_proxy_mode": best_index + 1, "kl_proxy_grid_size": int(proxy_H.shape[0])}  # 返回代理评分结果 / Return proxy score result
+    min_mode = int(config.get("optimisation", {}).get("kl_proxy_min_mode", config.get("optimisation", {}).get("target_min_mode", 1)))  # 读取代理最低匹配模态 / Read minimum proxy matching mode
+    objective = str(config.get("optimisation", {}).get("kl_proxy_objective", "search_soft"))  # 读取代理优化目标 / Read proxy optimisation objective
+    scoring_fn = score_kl_mode_search if objective == "search_soft" else score_kl_mode  # 选择搜索软分或严格分 / Choose search-soft or strict score
+    indexed_scores = [(index + 1, scoring_fn(mode, nodal_map_from_mode(mode), target) if objective == "search_soft" else scoring_fn(nodal_map_from_mode(mode), target)) for index, mode in enumerate(modes) if index + 1 >= min_mode]  # 计算过滤后的代理评分 / Compute filtered proxy scores
+    if not indexed_scores:  # 检查是否没有高阶代理模态 / Check whether no high-order proxy mode exists
+        indexed_scores = [(index + 1, scoring_fn(mode, nodal_map_from_mode(mode), target) if objective == "search_soft" else scoring_fn(nodal_map_from_mode(mode), target)) for index, mode in enumerate(modes)]  # 回退全部模态评分 / Fall back to all mode scores
+    best_mode, best_score = max(indexed_scores, key=lambda item: item[1]) if indexed_scores else (1, 0.0)  # 选择最佳代理模态 / Select best proxy mode
+    best_nodal = nodal_map_from_mode(modes[max(0, min(len(modes) - 1, best_mode - 1))]) if modes else np.zeros_like(target, dtype=bool)  # 读取最佳模态节点图 / Read best-mode nodal map
+    strict_score = score_kl_mode(best_nodal, target) if modes else 0.0  # 计算严格参考分 / Compute strict reference score
+    return {"kl_proxy_score": float(best_score), "kl_proxy_strict_score": float(strict_score), "kl_proxy_mode": int(best_mode), "kl_proxy_grid_size": int(proxy_H.shape[0]), "kl_proxy_objective": objective}  # 返回代理评分结果 / Return proxy score result

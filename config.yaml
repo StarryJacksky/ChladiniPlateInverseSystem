@@ -50,7 +50,7 @@ comsol:
 # 目标图与节点线提取设置 / Target and nodal extraction settings
 nodal_extraction:
   image_size: 256 # 算法统一图像尺寸 / Unified algorithm image size
-  epsilon_ratio: 0.05 # 节点线阈值比例 / Nodal threshold ratio
+  epsilon_ratio: 0.025 # 节点线阈值比例 / Nodal threshold ratio
   target_mode: "chladni" # 目标提取模式 / Target extraction mode
   target_line_width_px: 8 # 目标线宽 / Target line width
   remove_center_region: true # 是否移除中心夹持区域 / Whether to remove center clamp
@@ -66,9 +66,13 @@ optimisation:
   bayesian_ensemble_size: 16 # 贝叶斯代理集成数量 / Bayesian surrogate ensemble size
   bayesian_ucb_beta: 0.42 # 贝叶斯 UCB 探索强度 / Bayesian UCB exploration strength
   bayesian_expected_improvement_weight: 0.30 # 期望改进权重 / Expected improvement weight
+  target_min_mode: 8 # 目标图案最低匹配模态 / Minimum mode used for target matching
+  modal_compiler_count: 4 # 目标模态编译候选数量 / Number of target-modal compiler candidates
   kl_proxy_weight: 0.28 # KL 物理代理权重 / KL physics proxy weight
+  kl_proxy_objective: "search_soft" # KL 代理搜索目标 / KL proxy search objective
   kl_proxy_grid_size: 31 # KL 代理高分辨率求解网格 / High-resolution solve grid for KL proxy
   kl_proxy_num_modes: 32 # KL 代理参与匹配的模态数量 / Number of KL proxy modes used for matching
+  kl_proxy_min_mode: 8 # KL 代理最低匹配模态 / Minimum KL proxy matching mode
   kl_proxy_optimised_count: 6 # KL 直接优化候选数量 / Number of directly KL-optimised candidates
   kl_proxy_local_steps: 14 # KL 直接优化局部搜索步数 / Local search steps for direct KL optimisation
   kl_proxy_pool_stride: 6 # 贝叶斯候选池 KL 精算间隔 / KL exact-scoring interval for Bayesian pool

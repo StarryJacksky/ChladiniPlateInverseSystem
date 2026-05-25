@@ -2,7 +2,7 @@ from __future__ import annotations  # 启用现代类型注解 / Enable modern t
 
 import numpy as np  # 导入数值计算库 / Import numerical library
 
-SCORING_VERSION = "precision_topology_v3"  # 记录当前评分口径版本 / Record current scoring-rule version
+SCORING_VERSION = "strict_precision_topology_v4"  # 记录当前评分口径版本 / Record current scoring-rule version
 
 try:  # 优先使用 SciPy 加速距离变换 / Prefer SciPy to accelerate distance transforms
     from scipy.ndimage import distance_transform_edt as scipy_distance_transform_edt  # 导入欧氏距离变换 / Import Euclidean distance transform
@@ -257,4 +257,8 @@ def pattern_similarity(iou: float, dice: float, distance_similarity: float = 0.0
     balance = coverage_f_score(precision, recall)  # 计算精度召回平衡分 / Compute precision-recall balance score
     raw = 0.10 * iou + 0.15 * dice + 0.06 * distance_similarity + 0.15 * overlap_balance + 0.06 * layout + 0.03 * area + 0.16 * precision + 0.04 * recall + 0.10 * projection + 0.04 * extent + 0.03 * complexity + 0.04 * balance + 0.04 * topology  # 合成偏精确和拓扑的基础分 / Combine precision-and-topology-biased base score
     penalty = overcoverage_penalty(precision, recall, area)  # 计算多余响应惩罚 / Compute extra-response penalty
-    return float(max(0.0, raw - 0.18 * penalty))  # 返回抑制过覆盖后的相似度 / Return overcoverage-suppressed similarity
+    precision_gate = float(np.clip(precision / 0.34, 0.0, 1.0))  # 构造精度硬门控 / Build precision hard gate
+    balance_gate = float(np.clip(balance / 0.32, 0.0, 1.0))  # 构造 F 分数硬门控 / Build F-score hard gate
+    topology_gate = 0.15 + 0.85 * float(np.clip(topology, 0.0, 1.0))  # 构造拓扑硬门控 / Build topology hard gate
+    gated = raw * max(0.05, 0.58 * precision_gate + 0.42 * balance_gate) * topology_gate  # 应用硬门控压低假匹配 / Apply hard gates to suppress false matches
+    return float(max(0.0, gated - 0.22 * penalty))  # 返回严格抑制过覆盖后的相似度 / Return strictly overcoverage-suppressed similarity
