@@ -6,8 +6,11 @@ Each candidate folder contains:
 
 ```text
 H.csv
+density_scale.csv
+loss_factor.csv
 comsol_parameters.csv
 material_parameters.csv
+design_variable_parameters.csv
 ```
 
 `H.csv` is the direct matrix form:
@@ -60,6 +63,31 @@ mat_thermal_expansion,8e-05,1/K
 ```
 
 The bound COMSOL material should reference these global parameters for density, Young's modulus, Poisson ratio, thermal conductivity, heat capacity, and thermal expansion.
+
+`density_scale.csv` and `loss_factor.csv` are optional matrix fields with the same row/column orientation as `H.csv`.
+
+`design_variable_parameters.csv` expands those matrices into COMSOL scalar parameters:
+
+```csv
+name,value,unit
+rhoS0101,1.0,1
+...
+rhoS1515,1.0,1
+etaL0101,0.0,1
+...
+etaL1515,0.0,1
+```
+
+The design-bound COMSOL model should define:
+
+```text
+rho_scale_field = piecewise field built from rhoS0101 ... rhoS1515
+eta_loss_field = piecewise field built from etaL0101 ... etaL1515
+density = mat_density*rho_scale_field
+youngsmodulus = mat_youngs_modulus*(1+i*eta_loss_field)
+```
+
+The helper script `comsol_templates/apply_design_variable_contract.m` can apply this contract to a bound MPH model through MATLAB LiveLink.
 
 ## COMSOL To Python
 

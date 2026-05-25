@@ -23,6 +23,8 @@ design_variables:
   density_scale_max: 1.25 # 单元密度倍率上限 / Upper bound for per-cell density scale
   loss_factor_min: 0.0 # 单元损耗因子下限 / Lower bound for per-cell loss factor
   loss_factor_max: 0.08 # 单元损耗因子上限 / Upper bound for per-cell loss factor
+  density_noise_weight: 0.18 # 密度场独立探索权重 / Independent exploration weight for density field
+  loss_noise_weight: 0.22 # 损耗场独立探索权重 / Independent exploration weight for loss field
 
 # 材料参数 / Material parameters
 material:
@@ -41,7 +43,7 @@ simulation:
 
 # COMSOL 模型合同 / COMSOL model contract
 comsol:
-  model_path: "comsol_templates/Chladni_15x15_bound.mph" # 绑定模型路径 / Bound model path
+  model_path: "comsol_templates/Chladni_15x15_design_bound.mph" # 绑定模型路径 / Bound model path
   source_model_path: "/Users/apple/Documents/Chladni.mph" # 原始基准模型路径 / Original baseline model path
   comsol_command_path: "/Applications/COMSOL64/Multiphysics/bin/comsol" # COMSOL 命令路径 / COMSOL command path
   server_host: "127.0.0.1" # COMSOL server 主机 / COMSOL server host
@@ -51,6 +53,7 @@ comsol:
   matlab_path: "/Applications/MATLAB_R2024a.app/bin/matlab" # MATLAB 路径 / MATLAB path
   livelink_timeout_s: 7200 # 单次 LiveLink 运行超时秒数 / Single LiveLink run timeout seconds
   runner_path: "comsol_templates/run_chladni_candidate.m" # LiveLink 运行脚本 / LiveLink runner script
+  design_contract_runner_path: "comsol_templates/apply_design_variable_contract.m" # 设计变量合同升级脚本 / Design-variable contract upgrade script
   study_tag: "std1" # 特征频率研究标签 / Eigenfrequency study tag
   shell_tag: "shell" # 壳物理场标签 / Shell physics tag
   displacement_expression: "shell.w" # 面外位移表达式 / Out-of-plane displacement expression

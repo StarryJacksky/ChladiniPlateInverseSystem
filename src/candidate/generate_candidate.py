@@ -698,17 +698,28 @@ def scale_field(values: np.ndarray, low: float, high: float) -> np.ndarray:  # �
     return low + normalise_design_map(values) * (high - low)  # 返回缩放场 / Return scaled field
 
 
-def build_auxiliary_design_fields(H: np.ndarray, levels: list[float], target_grid: np.ndarray | None, config: dict) -> dict[str, np.ndarray]:  # 构建辅助设计变量场 / Build auxiliary design-variable fields
+def build_auxiliary_noise(shape: tuple[int, int], rng: np.random.Generator | None) -> np.ndarray:  # 构建辅助变量探索噪声 / Build auxiliary-variable exploration noise
+    random_gen = rng or np.random.default_rng(0)  # 读取随机源 / Read random generator
+    noise = random_gen.normal(0.0, 1.0, size=shape)  # 生成高斯噪声 / Generate Gaussian noise
+    return normalise_design_map(smooth_design_map(noise, 2))  # 平滑并归一化噪声 / Smooth and normalize noise
+
+
+def build_auxiliary_design_fields(H: np.ndarray, levels: list[float], target_grid: np.ndarray | None, config: dict, rng: np.random.Generator | None = None, variant_name: str = "") -> dict[str, np.ndarray]:  # 构建辅助设计变量场 / Build auxiliary design-variable fields
     settings = config.get("design_variables", {})  # 读取辅助变量配置 / Read auxiliary-variable config
     thickness = matrix_to_guidance(H, levels)  # 归一化厚度场 / Normalize thickness field
     target = normalise_design_map(target_grid) if target_grid is not None else thickness  # 读取目标引导图 / Read target guidance map
     edge = target_edge_guidance(target) if target_grid is not None else radial_design_bias(H.shape[0])  # 构造边缘或径向引导 / Build edge or radial guidance
+    density_noise = build_auxiliary_noise(H.shape, rng)  # 构造密度探索噪声 / Build density exploration noise
+    loss_noise = build_auxiliary_noise(H.shape, rng)  # 构造损耗探索噪声 / Build loss exploration noise
     density_low = float(settings.get("density_scale_min", 0.90))  # 读取密度倍率下限 / Read density-scale lower bound
     density_high = float(settings.get("density_scale_max", 1.15))  # 读取密度倍率上限 / Read density-scale upper bound
     loss_low = float(settings.get("loss_factor_min", 0.00))  # 读取损耗因子下限 / Read loss-factor lower bound
     loss_high = float(settings.get("loss_factor_max", 0.06))  # 读取损耗因子上限 / Read loss-factor upper bound
-    density_source = 0.45 * (1.0 - thickness) + 0.35 * target + 0.20 * edge  # 合成单元密度引导 / Combine per-cell density guidance
-    loss_source = 0.45 * (1.0 - target) + 0.35 * edge + 0.20 * radial_design_bias(H.shape[0])  # 合成局部阻尼引导 / Combine local damping guidance
+    density_noise_weight = float(settings.get("density_noise_weight", 0.16))  # 读取密度噪声权重 / Read density-noise weight
+    loss_noise_weight = float(settings.get("loss_noise_weight", 0.20))  # 读取损耗噪声权重 / Read loss-noise weight
+    response_bias = 0.12 if any(token in variant_name for token in ("extra", "anti_star", "response")) else 0.0  # 根据真实响应变体增强阻尼 / Increase damping for real-response variants
+    density_source = 0.36 * (1.0 - thickness) + 0.30 * target + 0.18 * edge + density_noise_weight * density_noise  # 合成单元密度引导 / Combine per-cell density guidance
+    loss_source = (0.36 - response_bias) * (1.0 - target) + (0.34 + response_bias) * edge + 0.18 * radial_design_bias(H.shape[0]) + loss_noise_weight * loss_noise  # 合成局部阻尼引导 / Combine local damping guidance
     density_scale = scale_field(density_source, density_low, density_high)  # 生成密度倍率场 / Generate density-scale field
     loss_factor = scale_field(loss_source, loss_low, loss_high)  # 生成损耗因子场 / Generate loss-factor field
     return {"density_scale": np.round(density_scale, 4), "loss_factor": np.round(loss_factor, 5)}  # 返回辅助场 / Return auxiliary fields
@@ -767,7 +778,7 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
             H = generate_evolutionary_H(parents, levels, default, max_diff, rng, mutation_rate) if parents else generate_random_H(grid_size, levels, default, max_diff, rng)  # 生成探索矩阵 / Generate exploration matrix
             variant_name = "genetic_explorer" if parents else "random_explorer"  # 设置探索变体名 / Set explorer variant name
             created_by = "genetic_search" if parents else "random_search"  # 设置生成来源 / Set creation source
-        auxiliary_fields = build_auxiliary_design_fields(H, levels, target_grid, config) if config.get("design_variables", {}).get("export_auxiliary_fields", True) else {}  # 构建辅助物理场 / Build auxiliary physical fields
+        auxiliary_fields = build_auxiliary_design_fields(H, levels, target_grid, config, rng, variant_name) if config.get("design_variables", {}).get("export_auxiliary_fields", True) else {}  # 构建辅助物理场 / Build auxiliary physical fields
         metadata = {"candidate_id": candidate_id, "generation": generation, "grid_size": grid_size, "thickness_mode": "continuous", "thickness_bounds_mm": levels, "center_fixed": True, "created_by": created_by, "target_guidance_variant": variant_name, "target_guided": target_grid is not None, "auxiliary_fields": sorted(auxiliary_fields.keys())}  # 记录元数据 / Record metadata
         save_candidate(candidates_dir / candidate_id, H, metadata, auxiliary_fields)  # 保存候选 / Save candidate
         candidate_ids.append(candidate_id)  # 添加候选编号 / Add candidate id

@@ -10,6 +10,7 @@ import numpy as np  # 导入数值计算库 / Import numerical library
 
 from src.comsol.discovery import discover_runtime_environment  # 导入运行环境发现 / Import runtime environment discovery
 from src.comsol.discovery import config_with_runtime_discovery  # 导入运行时配置补全 / Import runtime config completion
+from src.comsol.design_contract import expected_design_parameter_names  # 导入扩展设计参数名 / Import expanded design parameter names
 from src.comsol.export_parameters import export_candidate_for_comsol  # 导入参数导出函数 / Import parameter export helper
 from src.comsol.run_livelink import build_matlab_batch  # 导入 MATLAB batch 构造函数 / Import MATLAB batch builder
 from src.comsol.server import is_server_reachable  # 导入 server 端口检查 / Import server port check
@@ -187,6 +188,17 @@ def check_runner_contract(runner_path: Path) -> dict:  # 检查 LiveLink runner 
     return self_test_item("LiveLink runner contract", ok, message, str(runner_path))  # 返回检查结果 / Return check result
 
 
+def check_design_contract_runner(script_path: Path) -> dict:  # 检查设计变量合同脚本 / Check design-variable contract script
+    if not script_path.exists():  # 检查脚本是否存在 / Check whether script exists
+        return self_test_item("Design contract runner", False, "Design contract script is missing. / 设计变量合同脚本不存在。", str(script_path))  # 返回缺失结果 / Return missing result
+    text = script_path.read_text(encoding="utf-8", errors="ignore")  # 读取脚本文本 / Read script text
+    required_tokens = ["function apply_design_variable_contract", "rho_scale_field", "eta_loss_field", "rhoS%02d%02d", "etaL%02d%02d", "mphsave"]  # 定义关键片段 / Define key tokens
+    missing = [token for token in required_tokens if token not in text]  # 查找缺失片段 / Find missing tokens
+    ok = not missing  # 判断合同是否完整 / Decide whether contract is complete
+    message = "Design contract script looks complete. / 设计变量合同脚本看起来完整。" if ok else f"Missing tokens: {', '.join(missing)}"  # 生成消息 / Build message
+    return self_test_item("Design contract runner", ok, message, str(script_path))  # 返回检查结果 / Return check result
+
+
 def check_export_directory_write(path: Path) -> dict:  # 检查导出目录写入 / Check export directory writing
     try:  # 捕获写入错误 / Catch write errors
         path.mkdir(parents=True, exist_ok=True)  # 确保目录存在 / Ensure directory exists
@@ -262,16 +274,23 @@ def check_parameter_export(config: dict) -> dict:  # 检查候选参数导出 / 
         candidate_dir = Path(temporary_dir) / "candidate_000_0000"  # 构造临时候选目录 / Build temporary candidate directory
         candidate_dir.mkdir(parents=True, exist_ok=True)  # 创建候选目录 / Create candidate directory
         np.savetxt(candidate_dir / "H.csv", np.full((grid_size, grid_size), default_mm), delimiter=",", fmt="%.3f")  # 写入临时厚度矩阵 / Write temporary thickness matrix
+        np.savetxt(candidate_dir / "density_scale.csv", np.ones((grid_size, grid_size)), delimiter=",", fmt="%.4f")  # 写入临时密度倍率 / Write temporary density scale
+        np.savetxt(candidate_dir / "loss_factor.csv", np.zeros((grid_size, grid_size)), delimiter=",", fmt="%.5f")  # 写入临时损耗因子 / Write temporary loss factor
         export_candidate_for_comsol(candidate_dir, config.get("material"))  # 导出参数文件 / Export parameter files
         with (candidate_dir / "comsol_parameters.csv").open("r", encoding="utf-8", newline="") as file_obj:  # 打开厚度参数表 / Open thickness parameter table
             parameter_rows = list(csv.DictReader(file_obj))  # 读取厚度参数行 / Read thickness parameter rows
         with (candidate_dir / "material_parameters.csv").open("r", encoding="utf-8", newline="") as file_obj:  # 打开材料参数表 / Open material parameter table
             material_rows = list(csv.DictReader(file_obj))  # 读取材料参数行 / Read material parameter rows
+        with (candidate_dir / "design_variable_parameters.csv").open("r", encoding="utf-8", newline="") as file_obj:  # 打开设计变量参数表 / Open design-variable parameter table
+            design_rows = list(csv.DictReader(file_obj))  # 读取设计变量参数行 / Read design-variable parameter rows
     expected_count = grid_size * grid_size  # 计算预期参数数量 / Compute expected parameter count
     names_ok = parameter_rows[0]["name"] == "h0101" and parameter_rows[-1]["name"] == f"h{grid_size:02d}{grid_size:02d}" if parameter_rows else False  # 检查首尾参数名 / Check first and last parameter names
     material_ok = len(material_rows) >= 6  # 检查材料参数数量 / Check material parameter count
-    ok = len(parameter_rows) == expected_count and names_ok and material_ok  # 汇总导出结果 / Combine export result
-    message = f"{len(parameter_rows)}/{expected_count} thickness rows, {len(material_rows)} material rows. / 厚度行 {len(parameter_rows)}/{expected_count}，材料行 {len(material_rows)}。"  # 生成导出消息 / Build export message
+    design_names = [row.get("name", "") for row in design_rows]  # 读取设计变量参数名 / Read design-variable parameter names
+    expected_design_names = expected_design_parameter_names(grid_size)  # 构造预期设计变量参数名 / Build expected design-variable names
+    design_ok = design_names == expected_design_names  # 检查设计变量合同 / Check design-variable contract
+    ok = len(parameter_rows) == expected_count and names_ok and material_ok and design_ok  # 汇总导出结果 / Combine export result
+    message = f"{len(parameter_rows)}/{expected_count} thickness rows, {len(material_rows)} material rows, {len(design_rows)}/{len(expected_design_names)} design rows. / 厚度行 {len(parameter_rows)}/{expected_count}，材料行 {len(material_rows)}，设计变量行 {len(design_rows)}/{len(expected_design_names)}。"  # 生成导出消息 / Build export message
     return self_test_item("Parameter export dry run", ok, message)  # 返回检查结果 / Return check result
 
 
@@ -290,12 +309,14 @@ def run_deployment_self_test(config: dict) -> dict:  # 运行部署自检 / Run 
     comsol_config = config.get("comsol", {})  # 读取 COMSOL 配置 / Read COMSOL config
     paths_config = config.get("paths", {})  # 读取路径配置 / Read path config
     runner_path = resolve_project_path(comsol_config.get("runner_path", ""))  # 解析 runner 路径 / Resolve runner path
+    design_runner_path = resolve_project_path(comsol_config.get("design_contract_runner_path", ""))  # 解析设计合同脚本路径 / Resolve design-contract script path
     export_dir = resolve_project_path(paths_config.get("comsol_exports_dir", "data/comsol_exports"))  # 解析导出目录 / Resolve export directory
     grid_size = int(config["project"]["grid_size"])  # 读取网格尺寸 / Read grid size
     checks = [  # 创建自检列表 / Create self-test list
         self_test_item("Diagnostics readiness", bool(diagnostics["ready_for_auto_run"]), "Base diagnostics are ready. / 基础诊断已就绪。" if diagnostics["ready_for_auto_run"] else "Base diagnostics are not ready. / 基础诊断尚未就绪。"),  # 添加基础诊断结果 / Add base diagnostics result
         self_test_item("Grid calibration", grid_size == 15 and grid_size % 2 == 1, f"grid_size={grid_size}. / 网格尺寸={grid_size}。"),  # 添加网格校准检查 / Add grid calibration check
         check_runner_contract(runner_path),  # 添加 runner 合同检查 / Add runner contract check
+        check_design_contract_runner(design_runner_path),  # 添加设计变量合同脚本检查 / Add design-variable contract script check
         check_export_directory_write(export_dir),  # 添加导出目录写入检查 / Add export directory write check
         check_timeout_config(config),  # 添加超时配置检查 / Add timeout configuration check
         check_parameter_export(config),  # 添加参数导出检查 / Add parameter export check
@@ -319,6 +340,7 @@ def diagnose_comsol_environment(config: dict) -> dict:  # 诊断 COMSOL/MATLAB �
         check_license_environment(),  # 添加 license 环境提示 / Add license environment hint
         check_path("Bound MPH model", comsol_config.get("model_path", ""), True, False),  # 检查绑定模型 / Check bound model
         check_path("LiveLink runner", comsol_config.get("runner_path", ""), True, False),  # 检查 LiveLink 脚本 / Check LiveLink runner
+        check_path("Design contract runner", comsol_config.get("design_contract_runner_path", ""), True, False),  # 检查设计合同脚本 / Check design contract runner
         check_path("Source MPH model", comsol_config.get("source_model_path", ""), False, False),  # 检查原始模型 / Check source model
         check_output_directory("COMSOL exports", paths_config.get("comsol_exports_dir", "data/comsol_exports")),  # 检查导出目录 / Check export directory
         check_timeout_config(config),  # 检查超时配置 / Check timeout configuration

@@ -12,13 +12,23 @@
     "support_position",
     "actuator_position_phase"
   ],
-  "real_candidate_count": 5,
-  "best_candidate": "candidate_157_0010",
-  "best_final_score": 0.003834525288782235,
-  "best_precision": 0.06137497289091303,
-  "best_recall": 0.09442776109442776,
-  "mean_centerline_penalty": 0.1468643687831627,
+  "real_candidate_count": 7,
+  "best_candidate": "candidate_159_0000",
+  "best_final_score": 0.016091261708721605,
+  "best_precision": 0.05972515856236787,
+  "best_recall": 0.15081748415081747,
+  "mean_centerline_penalty": 0.1096465729403543,
   "records": [
+    {
+      "candidate_id": "candidate_159_0000",
+      "score_path": "candidates/candidate_159_0000/score.json",
+      "best_mode": 10,
+      "final_score": 0.016091261708721605,
+      "precision": 0.05972515856236787,
+      "recall": 0.15081748415081747,
+      "centerline_penalty": 0.033204166666666673,
+      "frequency_hz": 224.960637794
+    },
     {
       "candidate_id": "candidate_157_0010",
       "score_path": "candidates/candidate_157_0010/score.json",
@@ -28,6 +38,16 @@
       "recall": 0.09442776109442776,
       "centerline_penalty": 0.11118556836289684,
       "frequency_hz": 303.9359042
+    },
+    {
+      "candidate_id": "candidate_160_0005",
+      "score_path": "candidates/candidate_160_0005/score.json",
+      "best_mode": 8,
+      "final_score": -0.0017156520965797145,
+      "precision": 0.03415369161225515,
+      "recall": 0.04537871204537871,
+      "centerline_penalty": 0.0,
+      "frequency_hz": 229.980431089
     },
     {
       "candidate_id": "candidate_157_0005",

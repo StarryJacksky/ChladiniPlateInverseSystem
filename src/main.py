@@ -13,12 +13,13 @@ from src.optimisation.random_search import score_available_candidates  # 导入�
 
 def build_parser() -> argparse.ArgumentParser:  # 创建命令行解析器 / Build command-line parser
     parser = argparse.ArgumentParser(description="Chladni inverse design MVP. / Chladni 逆向设计 MVP。")  # 初始化解析器 / Initialise parser
-    parser.add_argument("command", choices=["prepare-target", "target-ui", "run-workflow", "generate-candidates", "generate-previews", "simulate-candidate", "simulate-batch", "render-mode-previews", "audit-comsol-model", "discover-comsol", "apply-comsol-discovery", "diagnose-comsol", "diagnose-feasibility", "self-test", "validate-comsol-exports", "score-candidates"], help="Workflow command. / 工作流命令。")  # 添加命令参数 / Add command argument
+    parser.add_argument("command", choices=["prepare-target", "target-ui", "run-workflow", "generate-candidates", "generate-previews", "simulate-candidate", "simulate-batch", "render-mode-previews", "audit-comsol-model", "apply-comsol-design-contract", "discover-comsol", "apply-comsol-discovery", "diagnose-comsol", "diagnose-feasibility", "self-test", "validate-comsol-exports", "score-candidates"], help="Workflow command. / 工作流命令。")  # 添加命令参数 / Add command argument
     parser.add_argument("--config", default="config.yaml", help="Config file path. / 配置文件路径。")  # 添加配置路径参数 / Add config path argument
     parser.add_argument("--host", default="127.0.0.1", help="Target UI host. / 目标 UI 主机。")  # 添加 UI 主机参数 / Add UI host argument
     parser.add_argument("--port", type=int, default=8765, help="Target UI port. / 目标 UI 端口。")  # 添加 UI 端口参数 / Add UI port argument
     parser.add_argument("--generation", type=int, default=None, help="Candidate generation index. / 候选代数编号。")  # 添加代数参数 / Add generation argument
     parser.add_argument("--model", default="", help="COMSOL MPH model path for audit. / 用于审计的 COMSOL MPH 模型路径。")  # 添加模型路径参数 / Add model path argument
+    parser.add_argument("--output-model", default="", help="Output MPH model path for design-contract upgrade. / 设计变量合同升级输出 MPH 路径。")  # 添加输出模型路径参数 / Add output model path argument
     parser.add_argument("--candidate-id", default="", help="Candidate id for COMSOL simulation. / 用于 COMSOL 仿真的候选编号。")  # 添加候选编号参数 / Add candidate id argument
     parser.add_argument("--num-modes", type=int, default=0, help="Number of COMSOL modes to export. / COMSOL 导出模态数量。")  # 添加模态数量参数 / Add mode-count argument
     parser.add_argument("--limit", type=int, default=0, help="Preview render limit. / 预览渲染数量上限。")  # 添加预览数量参数 / Add preview limit argument
@@ -89,6 +90,11 @@ def main() -> None:  # 主程序入口 / Main program entry
         report_path = Path("reports") / "comsol_model_audit.json"  # 构造审计报告路径 / Build audit report path
         save_model_audit(audit, report_path)  # 保存审计报告 / Save audit report
         print(f"Model audit saved: {report_path} / 模型审计已保存：{report_path}")  # 打印审计报告路径 / Print audit report path
+    if args.command == "apply-comsol-design-contract":  # 判断是否应用 COMSOL 设计变量合同 / Check COMSOL design-contract application command
+        import json  # 延迟导入 JSON / Lazily import JSON
+        from src.comsol.design_contract_runner import apply_design_variable_contract  # 延迟导入设计合同应用器 / Lazily import design-contract applier
+        result = apply_design_variable_contract(config, args.model or None, args.output_model or None)  # 应用设计变量合同 / Apply design-variable contract
+        print(json.dumps(result, ensure_ascii=False, indent=2))  # 打印应用结果 / Print application result
     if args.command == "diagnose-comsol":  # 判断是否诊断 COMSOL 环境 / Check COMSOL diagnostics command
         import json  # 延迟导入 JSON / Lazily import JSON
         from src.comsol.diagnostics import diagnose_comsol_environment  # 延迟导入环境诊断 / Lazily import environment diagnostics

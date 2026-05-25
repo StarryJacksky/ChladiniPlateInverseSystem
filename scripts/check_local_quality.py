@@ -9,6 +9,7 @@ PYTHON_CHECKS = [  # 定义 Python 检查命令 / Define Python check commands
     ["scripts/check_docs_links.py"],  # 文档链接检查 / Documentation link check
     ["scripts/check_bilingual_comments.py"],  # 双语注释检查 / Bilingual comment check
     ["scripts/check_config_contract.py"],  # 配置合同检查 / Config contract check
+    ["scripts/check_design_contract.py"],  # 设计变量合同检查 / Design-variable contract check
     ["scripts/check_discovery_fixtures.py"],  # 自动发现样例检查 / Discovery fixture check
     ["scripts/check_artifact_cleanup.py"],  # 产物清理检查 / Artifact cleanup check
     ["scripts/check_python_smoke.py"],  # 无 COMSOL 烟测 / Python-only smoke check
@@ -20,6 +21,7 @@ COMPILE_TARGETS = [  # 定义编译检查目标 / Define compile check targets
     "scripts/check_artifact_cleanup.py",  # 产物清理脚本 / Artifact cleanup script
     "scripts/check_bilingual_comments.py",  # 注释检查脚本 / Comment check script
     "scripts/check_config_contract.py",  # 配置检查脚本 / Config check script
+    "scripts/check_design_contract.py",  # 设计变量合同脚本 / Design-variable contract script
     "scripts/check_discovery_fixtures.py",  # 发现样例脚本 / Discovery fixture script
     "scripts/check_docs_links.py",  # 文档链接脚本 / Documentation link script
     "scripts/check_python_smoke.py",  # 烟测脚本 / Smoke test script
