@@ -3113,6 +3113,7 @@
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.best_dice)}</strong><span>Dice</span></div>
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.best_overlap_balance)}</strong><span>Balance</span></div>
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.best_layout_similarity)}</strong><span>Layout</span></div>
+          <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.best_area_similarity)}</strong><span>Area Fit</span></div>
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${formatScore(best.final_score)}</strong><span>Score</span></div>
         <!-- 模板内容 / Template content --></div>
         <!-- 模板内容 / Template content --><div class="result-note">${rankingExplanation(best, rows)}</div>
@@ -3121,7 +3122,7 @@
       // 前端逻辑 / Frontend logic
       resultsList.innerHTML = rows.slice(0, 10).map((row, index) => `
         <!-- 模板内容 / Template content --><button class="result-row" type="button" data-candidate-id="${escapeText(row.candidate_id)}">
-          <!-- 模板内容 / Template content --><div><strong>${index + 1}. ${escapeText(row.candidate_id)}</strong><br>mode ${escapeText(row.best_mode)} · IoU ${formatScore(row.best_iou)} · Dice ${formatScore(row.best_dice)} · Bal ${formatScore(row.best_overlap_balance)} · Lay ${formatScore(row.best_layout_similarity)}</div>
+          <!-- 模板内容 / Template content --><div><strong>${index + 1}. ${escapeText(row.candidate_id)}</strong><br>mode ${escapeText(row.best_mode)} · IoU ${formatScore(row.best_iou)} · Dice ${formatScore(row.best_dice)} · Bal ${formatScore(row.best_overlap_balance)} · Lay ${formatScore(row.best_layout_similarity)} · Area ${formatScore(row.best_area_similarity)}</div>
           <!-- 模板内容 / Template content --><div>${formatFrequency(row.frequency_hz)} Hz<br>${formatScore(row.final_score)}</div>
         <!-- 模板内容 / Template content --></button>
       <!-- 模板内容 / Template content -->`).join("");

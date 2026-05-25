@@ -30,6 +30,24 @@ def compute_overlap_balance(A: np.ndarray, B: np.ndarray) -> float:  # 计算覆
     return float(min(precision, recall))  # 返回较弱一侧作为平衡分 / Return weaker side as balance score
 
 
+def compute_precision_recall(A: np.ndarray, B: np.ndarray) -> tuple[float, float]:  # 计算仿真精度和目标召回 / Compute simulation precision and target recall
+    left = A.astype(bool)  # 转换仿真图 / Convert simulation map
+    right = B.astype(bool)  # 转换目标图 / Convert target map
+    intersection = np.logical_and(left, right).sum()  # 计算交集像素 / Count intersection pixels
+    precision = float(intersection / left.sum()) if left.sum() else 0.0  # 计算仿真前景精度 / Compute simulated foreground precision
+    recall = float(intersection / right.sum()) if right.sum() else 0.0  # 计算目标召回率 / Compute target recall
+    return precision, recall  # 返回精度和召回 / Return precision and recall
+
+
+def area_similarity(A: np.ndarray, B: np.ndarray) -> float:  # 计算前景面积相似度 / Compute foreground area similarity
+    left_area = float(A.astype(bool).mean())  # 计算仿真前景面积比例 / Compute simulated foreground area ratio
+    right_area = float(B.astype(bool).mean())  # 计算目标前景面积比例 / Compute target foreground area ratio
+    if left_area == 0.0 and right_area == 0.0:  # 检查双空图 / Check both-empty maps
+        return 1.0  # 双空面积完全一致 / Both empty maps match in area
+    denominator = max(left_area, right_area, 1.0e-9)  # 计算归一化分母 / Compute normalization denominator
+    return float(max(0.0, 1.0 - abs(left_area - right_area) / denominator))  # 返回面积相似度 / Return area similarity
+
+
 def coarse_occupancy(binary: np.ndarray, cells: int = 16) -> np.ndarray:  # 计算粗网格占用图 / Compute coarse occupancy map
     data = binary.astype(float)  # 转为浮点图 / Convert to float map
     rows, cols = data.shape  # 读取图像尺寸 / Read image shape
@@ -108,5 +126,5 @@ def frequency_penalty(frequency: float, f_min: float, f_max: float) -> float:  #
     return float((frequency - f_max) / max(f_max, 1.0))  # 返回高频惩罚 / Return high-frequency penalty
 
 
-def pattern_similarity(iou: float, dice: float, distance_similarity: float = 0.0, overlap_balance: float = 0.0, layout: float = 0.0) -> float:  # 合成图案相似度 / Combine pattern similarity
-    return float(0.18 * iou + 0.22 * dice + 0.18 * distance_similarity + 0.24 * overlap_balance + 0.18 * layout)  # 返回加权相似度 / Return weighted similarity
+def pattern_similarity(iou: float, dice: float, distance_similarity: float = 0.0, overlap_balance: float = 0.0, layout: float = 0.0, area: float = 0.0, precision: float = 0.0) -> float:  # 合成图案相似度 / Combine pattern similarity
+    return float(0.14 * iou + 0.18 * dice + 0.14 * distance_similarity + 0.16 * overlap_balance + 0.14 * layout + 0.14 * area + 0.10 * precision)  # 返回加权相似度 / Return weighted similarity

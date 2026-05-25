@@ -13,9 +13,11 @@ from src.comsol.import_results import load_mode_csv  # 导入模态读取 / Impo
 from src.nodal.extract_nodal import extract_nodal_region  # 导入节点线提取 / Import nodal extraction
 from src.nodal.extract_nodal import postprocess_nodal_region  # 导入节点线后处理 / Import nodal postprocessing
 from src.nodal.extract_nodal import remove_center_region  # 导入中心区域移除 / Import centre-region removal
+from src.scoring.metrics import area_similarity  # 导入面积相似度 / Import area similarity
 from src.scoring.metrics import compute_dice  # 导入 Dice 指标 / Import Dice metric
 from src.scoring.metrics import compute_iou  # 导入 IoU 指标 / Import IoU metric
 from src.scoring.metrics import compute_overlap_balance  # 导入覆盖平衡分数 / Import overlap balance score
+from src.scoring.metrics import compute_precision_recall  # 导入精度召回指标 / Import precision-recall metrics
 from src.scoring.metrics import chamfer_similarity  # 导入距离相似度 / Import distance similarity
 from src.scoring.metrics import frequency_penalty  # 导入频率惩罚 / Import frequency penalty
 from src.scoring.metrics import layout_similarity  # 导入布局相似度 / Import layout similarity
@@ -46,10 +48,12 @@ def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], ima
         distance = chamfer_similarity(nodal, target)  # 计算距离相似度 / Compute distance similarity
         overlap = compute_overlap_balance(nodal, target)  # 计算覆盖平衡 / Compute overlap balance
         layout = layout_similarity(nodal, target)  # 计算粗布局相似度 / Compute coarse layout similarity
-        similarity = pattern_similarity(iou, dice, distance, overlap, layout)  # 合成相似度 / Combine similarity
-        best["all_modes"].append({"mode": mode_number, "iou": iou, "dice": dice, "distance_similarity": distance, "overlap_balance": overlap, "layout_similarity": layout, "similarity": similarity})  # 记录该模态结果 / Record this mode result
+        area = area_similarity(nodal, target)  # 计算面积相似度 / Compute area similarity
+        precision, recall = compute_precision_recall(nodal, target)  # 计算精度和召回 / Compute precision and recall
+        similarity = pattern_similarity(iou, dice, distance, overlap, layout, area, precision)  # 合成相似度 / Combine similarity
+        best["all_modes"].append({"mode": mode_number, "iou": iou, "dice": dice, "distance_similarity": distance, "overlap_balance": overlap, "layout_similarity": layout, "area_similarity": area, "precision": precision, "recall": recall, "similarity": similarity})  # 记录该模态结果 / Record this mode result
         if similarity > best["best_similarity"]:  # 检查是否是新最佳 / Check whether this is new best
-            best.update({"best_mode": mode_number, "best_iou": iou, "best_dice": dice, "best_distance_similarity": distance, "best_overlap_balance": overlap, "best_layout_similarity": layout, "best_similarity": similarity})  # 更新最佳结果 / Update best result
+            best.update({"best_mode": mode_number, "best_iou": iou, "best_dice": dice, "best_distance_similarity": distance, "best_overlap_balance": overlap, "best_layout_similarity": layout, "best_area_similarity": area, "best_precision": precision, "best_recall": recall, "best_similarity": similarity})  # 更新最佳结果 / Update best result
     return best  # 返回评分结果 / Return scoring result
 
 

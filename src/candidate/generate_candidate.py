@@ -158,6 +158,106 @@ def blend_parent_with_guidance(parent: np.ndarray, guidance: np.ndarray, levels:
     return level_array[indices]  # 返回量化混合矩阵 / Return quantized mixed matrix
 
 
+def matrix_to_guidance(H: np.ndarray, levels: list[float]) -> np.ndarray:  # 将厚度矩阵转为 0-1 引导图 / Convert thickness matrix to 0-1 guidance map
+    low = float(min(levels))  # 读取最小厚度 / Read minimum thickness
+    high = float(max(levels))  # 读取最大厚度 / Read maximum thickness
+    return np.clip((H.astype(float) - low) / max(high - low, 1.0e-9), 0.0, 1.0)  # 返回归一化厚度 / Return normalized thickness
+
+
+def load_response_guidance_records(config: dict, candidates_dir: Path, target_grid: np.ndarray, limit: int = 4) -> list[dict]:  # 读取上一轮真实响应作为闭环引导 / Load previous real responses as closed-loop guidance
+    ranking_path = candidates_dir / "ranked_candidates.csv"  # 构造排行文件路径 / Build ranking file path
+    if not ranking_path.exists():  # 检查排行文件是否存在 / Check whether ranking exists
+        return []  # 没有排行则无响应引导 / Return no response guidance without ranking
+    import csv  # 局部导入 CSV 工具 / Locally import CSV utilities
+    records = []  # 创建响应记录列表 / Create response record list
+    with ranking_path.open("r", encoding="utf-8", newline="") as file_obj:  # 打开排行文件 / Open ranking file
+        for row in csv.DictReader(file_obj):  # 遍历排行行 / Iterate ranking rows
+            record = build_response_guidance_record(config, candidates_dir, row, target_grid)  # 构建单个响应记录 / Build one response record
+            if record is not None:  # 检查记录是否可用 / Check whether record is usable
+                records.append(record)  # 保存响应记录 / Store response record
+            if len(records) >= limit:  # 检查记录上限 / Check record limit
+                break  # 停止读取 / Stop reading
+    return records  # 返回响应记录 / Return response records
+
+
+def build_response_guidance_record(config: dict, candidates_dir: Path, ranking_row: dict, target_grid: np.ndarray) -> dict | None:  # 构建响应闭环记录 / Build response closed-loop record
+    from src.comsol.import_results import interpolate_to_grid  # 局部导入插值函数 / Locally import interpolation helper
+    from src.comsol.import_results import load_mode_csv  # 局部导入模态读取 / Locally import mode CSV loader
+    from src.nodal.extract_nodal import extract_nodal_region  # 局部导入节点线提取 / Locally import nodal extraction
+    from src.nodal.extract_nodal import postprocess_nodal_region  # 局部导入节点线后处理 / Locally import nodal postprocessing
+    from src.nodal.extract_nodal import remove_center_region  # 局部导入中心移除 / Locally import centre removal
+    candidate_id = str(ranking_row.get("candidate_id", ""))  # 读取候选编号 / Read candidate id
+    if not candidate_id:  # 检查候选编号 / Check candidate id
+        return None  # 无编号则跳过 / Skip without id
+    candidate_path = candidates_dir / candidate_id  # 构造候选路径 / Build candidate path
+    matrix_path = candidate_path / "H.csv"  # 构造厚度矩阵路径 / Build thickness matrix path
+    if not matrix_path.exists():  # 检查厚度矩阵是否存在 / Check whether thickness matrix exists
+        return None  # 缺失矩阵则跳过 / Skip missing matrix
+    try:  # 捕获响应读取失败 / Catch response-loading failures
+        best_mode = int(float(ranking_row.get("best_mode", 0)))  # 读取最佳模态号 / Read best mode number
+    except ValueError:  # 处理模态号异常 / Handle bad mode number
+        return None  # 模态号无效则跳过 / Skip invalid mode number
+    mode_file = Path(config["paths"]["comsol_exports_dir"]) / candidate_id / f"mode_{best_mode:02d}.csv"  # 构造最佳模态文件 / Build best-mode file
+    if not mode_file.exists():  # 检查最佳模态文件 / Check best-mode file
+        return None  # 缺失模态则跳过 / Skip missing mode file
+    image_size = int(config["nodal_extraction"]["image_size"])  # 读取图像尺寸 / Read image size
+    epsilon_ratio = float(config["nodal_extraction"]["epsilon_ratio"])  # 读取节点阈值比例 / Read nodal threshold ratio
+    center_radius_px = int(image_size * float(config["project"]["center_clamp_radius_mm"]) / float(config["project"]["plate_length_mm"])) if config["nodal_extraction"].get("remove_center_region", True) else 0  # 计算中心移除半径 / Compute centre-removal radius
+    x, y, w = load_mode_csv(mode_file)  # 读取模态位移数据 / Load mode displacement data
+    W = interpolate_to_grid(x, y, w, image_size)  # 插值到图像网格 / Interpolate to image grid
+    nodal = extract_nodal_region(W, epsilon_ratio)  # 提取节点线区域 / Extract nodal-line region
+    nodal = postprocess_nodal_region(nodal)  # 后处理节点线 / Postprocess nodal lines
+    nodal = remove_center_region(nodal, center_radius_px) if center_radius_px > 0 else nodal  # 移除中心夹持区 / Remove centre clamp area
+    simulated_grid = downsample_binary_to_grid(nodal, target_grid.shape[0])  # 将仿真节点线压到厚度网格 / Compress simulated nodal lines to thickness grid
+    missing = np.clip(target_grid - simulated_grid, 0.0, 1.0)  # 计算目标有而仿真缺失区域 / Compute target-present simulation-missing area
+    extra = np.clip(simulated_grid - target_grid, 0.0, 1.0)  # 计算仿真多余区域 / Compute simulation-extra area
+    score = float(ranking_row.get("final_score", 0.0) or 0.0)  # 读取最终分数 / Read final score
+    return {"candidate_id": candidate_id, "H": np.loadtxt(matrix_path, delimiter=","), "target": target_grid, "simulated": simulated_grid, "missing": missing, "extra": extra, "score": score, "mode": best_mode}  # 返回闭环记录 / Return closed-loop record
+
+
+def response_error_guidance(record: dict, variant_index: int, levels: list[float], rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 根据真实响应误差生成引导图 / Build guidance from real response error
+    parent = matrix_to_guidance(record["H"], levels)  # 读取父代归一化厚度 / Read normalized parent thickness
+    target = normalise_design_map(record["target"])  # 读取目标占用图 / Read target occupancy map
+    simulated = normalise_design_map(record["simulated"])  # 读取仿真占用图 / Read simulated occupancy map
+    missing = smooth_design_map(record["missing"], 2)  # 平滑缺失区域 / Smooth missing area
+    extra = smooth_design_map(record["extra"], 2)  # 平滑多余区域 / Smooth extra area
+    edge = target_edge_guidance(target)  # 构建目标边缘图 / Build target edge map
+    radial = radial_design_bias(parent.shape[0])  # 构建径向破缺图 / Build radial breaking map
+    angular = angular_design_bias(parent.shape[0], float(rng.uniform(0.0, 2.0 * np.pi)))  # 构建角向破缺图 / Build angular breaking map
+    kind = variant_index % 8  # 选择闭环变体类型 / Select closed-loop variant type
+    if kind == 0:  # 第一类：缺失区增厚、多余区减薄 / Type one: thicken missing and thin extra
+        return normalise_design_map(0.45 * parent + 0.55 * target + 0.55 * missing - 0.40 * extra), "error_push_positive"  # 返回正向误差推动 / Return positive error push
+    if kind == 1:  # 第二类：反向符号探索 / Type two: opposite-sign exploration
+        return normalise_design_map(0.45 * parent + 0.50 * target - 0.45 * missing + 0.45 * extra), "error_push_negative"  # 返回反向误差推动 / Return negative error push
+    if kind == 2:  # 第三类：目标边缘和缺失区优先 / Type three: target edge and missing area first
+        return normalise_design_map(0.35 * parent + 0.35 * edge + 0.55 * missing - 0.25 * simulated), "missing_edge_focus"  # 返回缺失边缘聚焦 / Return missing-edge focus
+    if kind == 3:  # 第四类：强力压制多余星形臂 / Type four: strongly suppress extra star arms
+        return normalise_design_map(0.55 * parent + 0.45 * target - 0.70 * extra + 0.20 * angular), "extra_suppression"  # 返回多余响应压制 / Return extra-response suppression
+    if kind == 4:  # 第五类：反相目标和径向破缺 / Type five: inverse target and radial breaking
+        return normalise_design_map(0.35 * parent + 0.45 * (1.0 - target) + 0.25 * radial - 0.35 * extra), "inverse_breaking"  # 返回反相破缺 / Return inverse breaking
+    if kind == 5:  # 第六类：父代保持加非对称扰动 / Type six: parent keeping with asymmetric perturbation
+        return normalise_design_map(0.65 * parent + 0.25 * target + 0.35 * angular - 0.25 * simulated), "asymmetric_parent"  # 返回非对称父代引导 / Return asymmetric parent guidance
+    if kind == 6:  # 第七类：缺失区和反星形共同驱动 / Type seven: missing area and anti-star jointly drive
+        return normalise_design_map(0.40 * parent + 0.45 * missing + 0.35 * (1.0 - simulated) + 0.20 * edge), "anti_star_missing"  # 返回反星形缺失引导 / Return anti-star missing guidance
+    return normalise_design_map(0.30 * parent + 0.40 * target + 0.20 * radial + 0.20 * angular + rng.normal(0.0, 0.10, size=parent.shape)), "noisy_surrogate"  # 返回噪声代理探索 / Return noisy surrogate exploration
+
+
+def generate_response_guided_H(records: list[dict], index: int, levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 生成闭环响应引导厚度矩阵 / Generate closed-loop response-guided thickness matrix
+    record = records[index % len(records)]  # 选择响应记录 / Select response record
+    guidance, variant = response_error_guidance(record, index, levels, rng)  # 生成误差引导图 / Build error guidance map
+    H = quantise_guidance_to_levels(guidance, levels)  # 量化为厚度等级 / Quantize to thickness levels
+    center_cells = center_cells_for_grid(H.shape[0])  # 获取中心单元 / Get center cells
+    fixed_cells = set(center_cells)  # 创建固定中心集合 / Create fixed center set
+    mutation_mask = rng.random(H.shape) < 0.08  # 创建闭环探索变异掩膜 / Build closed-loop exploration mutation mask
+    for row, col in np.argwhere(mutation_mask):  # 遍历变异单元 / Iterate mutated cells
+        if (int(row), int(col)) not in fixed_cells:  # 跳过固定中心单元 / Skip fixed centre cells
+            H[row, col] = random_level_near(float(H[row, col]), levels, rng)  # 执行邻近变异 / Apply nearby mutation
+    H = enforce_center_constraint(H, center_cells, default_thickness)  # 固定中心厚度 / Fix centre thickness
+    H = repair_neighbor_constraint(H, levels, max_neighbor_diff, passes=32, fixed_cells=center_cells)  # 强化修复相邻约束 / Strongly repair neighbour constraints
+    H = enforce_center_constraint(H, center_cells, default_thickness)  # 再次固定中心 / Fix centre again
+    return H, f"{variant}_from_{record['candidate_id']}"  # 返回矩阵和来源 / Return matrix and source
+
+
 def generate_target_guided_H(target_grid: np.ndarray, index: int, parents: list[np.ndarray], levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 生成目标感知厚度矩阵 / Generate target-aware thickness matrix
     variants = build_target_guidance_variants(target_grid, rng)  # 构建目标引导变体 / Build target guidance variants
     variant_name, guidance = variants[index % len(variants)]  # 选择当前变体 / Select current variant
@@ -207,11 +307,16 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
     rng = np.random.default_rng(generation)  # 创建可复现随机源 / Create reproducible random source
     parents = load_parent_matrices(candidates_dir) if method == "evolutionary_search" and generation > 0 else []  # 读取进化父代 / Load evolutionary parents
     target_grid = load_target_binary_grid(config, grid_size)  # 读取目标感知网格 / Load target-aware grid
-    target_count = max(min(population, 6), int(population * 0.75)) if target_grid is not None else 0  # 计算目标感知候选数量 / Compute target-aware candidate count
+    response_records = load_response_guidance_records(config, candidates_dir, target_grid) if target_grid is not None else []  # 读取真实响应闭环记录 / Load real-response closed-loop records
+    response_count = max(min(population, len(response_records) * 2), int(population * 0.75)) if response_records else 0  # 计算闭环响应候选数量 / Compute response-guided candidate count
+    target_count = max(response_count, max(min(population, 6), int(population * 0.90 if response_records else population * 0.75))) if target_grid is not None else 0  # 计算目标感知候选数量 / Compute target-aware candidate count
     candidate_ids = []  # 创建候选编号列表 / Create candidate id list
     for index in range(population):  # 遍历候选编号 / Iterate candidate index
         candidate_id = f"candidate_{generation:03d}_{index:04d}"  # 构造候选编号 / Build candidate id
-        if target_grid is not None and index < target_count:  # 优先生成目标感知候选 / Prefer target-aware candidates
+        if response_records and index < response_count:  # 优先生成闭环响应引导候选 / Prefer closed-loop response-guided candidates
+            H, variant_name = generate_response_guided_H(response_records, index, levels, default, max_diff, rng)  # 生成闭环响应引导矩阵 / Generate response-guided matrix
+            created_by = "response_guided_inverse_search"  # 设置生成来源 / Set creation source
+        elif target_grid is not None and index < target_count:  # 其次生成目标感知候选 / Then generate target-aware candidates
             H, variant_name = generate_target_guided_H(target_grid, index, parents, levels, default, max_diff, rng)  # 生成目标感知矩阵 / Generate target-aware matrix
             created_by = "target_guided_evolutionary_search" if parents else "target_guided_initial_search"  # 设置生成来源 / Set creation source
         else:  # 保留一部分探索候选 / Keep some exploration candidates
