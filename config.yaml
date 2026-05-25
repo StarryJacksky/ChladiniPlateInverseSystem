@@ -53,7 +53,7 @@ nodal_extraction:
 
 # 优化设置 / Optimisation settings
 optimisation:
-  method: "random_search" # 第一版优化方法 / First optimisation method
+  method: "evolutionary_search" # 搜索方法 / Search method
   population_size: 20 # 每批候选数量 / Candidates per batch
   num_iterations: 1 # 第一版迭代次数 / First-version iteration count
   roughness_weight: 0.05 # 粗糙度惩罚权重 / Roughness penalty weight

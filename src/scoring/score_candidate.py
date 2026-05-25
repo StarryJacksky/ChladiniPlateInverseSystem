@@ -15,6 +15,8 @@ from src.nodal.extract_nodal import postprocess_nodal_region  # 导入节点线�
 from src.nodal.extract_nodal import remove_center_region  # 导入中心区域移除 / Import centre-region removal
 from src.scoring.metrics import compute_dice  # 导入 Dice 指标 / Import Dice metric
 from src.scoring.metrics import compute_iou  # 导入 IoU 指标 / Import IoU metric
+from src.scoring.metrics import compute_overlap_balance  # 导入覆盖平衡分数 / Import overlap balance score
+from src.scoring.metrics import chamfer_similarity  # 导入距离相似度 / Import distance similarity
 from src.scoring.metrics import frequency_penalty  # 导入频率惩罚 / Import frequency penalty
 from src.scoring.metrics import pattern_similarity  # 导入相似度合成 / Import similarity combiner
 
@@ -40,10 +42,12 @@ def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], ima
         target = resize_binary_to_shape(target_binary, nodal.shape)  # 对齐目标图尺寸 / Align target map shape
         iou = compute_iou(nodal, target)  # 计算 IoU / Compute IoU
         dice = compute_dice(nodal, target)  # 计算 Dice / Compute Dice
-        similarity = pattern_similarity(iou, dice)  # 合成相似度 / Combine similarity
-        best["all_modes"].append({"mode": mode_number, "iou": iou, "dice": dice, "similarity": similarity})  # 记录该模态结果 / Record this mode result
+        distance = chamfer_similarity(nodal, target)  # 计算距离相似度 / Compute distance similarity
+        overlap = compute_overlap_balance(nodal, target)  # 计算覆盖平衡 / Compute overlap balance
+        similarity = pattern_similarity(iou, dice, distance, overlap)  # 合成相似度 / Combine similarity
+        best["all_modes"].append({"mode": mode_number, "iou": iou, "dice": dice, "distance_similarity": distance, "overlap_balance": overlap, "similarity": similarity})  # 记录该模态结果 / Record this mode result
         if similarity > best["best_similarity"]:  # 检查是否是新最佳 / Check whether this is new best
-            best.update({"best_mode": mode_number, "best_iou": iou, "best_dice": dice, "best_similarity": similarity})  # 更新最佳结果 / Update best result
+            best.update({"best_mode": mode_number, "best_iou": iou, "best_dice": dice, "best_distance_similarity": distance, "best_overlap_balance": overlap, "best_similarity": similarity})  # 更新最佳结果 / Update best result
     return best  # 返回评分结果 / Return scoring result
 
 

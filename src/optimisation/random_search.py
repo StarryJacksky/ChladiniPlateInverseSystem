@@ -41,10 +41,10 @@ def score_available_candidates(config: dict, target_binary, candidate_id: str | 
         if not export_path.exists():  # 检查导出目录是否存在 / Check whether export directory exists
             continue  # 跳过未仿真的候选 / Skip unsimulated candidate
         result = score_candidate(candidate_path, export_path, target_binary, config)  # 计算候选分数 / Score candidate
-        rows.append({"candidate_id": candidate_path.name, "best_mode": result["best_mode"], "best_iou": result["best_iou"], "best_dice": result["best_dice"], "frequency_hz": result["frequency_hz"], "final_score": result["final_score"]})  # 添加排行行 / Add ranking row
+        rows.append({"candidate_id": candidate_path.name, "best_mode": result["best_mode"], "best_iou": result["best_iou"], "best_dice": result["best_dice"], "best_distance_similarity": result.get("best_distance_similarity", ""), "best_overlap_balance": result.get("best_overlap_balance", ""), "frequency_hz": result["frequency_hz"], "final_score": result["final_score"]})  # 添加排行行 / Add ranking row
     ranking = sorted(rows, key=lambda item: item["final_score"], reverse=True)  # 按最终分数排序 / Sort by final score
     with (candidates_dir / "ranked_candidates.csv").open("w", encoding="utf-8", newline="") as file_obj:  # 打开排行文件 / Open ranking file
-        writer = csv.DictWriter(file_obj, fieldnames=["candidate_id", "best_mode", "best_iou", "best_dice", "frequency_hz", "final_score"])  # 创建 CSV 写入器 / Create CSV writer
+        writer = csv.DictWriter(file_obj, fieldnames=["candidate_id", "best_mode", "best_iou", "best_dice", "best_distance_similarity", "best_overlap_balance", "frequency_hz", "final_score"])  # 创建 CSV 写入器 / Create CSV writer
         writer.writeheader()  # 写入表头 / Write header
         writer.writerows(ranking)  # 写入排行数据 / Write ranking rows
     return ranking  # 返回排行列表 / Return ranking list
