@@ -2,7 +2,7 @@ from __future__ import annotations  # 启用现代类型注解 / Enable modern t
 
 import numpy as np  # 导入数值计算库 / Import numerical library
 
-SCORING_VERSION = "strict_precision_topology_v4"  # 记录当前评分口径版本 / Record current scoring-rule version
+SCORING_VERSION = "strict_precision_topology_v5"  # 记录当前评分口径版本 / Record current scoring-rule version
 
 try:  # 优先使用 SciPy 加速距离变换 / Prefer SciPy to accelerate distance transforms
     from scipy.ndimage import distance_transform_edt as scipy_distance_transform_edt  # 导入欧氏距离变换 / Import Euclidean distance transform
@@ -253,7 +253,29 @@ def overcoverage_penalty(precision: float, recall: float, area: float) -> float:
     return float(0.70 * recall_precision_gap + 0.30 * area_gap * recall_precision_gap)  # 返回过覆盖惩罚 / Return overcoverage penalty
 
 
-def pattern_similarity(iou: float, dice: float, distance_similarity: float = 0.0, overlap_balance: float = 0.0, layout: float = 0.0, area: float = 0.0, precision: float = 0.0, recall: float = 0.0, projection: float = 0.0, extent: float = 0.0, complexity: float = 0.0, topology: float = 0.0) -> float:  # 合成图案相似度 / Combine pattern similarity
+def centerline_overreach_penalty(A: np.ndarray, B: np.ndarray) -> float:  # 惩罚中心十字和辐射骨架 / Penalize centre-cross and radiating skeletons
+    left = A.astype(bool)  # 转换仿真图 / Convert simulated map
+    right = B.astype(bool)  # 转换目标图 / Convert target map
+    rows, cols = left.shape  # 读取图像尺寸 / Read map shape
+    yy, xx = np.meshgrid(np.linspace(-1.0, 1.0, rows), np.linspace(-1.0, 1.0, cols), indexing="ij")  # 构造归一化坐标 / Build normalized coordinates
+    radius = np.sqrt(xx * xx + yy * yy)  # 计算半径 / Compute radius
+    central = radius < 0.34  # 定义中心区域 / Define central zone
+    edge = (np.abs(xx) > 0.78) | (np.abs(yy) > 0.78)  # 定义边缘区域 / Define edge zone
+    simulated_centre = float(left[central].mean()) if central.any() else 0.0  # 计算仿真中心占用 / Compute simulated centre occupancy
+    target_centre = float(right[central].mean()) if central.any() else 0.0  # 计算目标中心占用 / Compute target centre occupancy
+    simulated_edge = float(left[edge].mean()) if edge.any() else 0.0  # 计算仿真边缘占用 / Compute simulated edge occupancy
+    target_edge = float(right[edge].mean()) if edge.any() else 0.0  # 计算目标边缘占用 / Compute target edge occupancy
+    centre_excess = float(np.clip((simulated_centre - target_centre - 0.035) / 0.24, 0.0, 1.0))  # 计算中心过量 / Compute centre excess
+    edge_excess = float(np.clip((simulated_edge - target_edge - 0.025) / 0.20, 0.0, 1.0))  # 计算边缘过量 / Compute edge excess
+    horizontal = np.abs(yy) < 0.12  # 定义水平中心带 / Define horizontal centre band
+    vertical = np.abs(xx) < 0.12  # 定义垂直中心带 / Define vertical centre band
+    simulated_cross = 0.5 * (float(left[horizontal].mean()) + float(left[vertical].mean()))  # 计算仿真十字占用 / Compute simulated cross occupancy
+    target_cross = 0.5 * (float(right[horizontal].mean()) + float(right[vertical].mean()))  # 计算目标十字占用 / Compute target cross occupancy
+    cross_excess = float(np.clip((simulated_cross - target_cross - 0.035) / 0.25, 0.0, 1.0))  # 计算十字过量 / Compute cross excess
+    return float(np.clip(0.44 * centre_excess + 0.30 * centre_excess * edge_excess + 0.26 * cross_excess, 0.0, 1.0))  # 返回中心骨架惩罚 / Return centre-skeleton penalty
+
+
+def pattern_similarity(iou: float, dice: float, distance_similarity: float = 0.0, overlap_balance: float = 0.0, layout: float = 0.0, area: float = 0.0, precision: float = 0.0, recall: float = 0.0, projection: float = 0.0, extent: float = 0.0, complexity: float = 0.0, topology: float = 0.0, centerline_penalty: float = 0.0) -> float:  # 合成图案相似度 / Combine pattern similarity
     balance = coverage_f_score(precision, recall)  # 计算精度召回平衡分 / Compute precision-recall balance score
     raw = 0.10 * iou + 0.15 * dice + 0.06 * distance_similarity + 0.15 * overlap_balance + 0.06 * layout + 0.03 * area + 0.16 * precision + 0.04 * recall + 0.10 * projection + 0.04 * extent + 0.03 * complexity + 0.04 * balance + 0.04 * topology  # 合成偏精确和拓扑的基础分 / Combine precision-and-topology-biased base score
     penalty = overcoverage_penalty(precision, recall, area)  # 计算多余响应惩罚 / Compute extra-response penalty
@@ -261,4 +283,4 @@ def pattern_similarity(iou: float, dice: float, distance_similarity: float = 0.0
     balance_gate = float(np.clip(balance / 0.32, 0.0, 1.0))  # 构造 F 分数硬门控 / Build F-score hard gate
     topology_gate = 0.15 + 0.85 * float(np.clip(topology, 0.0, 1.0))  # 构造拓扑硬门控 / Build topology hard gate
     gated = raw * max(0.05, 0.58 * precision_gate + 0.42 * balance_gate) * topology_gate  # 应用硬门控压低假匹配 / Apply hard gates to suppress false matches
-    return float(max(0.0, gated - 0.22 * penalty))  # 返回严格抑制过覆盖后的相似度 / Return strictly overcoverage-suppressed similarity
+    return float(max(0.0, gated - 0.22 * penalty - 0.20 * centerline_penalty))  # 返回严格抑制过覆盖和中心骨架后的相似度 / Return strictly overcoverage-and-centre-skeleton-suppressed similarity

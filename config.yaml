@@ -16,6 +16,14 @@ thickness:
   default_mm: 2.0 # 默认厚度 / Default thickness
   max_neighbor_difference_mm: 1.0 # 相邻单元最大厚度差 / Maximum neighbour thickness difference
 
+# 扩展设计变量 / Expanded design variables
+design_variables:
+  export_auxiliary_fields: true # 导出辅助物理场 / Export auxiliary physical fields
+  density_scale_min: 0.85 # 单元密度倍率下限 / Lower bound for per-cell density scale
+  density_scale_max: 1.25 # 单元密度倍率上限 / Upper bound for per-cell density scale
+  loss_factor_min: 0.0 # 单元损耗因子下限 / Lower bound for per-cell loss factor
+  loss_factor_max: 0.08 # 单元损耗因子上限 / Upper bound for per-cell loss factor
+
 # 材料参数 / Material parameters
 material:
   density_kg_m3: 1200 # 密度 / Density
@@ -68,6 +76,11 @@ optimisation:
   bayesian_expected_improvement_weight: 0.30 # 期望改进权重 / Expected improvement weight
   target_min_mode: 8 # 目标图案最低匹配模态 / Minimum mode used for target matching
   modal_compiler_count: 4 # 目标模态编译候选数量 / Number of target-modal compiler candidates
+  response_guidance_limit: 10 # 真实响应失败记忆数量 / Number of real-response failure memories
+  response_guidance_pool_limit: 36 # 真实响应闭环候选池数量 / Real-response closed-loop pool size
+  feasibility_min_real_candidates: 4 # 可行性诊断最少真实候选数 / Minimum real candidates for feasibility diagnosis
+  feasibility_score_floor: 0.08 # 厚度单变量可接受分数下限 / Acceptable score floor for thickness-only search
+  feasibility_precision_floor: 0.20 # 厚度单变量可接受精度下限 / Acceptable precision floor for thickness-only search
   kl_proxy_weight: 0.28 # KL 物理代理权重 / KL physics proxy weight
   kl_proxy_objective: "search_soft" # KL 代理搜索目标 / KL proxy search objective
   kl_proxy_grid_size: 31 # KL 代理高分辨率求解网格 / High-resolution solve grid for KL proxy

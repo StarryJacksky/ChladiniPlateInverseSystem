@@ -238,20 +238,74 @@ def matrix_to_guidance(H: np.ndarray, levels: list[float]) -> np.ndarray:  # 将
     return np.clip((H.astype(float) - low) / max(high - low, 1.0e-9), 0.0, 1.0)  # 返回归一化厚度 / Return normalized thickness
 
 
-def load_response_guidance_records(config: dict, candidates_dir: Path, target_grid: np.ndarray, limit: int = 4) -> list[dict]:  # 读取上一轮真实响应作为闭环引导 / Load previous real responses as closed-loop guidance
+def candidate_generation_number(candidate_id: str) -> int:  # 从候选编号读取代数 / Read generation number from candidate id
+    parts = candidate_id.split("_")  # 拆分候选编号 / Split candidate id
+    try:  # 捕获异常编号 / Catch malformed ids
+        return int(parts[1])  # 返回第二段代数 / Return second-part generation
+    except Exception:  # 兼容无法解析的编号 / Support unparseable ids
+        return -1  # 返回最低优先级 / Return lowest priority
+
+
+def safe_float(value: object, default: float = 0.0) -> float:  # 安全转换浮点数 / Safely convert to float
+    try:  # 尝试转换 / Try conversion
+        return float(value)  # 返回浮点值 / Return float value
+    except Exception:  # 捕获空值或非法字符串 / Catch empty or invalid values
+        return default  # 返回默认值 / Return default value
+
+
+def score_row_from_score_file(score_path: Path) -> dict | None:  # 从评分文件构造候选行 / Build candidate row from score file
+    try:  # 捕获 JSON 读取失败 / Catch JSON read failures
+        with score_path.open("r", encoding="utf-8") as file_obj:  # 打开评分文件 / Open score file
+            score = json.load(file_obj)  # 读取评分数据 / Read score data
+    except Exception:  # 评分文件损坏时跳过 / Skip broken score files
+        return None  # 返回空 / Return none
+    if score.get("scoring_version") != SCORING_VERSION:  # 只使用当前评分版本 / Use only current scoring version
+        return None  # 跳过旧评分 / Skip stale score
+    candidate_id = score_path.parent.name  # 读取候选编号 / Read candidate id
+    if not score.get("best_mode"):  # 检查是否有最佳模态 / Check best-mode presence
+        return None  # 无最佳模态则跳过 / Skip without best mode
+    return {"candidate_id": candidate_id, "best_mode": score.get("best_mode"), "final_score": score.get("final_score", 0.0), "best_precision": score.get("best_precision", 0.0), "best_recall": score.get("best_recall", 0.0), "source": "score_json"}  # 返回候选行 / Return candidate row
+
+
+def load_response_guidance_rows(candidates_dir: Path, pool_limit: int) -> list[dict]:  # 读取可用于闭环的候选行 / Load candidate rows usable for closed-loop guidance
+    rows = {}  # 创建候选行字典 / Create candidate-row dictionary
     ranking_path = candidates_dir / "ranked_candidates.csv"  # 构造排行文件路径 / Build ranking file path
-    if not ranking_path.exists():  # 检查排行文件是否存在 / Check whether ranking exists
-        return []  # 没有排行则无响应引导 / Return no response guidance without ranking
-    import csv  # 局部导入 CSV 工具 / Locally import CSV utilities
+    if ranking_path.exists():  # 检查排行是否存在 / Check ranking existence
+        with ranking_path.open("r", encoding="utf-8", newline="") as file_obj:  # 打开排行文件 / Open ranking file
+            for row in csv.DictReader(file_obj):  # 遍历排行候选 / Iterate ranked candidates
+                candidate_id = str(row.get("candidate_id", ""))  # 读取候选编号 / Read candidate id
+                if candidate_id:  # 检查编号是否有效 / Check id validity
+                    rows[candidate_id] = dict(row)  # 保存排行行 / Store ranking row
+    for score_path in sorted(candidates_dir.glob("candidate_*_*/score.json")):  # 遍历所有评分文件 / Iterate all score files
+        row = score_row_from_score_file(score_path)  # 从评分文件构造行 / Build row from score file
+        if row is not None:  # 检查是否可用 / Check row usability
+            rows[row["candidate_id"]] = row  # 评分文件优先覆盖排行 / Let score file override ranking row
+    ordered = sorted(rows.values(), key=lambda row: (candidate_generation_number(str(row.get("candidate_id", ""))), safe_float(row.get("final_score", 0.0))), reverse=True)  # 最新且较高分优先 / Prefer recent and higher-score rows
+    return ordered[:max(1, pool_limit)]  # 返回候选池 / Return candidate-row pool
+
+
+def response_record_priority(record: dict) -> float:  # 计算失败记忆优先级 / Compute failure-memory priority
+    precision = float(record.get("precision", 0.0))  # 读取精度 / Read precision
+    recall = float(record.get("recall", 0.0))  # 读取召回 / Read recall
+    extra_ratio = float(record.get("extra_ratio", 0.0))  # 读取多余响应比例 / Read extra-response ratio
+    missing_ratio = float(record.get("missing_ratio", 0.0))  # 读取缺失比例 / Read missing ratio
+    generation = max(candidate_generation_number(str(record.get("candidate_id", ""))), 0)  # 读取候选代数 / Read candidate generation
+    recency = min(generation / 200.0, 1.0)  # 归一化新近程度 / Normalize recency
+    badness = (1.0 - precision) * 0.34 + max(0.0, recall - precision) * 0.24 + extra_ratio * 0.22 + missing_ratio * 0.10 + recency * 0.10  # 合成坏样本优先级 / Combine bad-sample priority
+    return float(badness)  # 返回优先级 / Return priority
+
+
+def load_response_guidance_records(config: dict, candidates_dir: Path, target_grid: np.ndarray, limit: int = 4) -> list[dict]:  # 读取上一轮真实响应作为闭环引导 / Load previous real responses as closed-loop guidance
+    optimisation = config.get("optimisation", {})  # 读取优化设置 / Read optimisation settings
+    record_limit = int(optimisation.get("response_guidance_limit", limit))  # 读取闭环记录数量 / Read response-guidance record count
+    pool_limit = int(optimisation.get("response_guidance_pool_limit", max(record_limit * 4, 16)))  # 读取闭环候选池数量 / Read response-guidance pool size
     records = []  # 创建响应记录列表 / Create response record list
-    with ranking_path.open("r", encoding="utf-8", newline="") as file_obj:  # 打开排行文件 / Open ranking file
-        for row in csv.DictReader(file_obj):  # 遍历排行行 / Iterate ranking rows
-            record = build_response_guidance_record(config, candidates_dir, row, target_grid)  # 构建单个响应记录 / Build one response record
-            if record is not None:  # 检查记录是否可用 / Check whether record is usable
-                records.append(record)  # 保存响应记录 / Store response record
-            if len(records) >= limit:  # 检查记录上限 / Check record limit
-                break  # 停止读取 / Stop reading
-    return records  # 返回响应记录 / Return response records
+    for row in load_response_guidance_rows(candidates_dir, pool_limit):  # 遍历可用候选行 / Iterate usable candidate rows
+        record = build_response_guidance_record(config, candidates_dir, row, target_grid)  # 构建单个响应记录 / Build one response record
+        if record is not None:  # 检查记录是否可用 / Check whether record is usable
+            records.append(record)  # 保存响应记录 / Store response record
+    records = sorted(records, key=response_record_priority, reverse=True)  # 失败记忆优先 / Prioritize failure memories
+    return records[:max(1, record_limit)]  # 返回响应记录 / Return response records
 
 
 def build_response_guidance_record(config: dict, candidates_dir: Path, ranking_row: dict, target_grid: np.ndarray) -> dict | None:  # 构建响应闭环记录 / Build response closed-loop record
@@ -288,8 +342,11 @@ def build_response_guidance_record(config: dict, candidates_dir: Path, ranking_r
     simulated_grid = downsample_binary_to_grid(nodal, target_grid.shape[0])  # 将仿真节点线压到厚度网格 / Compress simulated nodal lines to thickness grid
     missing = np.clip(target_grid - simulated_grid, 0.0, 1.0)  # 计算目标有而仿真缺失区域 / Compute target-present simulation-missing area
     extra = np.clip(simulated_grid - target_grid, 0.0, 1.0)  # 计算仿真多余区域 / Compute simulation-extra area
-    score = float(ranking_row.get("final_score", 0.0) or 0.0)  # 读取最终分数 / Read final score
-    return {"candidate_id": candidate_id, "H": H, "target": target_grid, "simulated": simulated_grid, "missing": missing, "extra": extra, "score": score, "mode": best_mode}  # 返回闭环记录 / Return closed-loop record
+    score = safe_float(ranking_row.get("final_score", 0.0), 0.0)  # 读取最终分数 / Read final score
+    precision = safe_float(ranking_row.get("best_precision", 0.0), 0.0)  # 读取精度 / Read precision
+    recall = safe_float(ranking_row.get("best_recall", 0.0), 0.0)  # 读取召回 / Read recall
+    avoid = np.clip(0.70 * extra + 0.30 * simulated_grid, 0.0, 1.0)  # 构造坏响应规避图 / Build bad-response avoidance map
+    return {"candidate_id": candidate_id, "H": H, "target": target_grid, "simulated": simulated_grid, "missing": missing, "extra": extra, "avoid": avoid, "score": score, "precision": precision, "recall": recall, "extra_ratio": float(extra.mean()), "missing_ratio": float(missing.mean()), "mode": best_mode}  # 返回闭环记录 / Return closed-loop record
 
 
 def response_error_guidance(record: dict, variant_index: int, levels: list[float], rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 根据真实响应误差生成引导图 / Build guidance from real response error
@@ -298,25 +355,26 @@ def response_error_guidance(record: dict, variant_index: int, levels: list[float
     simulated = normalise_design_map(record["simulated"])  # 读取仿真占用图 / Read simulated occupancy map
     missing = smooth_design_map(record["missing"], 2)  # 平滑缺失区域 / Smooth missing area
     extra = smooth_design_map(record["extra"], 2)  # 平滑多余区域 / Smooth extra area
+    avoid = smooth_design_map(record.get("avoid", record["extra"]), 2)  # 平滑失败规避区域 / Smooth failure-avoidance area
     edge = target_edge_guidance(target)  # 构建目标边缘图 / Build target edge map
     radial = radial_design_bias(parent.shape[0])  # 构建径向破缺图 / Build radial breaking map
     angular = angular_design_bias(parent.shape[0], float(rng.uniform(0.0, 2.0 * np.pi)))  # 构建角向破缺图 / Build angular breaking map
     kind = variant_index % 8  # 选择闭环变体类型 / Select closed-loop variant type
     if kind == 0:  # 第一类：缺失区增厚、多余区减薄 / Type one: thicken missing and thin extra
-        return normalise_design_map(0.45 * parent + 0.55 * target + 0.55 * missing - 0.40 * extra), "error_push_positive"  # 返回正向误差推动 / Return positive error push
+        return normalise_design_map(0.35 * parent + 0.60 * target + 0.70 * missing - 0.70 * avoid), "error_push_positive"  # 返回正向误差推动 / Return positive error push
     if kind == 1:  # 第二类：反向符号探索 / Type two: opposite-sign exploration
-        return normalise_design_map(0.45 * parent + 0.50 * target - 0.45 * missing + 0.45 * extra), "error_push_negative"  # 返回反向误差推动 / Return negative error push
+        return normalise_design_map(0.38 * parent + 0.52 * (1.0 - target) + 0.30 * angular - 0.55 * avoid), "error_push_negative"  # 返回反向误差推动 / Return negative error push
     if kind == 2:  # 第三类：目标边缘和缺失区优先 / Type three: target edge and missing area first
-        return normalise_design_map(0.35 * parent + 0.35 * edge + 0.55 * missing - 0.25 * simulated), "missing_edge_focus"  # 返回缺失边缘聚焦 / Return missing-edge focus
+        return normalise_design_map(0.32 * parent + 0.46 * edge + 0.70 * missing - 0.48 * avoid), "missing_edge_focus"  # 返回缺失边缘聚焦 / Return missing-edge focus
     if kind == 3:  # 第四类：强力压制多余星形臂 / Type four: strongly suppress extra star arms
-        return normalise_design_map(0.55 * parent + 0.45 * target - 0.70 * extra + 0.20 * angular), "extra_suppression"  # 返回多余响应压制 / Return extra-response suppression
+        return normalise_design_map(0.45 * parent + 0.48 * target - 0.95 * avoid + 0.28 * angular), "extra_suppression"  # 返回多余响应压制 / Return extra-response suppression
     if kind == 4:  # 第五类：反相目标和径向破缺 / Type five: inverse target and radial breaking
-        return normalise_design_map(0.35 * parent + 0.45 * (1.0 - target) + 0.25 * radial - 0.35 * extra), "inverse_breaking"  # 返回反相破缺 / Return inverse breaking
+        return normalise_design_map(0.30 * parent + 0.46 * (1.0 - target) + 0.34 * radial - 0.62 * avoid), "inverse_breaking"  # 返回反相破缺 / Return inverse breaking
     if kind == 5:  # 第六类：父代保持加非对称扰动 / Type six: parent keeping with asymmetric perturbation
-        return normalise_design_map(0.65 * parent + 0.25 * target + 0.35 * angular - 0.25 * simulated), "asymmetric_parent"  # 返回非对称父代引导 / Return asymmetric parent guidance
+        return normalise_design_map(0.58 * parent + 0.28 * target + 0.45 * angular - 0.45 * avoid), "asymmetric_parent"  # 返回非对称父代引导 / Return asymmetric parent guidance
     if kind == 6:  # 第七类：缺失区和反星形共同驱动 / Type seven: missing area and anti-star jointly drive
-        return normalise_design_map(0.40 * parent + 0.45 * missing + 0.35 * (1.0 - simulated) + 0.20 * edge), "anti_star_missing"  # 返回反星形缺失引导 / Return anti-star missing guidance
-    return normalise_design_map(0.30 * parent + 0.40 * target + 0.20 * radial + 0.20 * angular + rng.normal(0.0, 0.10, size=parent.shape)), "noisy_surrogate"  # 返回噪声代理探索 / Return noisy surrogate exploration
+        return normalise_design_map(0.34 * parent + 0.62 * missing + 0.52 * (1.0 - simulated) + 0.28 * edge - 0.38 * avoid), "anti_star_missing"  # 返回反星形缺失引导 / Return anti-star missing guidance
+    return normalise_design_map(0.26 * parent + 0.42 * target + 0.24 * radial + 0.30 * angular - 0.44 * avoid + rng.normal(0.0, 0.12, size=parent.shape)), "noisy_surrogate"  # 返回噪声代理探索 / Return noisy surrogate exploration
 
 
 def generate_response_guided_H(records: list[dict], index: int, levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 生成闭环响应引导厚度矩阵 / Generate closed-loop response-guided thickness matrix
@@ -636,10 +694,38 @@ def save_H_csv(H: np.ndarray, path: str | Path) -> None:  # 保存厚度矩阵 C
     np.savetxt(output_path, H, delimiter=",", fmt="%.3f")  # 保存 CSV 文件 / Save CSV file
 
 
-def save_candidate(candidate_dir: str | Path, H: np.ndarray, metadata: dict) -> None:  # 保存候选结构 / Save candidate design
+def scale_field(values: np.ndarray, low: float, high: float) -> np.ndarray:  # 缩放归一化场到物理范围 / Scale normalized field to physical range
+    return low + normalise_design_map(values) * (high - low)  # 返回缩放场 / Return scaled field
+
+
+def build_auxiliary_design_fields(H: np.ndarray, levels: list[float], target_grid: np.ndarray | None, config: dict) -> dict[str, np.ndarray]:  # 构建辅助设计变量场 / Build auxiliary design-variable fields
+    settings = config.get("design_variables", {})  # 读取辅助变量配置 / Read auxiliary-variable config
+    thickness = matrix_to_guidance(H, levels)  # 归一化厚度场 / Normalize thickness field
+    target = normalise_design_map(target_grid) if target_grid is not None else thickness  # 读取目标引导图 / Read target guidance map
+    edge = target_edge_guidance(target) if target_grid is not None else radial_design_bias(H.shape[0])  # 构造边缘或径向引导 / Build edge or radial guidance
+    density_low = float(settings.get("density_scale_min", 0.90))  # 读取密度倍率下限 / Read density-scale lower bound
+    density_high = float(settings.get("density_scale_max", 1.15))  # 读取密度倍率上限 / Read density-scale upper bound
+    loss_low = float(settings.get("loss_factor_min", 0.00))  # 读取损耗因子下限 / Read loss-factor lower bound
+    loss_high = float(settings.get("loss_factor_max", 0.06))  # 读取损耗因子上限 / Read loss-factor upper bound
+    density_source = 0.45 * (1.0 - thickness) + 0.35 * target + 0.20 * edge  # 合成单元密度引导 / Combine per-cell density guidance
+    loss_source = 0.45 * (1.0 - target) + 0.35 * edge + 0.20 * radial_design_bias(H.shape[0])  # 合成局部阻尼引导 / Combine local damping guidance
+    density_scale = scale_field(density_source, density_low, density_high)  # 生成密度倍率场 / Generate density-scale field
+    loss_factor = scale_field(loss_source, loss_low, loss_high)  # 生成损耗因子场 / Generate loss-factor field
+    return {"density_scale": np.round(density_scale, 4), "loss_factor": np.round(loss_factor, 5)}  # 返回辅助场 / Return auxiliary fields
+
+
+def save_auxiliary_fields(candidate_path: Path, fields: dict[str, np.ndarray]) -> None:  # 保存辅助设计变量场 / Save auxiliary design-variable fields
+    for name, values in fields.items():  # 遍历辅助变量场 / Iterate auxiliary fields
+        fmt = "%.5f" if name == "loss_factor" else "%.4f"  # 选择保存精度 / Choose save precision
+        np.savetxt(candidate_path / f"{name}.csv", values, delimiter=",", fmt=fmt)  # 保存辅助变量 CSV / Save auxiliary variable CSV
+
+
+def save_candidate(candidate_dir: str | Path, H: np.ndarray, metadata: dict, auxiliary_fields: dict[str, np.ndarray] | None = None) -> None:  # 保存候选结构 / Save candidate design
     path = Path(candidate_dir)  # 转换为路径对象 / Convert to path object
     path.mkdir(parents=True, exist_ok=True)  # 创建候选目录 / Create candidate directory
     save_H_csv(H, path / "H.csv")  # 保存厚度矩阵 / Save thickness matrix
+    if auxiliary_fields:  # 检查是否存在辅助物理场 / Check whether auxiliary physical fields exist
+        save_auxiliary_fields(path, auxiliary_fields)  # 保存辅助物理场 / Save auxiliary physical fields
     with (path / "metadata.json").open("w", encoding="utf-8") as file_obj:  # 打开元数据文件 / Open metadata file
         json.dump(metadata, file_obj, indent=2, ensure_ascii=False)  # 写入元数据 / Write metadata
 
@@ -681,7 +767,8 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
             H = generate_evolutionary_H(parents, levels, default, max_diff, rng, mutation_rate) if parents else generate_random_H(grid_size, levels, default, max_diff, rng)  # 生成探索矩阵 / Generate exploration matrix
             variant_name = "genetic_explorer" if parents else "random_explorer"  # 设置探索变体名 / Set explorer variant name
             created_by = "genetic_search" if parents else "random_search"  # 设置生成来源 / Set creation source
-        metadata = {"candidate_id": candidate_id, "generation": generation, "grid_size": grid_size, "thickness_mode": "continuous", "thickness_bounds_mm": levels, "center_fixed": True, "created_by": created_by, "target_guidance_variant": variant_name, "target_guided": target_grid is not None}  # 记录元数据 / Record metadata
-        save_candidate(candidates_dir / candidate_id, H, metadata)  # 保存候选 / Save candidate
+        auxiliary_fields = build_auxiliary_design_fields(H, levels, target_grid, config) if config.get("design_variables", {}).get("export_auxiliary_fields", True) else {}  # 构建辅助物理场 / Build auxiliary physical fields
+        metadata = {"candidate_id": candidate_id, "generation": generation, "grid_size": grid_size, "thickness_mode": "continuous", "thickness_bounds_mm": levels, "center_fixed": True, "created_by": created_by, "target_guidance_variant": variant_name, "target_guided": target_grid is not None, "auxiliary_fields": sorted(auxiliary_fields.keys())}  # 记录元数据 / Record metadata
+        save_candidate(candidates_dir / candidate_id, H, metadata, auxiliary_fields)  # 保存候选 / Save candidate
         candidate_ids.append(candidate_id)  # 添加候选编号 / Add candidate id
     return candidate_ids  # 返回候选编号 / Return candidate ids

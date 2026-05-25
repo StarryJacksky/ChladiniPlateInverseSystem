@@ -20,6 +20,7 @@ except Exception:  # 兼容无 SciPy 稀疏模块环境 / Support environments w
 
 from src.candidate.constraints import center_cells_for_grid  # 导入中心单元工具 / Import centre-cell helper
 from src.scoring.metrics import area_similarity  # 导入面积相似度 / Import area similarity
+from src.scoring.metrics import centerline_overreach_penalty  # 导入中心骨架惩罚 / Import centre-skeleton penalty
 from src.scoring.metrics import chamfer_distance  # 导入倒角距离场 / Import chamfer distance field
 from src.scoring.metrics import chamfer_similarity  # 导入倒角距离相似度 / Import chamfer-distance similarity
 from src.scoring.metrics import component_similarity  # 导入连通拓扑相似度 / Import connected-topology similarity
@@ -198,7 +199,8 @@ def score_kl_mode(nodal: np.ndarray, target_grid: np.ndarray) -> float:  # 评�
     extent = extent_similarity(nodal, target)  # 计算尺度相似度 / Compute extent similarity
     complexity = complexity_similarity(nodal, target)  # 计算复杂度相似度 / Compute complexity similarity
     topology = component_similarity(nodal, target)  # 计算连通拓扑相似度 / Compute connected-topology similarity
-    return pattern_similarity(iou, dice, 0.0, overlap, layout, area, precision, recall, projection, extent, complexity, topology)  # 返回统一口径的代理合成分 / Return unified proxy combined score
+    centerline = centerline_overreach_penalty(nodal, target)  # 计算中心骨架惩罚 / Compute centre-skeleton penalty
+    return pattern_similarity(iou, dice, 0.0, overlap, layout, area, precision, recall, projection, extent, complexity, topology, centerline)  # 返回统一口径的代理合成分 / Return unified proxy combined score
 
 
 def compact_center_trap_penalty(nodal: np.ndarray, target_grid: np.ndarray) -> float:  # 惩罚中心小团陷阱 / Penalize compact-centre traps
@@ -285,12 +287,13 @@ def score_kl_mode_search(mode: np.ndarray, nodal: np.ndarray, target_grid: np.nd
     chamfer = chamfer_similarity(nodal, target)  # 计算距离场软相似度 / Compute distance-field soft similarity
     balance = coverage_f_score(precision, recall)  # 计算精度召回 F 分数 / Compute precision-recall F-score
     signed = modal_field_alignment(mode, target_grid)  # 计算符号场相关分 / Compute signed-field alignment score
+    centerline = centerline_overreach_penalty(nodal, target)  # 计算中心骨架惩罚 / Compute centre-skeleton penalty
     soft = 0.05 * iou + 0.06 * dice + 0.14 * chamfer + 0.08 * overlap + 0.10 * layout + 0.10 * projection + 0.10 * extent + 0.05 * area + 0.03 * complexity + 0.03 * topology + 0.03 * balance + 0.23 * signed  # 合成搜索软分 / Combine search soft score
     penalty = overcoverage_penalty(precision, recall, area)  # 计算过覆盖惩罚 / Compute overcoverage penalty
     trap = compact_center_trap_penalty(nodal, target)  # 计算中心小团陷阱惩罚 / Compute compact-centre trap penalty
     spoke = radial_spoke_trap_penalty(nodal, target)  # 计算中心辐射骨架惩罚 / Compute centre-spoke trap penalty
     precision_shortfall = float(np.clip((0.22 - precision) / 0.22, 0.0, 1.0))  # 计算精度不足惩罚 / Compute precision-shortfall penalty
-    return float(max(0.0, soft - 0.16 * penalty - 0.22 * trap - 0.18 * spoke - 0.12 * precision_shortfall))  # 返回连续搜索评分 / Return continuous search score
+    return float(max(0.0, soft - 0.16 * penalty - 0.22 * trap - 0.18 * spoke - 0.12 * precision_shortfall - 0.16 * centerline))  # 返回连续搜索评分 / Return continuous search score
 
 
 def resize_target_to_grid(target_grid: np.ndarray, grid_size: int) -> np.ndarray:  # 将目标图压缩到代理网格 / Compress target map to proxy grid

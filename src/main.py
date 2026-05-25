@@ -13,7 +13,7 @@ from src.optimisation.random_search import score_available_candidates  # 导入�
 
 def build_parser() -> argparse.ArgumentParser:  # 创建命令行解析器 / Build command-line parser
     parser = argparse.ArgumentParser(description="Chladni inverse design MVP. / Chladni 逆向设计 MVP。")  # 初始化解析器 / Initialise parser
-    parser.add_argument("command", choices=["prepare-target", "target-ui", "run-workflow", "generate-candidates", "generate-previews", "simulate-candidate", "simulate-batch", "render-mode-previews", "audit-comsol-model", "discover-comsol", "apply-comsol-discovery", "diagnose-comsol", "self-test", "validate-comsol-exports", "score-candidates"], help="Workflow command. / 工作流命令。")  # 添加命令参数 / Add command argument
+    parser.add_argument("command", choices=["prepare-target", "target-ui", "run-workflow", "generate-candidates", "generate-previews", "simulate-candidate", "simulate-batch", "render-mode-previews", "audit-comsol-model", "discover-comsol", "apply-comsol-discovery", "diagnose-comsol", "diagnose-feasibility", "self-test", "validate-comsol-exports", "score-candidates"], help="Workflow command. / 工作流命令。")  # 添加命令参数 / Add command argument
     parser.add_argument("--config", default="config.yaml", help="Config file path. / 配置文件路径。")  # 添加配置路径参数 / Add config path argument
     parser.add_argument("--host", default="127.0.0.1", help="Target UI host. / 目标 UI 主机。")  # 添加 UI 主机参数 / Add UI host argument
     parser.add_argument("--port", type=int, default=8765, help="Target UI port. / 目标 UI 端口。")  # 添加 UI 端口参数 / Add UI port argument
@@ -93,6 +93,11 @@ def main() -> None:  # 主程序入口 / Main program entry
         import json  # 延迟导入 JSON / Lazily import JSON
         from src.comsol.diagnostics import diagnose_comsol_environment  # 延迟导入环境诊断 / Lazily import environment diagnostics
         print(json.dumps(diagnose_comsol_environment(config), ensure_ascii=False, indent=2))  # 打印诊断结果 / Print diagnostics result
+    if args.command == "diagnose-feasibility":  # 判断是否诊断逆向可行性 / Check inverse-feasibility diagnostics command
+        from src.scoring.feasibility import save_feasibility_report  # 延迟导入可行性报告保存 / Lazily import feasibility report saver
+        from src.scoring.feasibility import summarize_feasibility_report  # 延迟导入可行性摘要 / Lazily import feasibility summary
+        report = save_feasibility_report(config)  # 保存可行性报告 / Save feasibility report
+        print(summarize_feasibility_report(report))  # 打印可行性摘要 / Print feasibility summary
     if args.command == "discover-comsol":  # 判断是否发现 COMSOL/MATLAB / Check COMSOL/MATLAB discovery command
         import json  # 延迟导入 JSON / Lazily import JSON
         from src.comsol.discovery import discover_runtime_environment  # 延迟导入运行环境发现 / Lazily import runtime discovery

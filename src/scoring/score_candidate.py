@@ -14,6 +14,7 @@ from src.nodal.extract_nodal import extract_nodal_region  # 导入节点线提�
 from src.nodal.extract_nodal import postprocess_nodal_region  # 导入节点线后处理 / Import nodal postprocessing
 from src.nodal.extract_nodal import remove_center_region  # 导入中心区域移除 / Import centre-region removal
 from src.scoring.metrics import area_similarity  # 导入面积相似度 / Import area similarity
+from src.scoring.metrics import centerline_overreach_penalty  # 导入中心骨架惩罚 / Import centre-skeleton penalty
 from src.scoring.metrics import compute_dice  # 导入 Dice 指标 / Import Dice metric
 from src.scoring.metrics import compute_iou  # 导入 IoU 指标 / Import IoU metric
 from src.scoring.metrics import compute_overlap_balance  # 导入覆盖平衡分数 / Import overlap balance score
@@ -75,10 +76,11 @@ def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], ima
         extent = extent_similarity(nodal, target)  # 计算包围盒尺度相似度 / Compute extent similarity
         complexity = complexity_similarity(nodal, target)  # 计算结构复杂度相似度 / Compute complexity similarity
         topology = component_similarity(nodal, target)  # 计算连通拓扑相似度 / Compute connected-topology similarity
-        similarity = pattern_similarity(iou, dice, distance, overlap, layout, area, precision, recall, projection, extent, complexity, topology)  # 合成相似度 / Combine similarity
-        best["all_modes"].append({"mode": mode_number, "iou": iou, "dice": dice, "distance_similarity": distance, "overlap_balance": overlap, "layout_similarity": layout, "area_similarity": area, "precision": precision, "recall": recall, "projection_similarity": projection, "extent_similarity": extent, "complexity_similarity": complexity, "component_similarity": topology, "similarity": similarity})  # 记录该模态结果 / Record this mode result
+        centerline = centerline_overreach_penalty(nodal, target)  # 计算中心骨架惩罚 / Compute centre-skeleton penalty
+        similarity = pattern_similarity(iou, dice, distance, overlap, layout, area, precision, recall, projection, extent, complexity, topology, centerline)  # 合成相似度 / Combine similarity
+        best["all_modes"].append({"mode": mode_number, "iou": iou, "dice": dice, "distance_similarity": distance, "overlap_balance": overlap, "layout_similarity": layout, "area_similarity": area, "precision": precision, "recall": recall, "projection_similarity": projection, "extent_similarity": extent, "complexity_similarity": complexity, "component_similarity": topology, "centerline_penalty": centerline, "similarity": similarity})  # 记录该模态结果 / Record this mode result
         if similarity > best["best_similarity"]:  # 检查是否是新最佳 / Check whether this is new best
-            best.update({"best_mode": mode_number, "best_iou": iou, "best_dice": dice, "best_distance_similarity": distance, "best_overlap_balance": overlap, "best_layout_similarity": layout, "best_area_similarity": area, "best_precision": precision, "best_recall": recall, "best_projection_similarity": projection, "best_extent_similarity": extent, "best_complexity_similarity": complexity, "best_component_similarity": topology, "best_similarity": similarity})  # 更新最佳结果 / Update best result
+            best.update({"best_mode": mode_number, "best_iou": iou, "best_dice": dice, "best_distance_similarity": distance, "best_overlap_balance": overlap, "best_layout_similarity": layout, "best_area_similarity": area, "best_precision": precision, "best_recall": recall, "best_projection_similarity": projection, "best_extent_similarity": extent, "best_complexity_similarity": complexity, "best_component_similarity": topology, "best_centerline_penalty": centerline, "best_similarity": similarity})  # 更新最佳结果 / Update best result
     if best["best_mode"] is None and int(min_mode) > 1:  # 检查旧导出是否缺少高阶模态 / Check whether old export lacks high-order modes
         return score_candidate_modes(target_binary, mode_files, image_size, epsilon_ratio, center_radius_px, 1)  # 旧导出回退全模态评分 / Fall back to all modes for old exports
     if best["best_mode"] is None:  # 检查是否没有可评分模态 / Check whether no mode was scored

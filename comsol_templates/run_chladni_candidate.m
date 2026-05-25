@@ -56,6 +56,24 @@ if exist(material_file, 'file') % 执行本行 MATLAB/COMSOL 操作 / Execute th
     end % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
 end % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
 
+design_variable_file = fullfile(candidate_dir, 'design_variable_parameters.csv'); % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+if exist(design_variable_file, 'file') % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+    design_parameters = readtable(design_variable_file, 'TextType', 'string', 'VariableNamingRule', 'preserve'); % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+    design_names = string(design_parameters{:, 1}); % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+    design_values = design_parameters{:, 2}; % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+    design_units = string(design_parameters{:, 3}); % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+    for row = 1:height(design_parameters) % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+        name = char(design_names(row)); % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+        value = design_values(row); % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+        unit = char(design_units(row)); % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+        if strcmp(unit, '1') % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+            model.param.set(name, sprintf('%.12g', value)); % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+        else % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+            model.param.set(name, sprintf('%.12g[%s]', value, unit)); % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+        end % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+    end % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+end % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
+
 try % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
     model.study('std1').feature('eig').set('neigs', num2str(num_modes)); % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
 catch err % 执行本行 MATLAB/COMSOL 操作 / Execute this MATLAB/COMSOL operation
