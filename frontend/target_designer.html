@@ -753,10 +753,26 @@
 
     .result-filter { /* 样式设置 / Style setting */
       display: grid; /* 样式设置 / Style setting */
-      grid-template-columns: minmax(0, 1fr) minmax(112px, 0.7fr) minmax(82px, 0.45fr) auto; /* 样式设置 / Style setting */
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* 样式设置 / Style setting */
       gap: 8px; /* 样式设置 / Style setting */
       align-items: end; /* 样式设置 / Style setting */
       margin-bottom: 8px; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .result-filter .field { /* 样式设置 / Style setting */
+      grid-template-columns: max-content minmax(0, 1fr); /* 样式设置 / Style setting */
+      min-width: 0; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .result-filter .field input, /* 样式设置 / Style setting */
+    .result-filter .field select { /* 样式设置 / Style setting */
+      width: 100%; /* 样式设置 / Style setting */
+      min-width: 0; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .result-filter button { /* 样式设置 / Style setting */
+      justify-self: end; /* 样式设置 / Style setting */
+      padding: 0 12px; /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
     .result-summary { /* 样式设置 / Style setting */
@@ -1597,6 +1613,10 @@
 
       .result-filter { /* 样式设置 / Style setting */
         grid-template-columns: 1fr; /* 样式设置 / Style setting */
+      } /* 样式设置 / Style setting */
+
+      .result-filter button { /* 样式设置 / Style setting */
+        justify-self: stretch; /* 样式设置 / Style setting */
       } /* 样式设置 / Style setting */
 
       .trend-row { /* 样式设置 / Style setting */
