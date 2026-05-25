@@ -58,6 +58,32 @@ def repair_neighbor_constraint(H: np.ndarray, levels: list[float], max_diff: flo
     return repaired  # 返回修复结果 / Return repaired result
 
 
+def repair_continuous_neighbor_constraint(H: np.ndarray, h_min: float, h_max: float, max_diff: float, passes: int = 12, fixed_cells: list[tuple[int, int]] | None = None) -> np.ndarray:  # 修复连续厚度相邻约束 / Repair continuous-thickness neighbour constraint
+    repaired = np.clip(H.astype(float), h_min, h_max)  # 裁剪到厚度范围 / Clip to thickness range
+    rows, cols = repaired.shape  # 获取矩阵尺寸 / Get matrix size
+    fixed = set(fixed_cells or [])  # 创建固定单元集合 / Create fixed-cell set
+    for _ in range(passes):  # 多轮连续修复 / Run continuous repair passes
+        for row in range(rows):  # 遍历行 / Iterate rows
+            for col in range(cols):  # 遍历列 / Iterate columns
+                if (row, col) in fixed:  # 判断是否为固定单元 / Check fixed cell
+                    continue  # 跳过固定单元 / Skip fixed cell
+                neighbours = []  # 创建邻居列表 / Create neighbour list
+                if row > 0:  # 判断上邻居 / Check upper neighbour
+                    neighbours.append(repaired[row - 1, col])  # 加入上邻居 / Add upper neighbour
+                if row + 1 < rows:  # 判断下邻居 / Check lower neighbour
+                    neighbours.append(repaired[row + 1, col])  # 加入下邻居 / Add lower neighbour
+                if col > 0:  # 判断左邻居 / Check left neighbour
+                    neighbours.append(repaired[row, col - 1])  # 加入左邻居 / Add left neighbour
+                if col + 1 < cols:  # 判断右邻居 / Check right neighbour
+                    neighbours.append(repaired[row, col + 1])  # 加入右邻居 / Add right neighbour
+                lower = max([h_min] + [float(value) - max_diff for value in neighbours])  # 计算允许下界 / Compute allowed lower bound
+                upper = min([h_max] + [float(value) + max_diff for value in neighbours])  # 计算允许上界 / Compute allowed upper bound
+                repaired[row, col] = float(np.clip(repaired[row, col], lower, upper))  # 裁剪当前单元 / Clip current cell
+        if check_neighbor_constraint(repaired, max_diff):  # 判断是否已满足约束 / Check whether constraint is satisfied
+            break  # 停止修复 / Stop repair
+    return np.round(repaired, 3)  # 返回三位小数连续厚度 / Return continuous thickness rounded to 0.001 mm
+
+
 def roughness_penalty(H: np.ndarray) -> float:  # 计算粗糙度惩罚 / Compute roughness penalty
     row_penalty = np.square(np.diff(H, axis=0)).sum()  # 计算上下差平方和 / Sum vertical squared differences
     col_penalty = np.square(np.diff(H, axis=1)).sum()  # 计算左右差平方和 / Sum horizontal squared differences

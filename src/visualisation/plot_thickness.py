@@ -30,6 +30,15 @@ def draw_center_marker(draw: ImageDraw.ImageDraw, x0: int, y0: int, x1: int, y1:
     draw.line((x0 + 8, y1 - 8, x1 - 8, y0 + 8), fill=(255, 255, 255), width=3)  # 绘制白色反斜线 / Draw white anti-diagonal line
 
 
+def legend_values_for_thickness(H: np.ndarray) -> list[float]:  # 选择连续厚度图例值 / Choose legend values for continuous thickness
+    unique = sorted(set(float(v) for v in H.ravel()))  # 读取唯一厚度值 / Read unique thickness values
+    if len(unique) <= 8:  # 检查是否为少量离散值 / Check whether values are few and discrete
+        return unique  # 返回所有离散值 / Return all discrete values
+    minimum = float(np.min(H))  # 读取最小值 / Read minimum value
+    maximum = float(np.max(H))  # 读取最大值 / Read maximum value
+    return [minimum, (minimum + maximum) / 2.0, maximum]  # 返回连续图例三点 / Return three continuous legend points
+
+
 def render_thickness_matrix(H: np.ndarray, output_path: str | Path, title: str = "Thickness matrix") -> Path:  # 渲染厚度矩阵 / Render thickness matrix
     path = Path(output_path)  # 转换为路径对象 / Convert to path object
     path.parent.mkdir(parents=True, exist_ok=True)  # 创建输出目录 / Create output directory
@@ -58,7 +67,7 @@ def render_thickness_matrix(H: np.ndarray, output_path: str | Path, title: str =
             y1 = y0 + cell  # 计算单元下边界 / Compute cell bottom edge
             colour = thickness_colour(float(H[row, col]), min_value, max_value)  # 计算单元颜色 / Compute cell colour
             draw.rectangle((x0, y0, x1, y1), fill=colour, outline=(255, 255, 255), width=3)  # 绘制单元格 / Draw cell
-            label = f"{H[row, col]:.1f}"  # 生成厚度标签 / Build thickness label
+            label = f"{H[row, col]:.2f}"  # 生成连续厚度标签 / Build continuous thickness label
             box = draw.textbbox((0, 0), label, font=label_font)  # 计算文字边界 / Compute text bounding box
             tx = x0 + (cell - (box[2] - box[0])) / 2  # 计算文字 x 坐标 / Compute text x coordinate
             ty = y0 + (cell - (box[3] - box[1])) / 2  # 计算文字 y 坐标 / Compute text y coordinate
@@ -67,11 +76,11 @@ def render_thickness_matrix(H: np.ndarray, output_path: str | Path, title: str =
                 draw_center_marker(draw, x0, y0, x1, y1)  # 绘制中心标记 / Draw center marker
     legend_y = grid_top + rows * cell + 22  # 计算图例 y 坐标 / Compute legend y coordinate
     draw.text((margin, legend_y), "Thickness / 厚度 (mm)", fill=(24, 32, 40), font=small_font)  # 绘制图例标题 / Draw legend title
-    for index, value in enumerate(sorted(set(float(v) for v in H.ravel()))):  # 遍历厚度等级 / Iterate thickness levels
+    for index, value in enumerate(legend_values_for_thickness(H)):  # 遍历厚度图例值 / Iterate thickness legend values
         swatch_x = margin + 160 + index * 76  # 计算色块 x 坐标 / Compute swatch x coordinate
         colour = thickness_colour(value, min_value, max_value)  # 计算色块颜色 / Compute swatch colour
         draw.rectangle((swatch_x, legend_y - 2, swatch_x + 24, legend_y + 22), fill=colour)  # 绘制色块 / Draw swatch
-        draw.text((swatch_x + 30, legend_y), f"{value:.1f}", fill=(24, 32, 40), font=small_font)  # 绘制厚度标签 / Draw thickness label
+        draw.text((swatch_x + 30, legend_y), f"{value:.2f}", fill=(24, 32, 40), font=small_font)  # 绘制连续厚度标签 / Draw continuous thickness label
     image.save(path)  # 保存预览图 / Save preview image
     return path  # 返回输出路径 / Return output path
 

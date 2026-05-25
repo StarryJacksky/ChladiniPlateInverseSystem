@@ -9,17 +9,17 @@ import numpy as np  # 导入数值计算库 / Import numerical library
 from src.candidate.constraints import center_cells_for_grid  # 导入中心单元函数 / Import center-cell helper
 from src.candidate.constraints import check_neighbor_constraint  # 导入约束检查函数 / Import constraint checker
 from src.candidate.constraints import enforce_center_constraint  # 导入中心约束函数 / Import center constraint helper
-from src.candidate.constraints import repair_neighbor_constraint  # 导入约束修复函数 / Import constraint repair helper
+from src.candidate.constraints import repair_continuous_neighbor_constraint  # 导入连续约束修复 / Import continuous constraint repair helper
 
 
 def generate_random_H(grid_size: int, levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator | None = None) -> np.ndarray:  # 生成随机厚度矩阵 / Generate random thickness matrix
     random_gen = rng or np.random.default_rng()  # 创建随机数生成器 / Create random generator
-    H = random_gen.choice(np.asarray(levels, dtype=float), size=(grid_size, grid_size))  # 随机选择厚度等级 / Randomly choose thickness levels
+    H = random_gen.uniform(float(min(levels)), float(max(levels)), size=(grid_size, grid_size))  # 随机生成连续厚度 / Randomly generate continuous thicknesses
     center_cells = center_cells_for_grid(grid_size)  # 获取中心单元 / Get center cells
     H = enforce_center_constraint(H, center_cells, default_thickness)  # 固定中心厚度 / Fix center thickness
-    H = repair_neighbor_constraint(H, levels, max_neighbor_diff, fixed_cells=center_cells)  # 修复相邻厚度约束 / Repair neighbour constraint
+    H = repair_candidate_matrix(H, levels, max_neighbor_diff, center_cells)  # 修复连续相邻厚度约束 / Repair continuous neighbour constraint
     H = enforce_center_constraint(H, center_cells, default_thickness)  # 再次固定中心厚度 / Fix center thickness again
-    H = repair_neighbor_constraint(H, levels, max_neighbor_diff, fixed_cells=center_cells)  # 修复中心固定后的邻居 / Repair neighbours after centre fixing
+    H = repair_candidate_matrix(H, levels, max_neighbor_diff, center_cells)  # 修复中心固定后的邻居 / Repair neighbours after centre fixing
     if not check_neighbor_constraint(H, max_neighbor_diff):  # 检查最终约束 / Check final constraint
         raise ValueError("Generated matrix violates neighbour constraint. / 生成矩阵不满足相邻约束。")  # 抛出错误 / Raise error
     return H  # 返回厚度矩阵 / Return thickness matrix
@@ -41,12 +41,15 @@ def load_parent_matrices(candidates_dir: Path, limit: int = 6) -> list[np.ndarra
     return parents  # 返回父代矩阵 / Return parent matrices
 
 
-def random_level_near(value: float, levels: list[float], rng: np.random.Generator) -> float:  # 在邻近厚度等级中采样 / Sample a nearby thickness level
-    level_array = np.asarray(levels, dtype=float)  # 转换厚度等级数组 / Convert thickness levels to array
-    current = int(np.argmin(np.abs(level_array - value)))  # 找当前最近等级 / Find nearest current level
-    low = max(0, current - 1)  # 计算下界索引 / Compute lower index
-    high = min(len(level_array) - 1, current + 1)  # 计算上界索引 / Compute upper index
-    return float(level_array[int(rng.integers(low, high + 1))])  # 返回邻近随机等级 / Return nearby random level
+def random_continuous_near(value: float, levels: list[float], rng: np.random.Generator) -> float:  # 在邻近连续厚度中采样 / Sample a nearby continuous thickness
+    low = float(min(levels))  # 读取最小厚度 / Read minimum thickness
+    high = float(max(levels))  # 读取最大厚度 / Read maximum thickness
+    span = max(high - low, 1.0e-9)  # 计算厚度跨度 / Compute thickness span
+    return float(np.clip(value + rng.normal(0.0, 0.10 * span), low, high))  # 返回连续扰动厚度 / Return continuously perturbed thickness
+
+
+def repair_candidate_matrix(H: np.ndarray, levels: list[float], max_neighbor_diff: float, fixed_cells: list[tuple[int, int]], passes: int = 24) -> np.ndarray:  # 修复连续候选厚度矩阵 / Repair continuous candidate thickness matrix
+    return repair_continuous_neighbor_constraint(H, float(min(levels)), float(max(levels)), max_neighbor_diff, passes=passes, fixed_cells=fixed_cells)  # 调用连续约束修复 / Call continuous constraint repair
 
 
 def generate_evolutionary_H(parents: list[np.ndarray], levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator) -> np.ndarray:  # 生成进化候选矩阵 / Generate evolutionary candidate matrix
@@ -59,13 +62,13 @@ def generate_evolutionary_H(parents: list[np.ndarray], levels: list[float], defa
     mutation_rate = 0.10  # 设置变异率 / Set mutation rate
     mutation_mask = rng.random(child.shape) < mutation_rate  # 创建变异掩膜 / Build mutation mask
     for row, col in np.argwhere(mutation_mask):  # 遍历变异单元 / Iterate mutated cells
-        child[row, col] = random_level_near(float(child[row, col]), levels, rng)  # 设置邻近变异厚度 / Set nearby mutated thickness
+        child[row, col] = random_continuous_near(float(child[row, col]), levels, rng)  # 设置连续邻近变异厚度 / Set nearby continuous mutated thickness
     center_cells = center_cells_for_grid(child.shape[0])  # 获取中心单元 / Get center cells
     child = enforce_center_constraint(child, center_cells, default_thickness)  # 固定中心厚度 / Fix center thickness
-    child = repair_neighbor_constraint(child, levels, max_neighbor_diff, fixed_cells=center_cells)  # 修复相邻约束 / Repair neighbour constraint
+    child = repair_candidate_matrix(child, levels, max_neighbor_diff, center_cells)  # 修复连续相邻约束 / Repair continuous neighbour constraint
     child = enforce_center_constraint(child, center_cells, default_thickness)  # 再次固定中心 / Fix centre again
     if not check_neighbor_constraint(child, max_neighbor_diff):  # 检查最终约束 / Check final constraint
-        child = repair_neighbor_constraint(child, levels, max_neighbor_diff, passes=24, fixed_cells=center_cells)  # 加强修复 / Run stronger repair
+        child = repair_candidate_matrix(child, levels, max_neighbor_diff, center_cells, passes=32)  # 加强连续修复 / Run stronger continuous repair
     return child  # 返回子代矩阵 / Return child matrix
 
 
@@ -126,11 +129,11 @@ def angular_design_bias(grid_size: int, phase: float) -> np.ndarray:  # 生成�
     return normalise_design_map(np.sin(3.0 * angle + phase))  # 返回三瓣角向图 / Return three-lobed angular map
 
 
-def quantise_guidance_to_levels(guidance: np.ndarray, levels: list[float]) -> np.ndarray:  # 将引导图量化为厚度等级 / Quantize guidance map to thickness levels
-    level_array = np.asarray(levels, dtype=float)  # 转为厚度等级数组 / Convert levels to array
-    scaled = normalise_design_map(guidance) * (len(level_array) - 1)  # 缩放到等级索引范围 / Scale to level-index range
-    indices = np.clip(np.rint(scaled).astype(int), 0, len(level_array) - 1)  # 四舍五入并限制索引 / Round and clamp indices
-    return level_array[indices]  # 返回厚度矩阵 / Return thickness matrix
+def guidance_to_continuous_thickness(guidance: np.ndarray, levels: list[float]) -> np.ndarray:  # 将引导图映射为连续厚度 / Map guidance map to continuous thicknesses
+    low = float(min(levels))  # 读取最小厚度 / Read minimum thickness
+    high = float(max(levels))  # 读取最大厚度 / Read maximum thickness
+    scaled = low + normalise_design_map(guidance) * (high - low)  # 缩放到连续厚度范围 / Scale to continuous thickness range
+    return np.round(np.clip(scaled, low, high), 3)  # 返回三位小数厚度矩阵 / Return thickness matrix rounded to 0.001 mm
 
 
 def build_target_guidance_variants(target_grid: np.ndarray, rng: np.random.Generator) -> list[tuple[str, np.ndarray]]:  # 构建目标感知设计变体 / Build target-aware design variants
@@ -150,12 +153,10 @@ def build_target_guidance_variants(target_grid: np.ndarray, rng: np.random.Gener
 
 
 def blend_parent_with_guidance(parent: np.ndarray, guidance: np.ndarray, levels: list[float], rng: np.random.Generator) -> np.ndarray:  # 将父代与目标引导混合 / Blend parent design with target guidance
-    level_array = np.asarray(levels, dtype=float)  # 转为厚度等级数组 / Convert levels to array
-    guided = quantise_guidance_to_levels(guidance, levels)  # 量化目标引导图 / Quantize target guidance
+    guided = guidance_to_continuous_thickness(guidance, levels)  # 映射目标引导到连续厚度 / Map target guidance to continuous thickness
     blend = float(rng.uniform(0.35, 0.70))  # 随机选择引导强度 / Randomly choose guidance strength
     mixed = (1.0 - blend) * parent + blend * guided  # 混合父代和引导图 / Mix parent and guidance map
-    indices = np.argmin(np.abs(mixed[..., None] - level_array), axis=2)  # 找最近厚度等级 / Find nearest thickness levels
-    return level_array[indices]  # 返回量化混合矩阵 / Return quantized mixed matrix
+    return np.round(np.clip(mixed, float(min(levels)), float(max(levels))), 3)  # 返回连续混合矩阵 / Return continuous mixed matrix
 
 
 def matrix_to_guidance(H: np.ndarray, levels: list[float]) -> np.ndarray:  # 将厚度矩阵转为 0-1 引导图 / Convert thickness matrix to 0-1 guidance map
@@ -245,15 +246,15 @@ def response_error_guidance(record: dict, variant_index: int, levels: list[float
 def generate_response_guided_H(records: list[dict], index: int, levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 生成闭环响应引导厚度矩阵 / Generate closed-loop response-guided thickness matrix
     record = records[index % len(records)]  # 选择响应记录 / Select response record
     guidance, variant = response_error_guidance(record, index, levels, rng)  # 生成误差引导图 / Build error guidance map
-    H = quantise_guidance_to_levels(guidance, levels)  # 量化为厚度等级 / Quantize to thickness levels
+    H = guidance_to_continuous_thickness(guidance, levels)  # 映射为连续厚度 / Map to continuous thicknesses
     center_cells = center_cells_for_grid(H.shape[0])  # 获取中心单元 / Get center cells
     fixed_cells = set(center_cells)  # 创建固定中心集合 / Create fixed center set
     mutation_mask = rng.random(H.shape) < 0.08  # 创建闭环探索变异掩膜 / Build closed-loop exploration mutation mask
     for row, col in np.argwhere(mutation_mask):  # 遍历变异单元 / Iterate mutated cells
         if (int(row), int(col)) not in fixed_cells:  # 跳过固定中心单元 / Skip fixed centre cells
-            H[row, col] = random_level_near(float(H[row, col]), levels, rng)  # 执行邻近变异 / Apply nearby mutation
+            H[row, col] = random_continuous_near(float(H[row, col]), levels, rng)  # 执行连续邻近变异 / Apply nearby continuous mutation
     H = enforce_center_constraint(H, center_cells, default_thickness)  # 固定中心厚度 / Fix centre thickness
-    H = repair_neighbor_constraint(H, levels, max_neighbor_diff, passes=32, fixed_cells=center_cells)  # 强化修复相邻约束 / Strongly repair neighbour constraints
+    H = repair_candidate_matrix(H, levels, max_neighbor_diff, center_cells, passes=32)  # 强化修复连续相邻约束 / Strongly repair continuous neighbour constraints
     H = enforce_center_constraint(H, center_cells, default_thickness)  # 再次固定中心 / Fix centre again
     return H, f"{variant}_from_{record['candidate_id']}"  # 返回矩阵和来源 / Return matrix and source
 
@@ -268,18 +269,158 @@ def generate_target_guided_H(target_grid: np.ndarray, index: int, parents: list[
         H = blend_parent_with_guidance(parent, guided, levels, rng)  # 混合父代和目标引导 / Blend parent and target guidance
         variant_name = f"parent_{variant_name}"  # 标记父代混合变体 / Mark parent-blended variant
     else:  # 处理无父代或早期候选 / Handle no-parent or early candidate
-        H = quantise_guidance_to_levels(guided, levels)  # 直接量化引导图 / Directly quantize guidance map
+        H = guidance_to_continuous_thickness(guided, levels)  # 直接映射连续引导图 / Directly map continuous guidance map
     center_cells = center_cells_for_grid(H.shape[0])  # 获取中心单元 / Get center cells
     mutation_rate = 0.06 if parents else 0.10  # 设置变异率 / Set mutation rate
     mutation_mask = rng.random(H.shape) < mutation_rate  # 创建变异掩膜 / Build mutation mask
     fixed_cells = set(center_cells)  # 创建中心固定集合 / Create fixed center-cell set
     for row, col in np.argwhere(mutation_mask):  # 遍历变异单元 / Iterate mutated cells
         if (int(row), int(col)) not in fixed_cells:  # 跳过中心固定单元 / Skip fixed center cells
-            H[row, col] = random_level_near(float(H[row, col]), levels, rng)  # 执行邻近厚度变异 / Apply nearby thickness mutation
+            H[row, col] = random_continuous_near(float(H[row, col]), levels, rng)  # 执行连续邻近厚度变异 / Apply nearby continuous thickness mutation
     H = enforce_center_constraint(H, center_cells, default_thickness)  # 固定中心厚度 / Fix center thickness
-    H = repair_neighbor_constraint(H, levels, max_neighbor_diff, passes=24, fixed_cells=center_cells)  # 修复相邻厚度约束 / Repair neighbour thickness constraint
+    H = repair_candidate_matrix(H, levels, max_neighbor_diff, center_cells, passes=24)  # 修复连续相邻厚度约束 / Repair continuous neighbour thickness constraint
     H = enforce_center_constraint(H, center_cells, default_thickness)  # 再次固定中心 / Fix centre again
     return H, variant_name  # 返回矩阵和变体名 / Return matrix and variant name
+
+
+def load_surrogate_history(candidates_dir: Path, limit: int = 120) -> list[dict]:  # 读取历史评分样本 / Load historical scored samples
+    history = []  # 创建历史样本列表 / Create history sample list
+    for score_path in sorted(candidates_dir.glob("candidate_*_*/score.json")):  # 遍历候选评分文件 / Iterate candidate score files
+        matrix_path = score_path.parent / "H.csv"  # 构造厚度矩阵路径 / Build thickness matrix path
+        if not matrix_path.exists():  # 检查厚度矩阵是否存在 / Check whether thickness matrix exists
+            continue  # 跳过缺失矩阵 / Skip missing matrix
+        with score_path.open("r", encoding="utf-8") as file_obj:  # 打开评分文件 / Open score file
+            score = json.load(file_obj)  # 读取评分 JSON / Read score JSON
+        if "best_area_similarity" not in score or "best_precision" not in score:  # 检查是否为新版评分 / Check whether score uses current metrics
+            continue  # 跳过旧评分样本 / Skip old-score samples
+        final_score = float(score.get("final_score", -999.0))  # 读取最终评分 / Read final score
+        if np.isfinite(final_score):  # 检查评分是否有效 / Check whether score is finite
+            history.append({"candidate_id": score_path.parent.name, "H": np.loadtxt(matrix_path, delimiter=","), "score": final_score})  # 保存历史样本 / Store historical sample
+    return sorted(history, key=lambda item: item["score"], reverse=True)[:limit]  # 返回高分优先历史 / Return high-score-first history
+
+
+def surrogate_vector(H: np.ndarray, levels: list[float]) -> np.ndarray:  # 构建代理模型输入向量 / Build surrogate-model input vector
+    return matrix_to_guidance(H, levels).ravel()  # 返回归一化厚度向量 / Return normalized thickness vector
+
+
+def fit_score_surrogate(history: list[dict], levels: list[float]) -> dict | None:  # 拟合轻量岭回归代理模型 / Fit lightweight ridge-regression surrogate model
+    if len(history) < 6:  # 检查样本数量是否足够 / Check whether enough samples exist
+        return None  # 样本太少时不使用代理 / Do not use surrogate with too few samples
+    X = np.vstack([surrogate_vector(item["H"], levels) for item in history])  # 构建输入矩阵 / Build input matrix
+    y = np.asarray([float(item["score"]) for item in history], dtype=float)  # 构建评分向量 / Build score vector
+    x_mean = X.mean(axis=0)  # 计算输入均值 / Compute input mean
+    y_mean = float(y.mean())  # 计算评分均值 / Compute score mean
+    Xc = X - x_mean  # 中心化输入 / Center input matrix
+    yc = y - y_mean  # 中心化评分 / Center score vector
+    alpha = 0.08 + 0.02 * X.shape[1] / max(X.shape[0], 1)  # 设置岭回归正则 / Set ridge regularization
+    kernel = Xc @ Xc.T + alpha * np.eye(Xc.shape[0])  # 构造对偶岭回归矩阵 / Build dual ridge matrix
+    weights = np.linalg.solve(kernel, yc)  # 求解对偶权重 / Solve dual weights
+    coef = Xc.T @ weights  # 还原空间系数 / Recover feature-space coefficients
+    return {"x_mean": x_mean, "y_mean": y_mean, "y_min": float(y.min()), "y_max": float(y.max()), "coef": coef, "history_vectors": X, "history": history}  # 返回代理模型 / Return surrogate model
+
+
+def predict_surrogate_score(surrogate: dict, H: np.ndarray, levels: list[float]) -> float:  # 预测代理评分 / Predict surrogate score
+    vector = surrogate_vector(H, levels)  # 构建候选向量 / Build candidate vector
+    raw = float(surrogate["y_mean"] + np.dot(vector - surrogate["x_mean"], surrogate["coef"]))  # 计算原始预测 / Compute raw prediction
+    return float(np.clip(raw, surrogate["y_min"] - 0.15, surrogate["y_max"] + 0.15))  # 裁剪到合理外推范围 / Clip to reasonable extrapolation range
+
+
+def surrogate_novelty(surrogate: dict, H: np.ndarray, levels: list[float]) -> float:  # 计算候选新颖度 / Compute candidate novelty
+    vector = surrogate_vector(H, levels)  # 构建候选向量 / Build candidate vector
+    distances = np.sqrt(np.mean(np.square(surrogate["history_vectors"] - vector), axis=1))  # 计算到历史样本距离 / Compute distances to history samples
+    return float(np.clip(distances.min() / 0.35, 0.0, 1.0))  # 返回归一化新颖度 / Return normalized novelty
+
+
+def target_alignment_score(H: np.ndarray, target_grid: np.ndarray, levels: list[float]) -> float:  # 计算厚度场与目标的弱对齐分 / Compute weak alignment between thickness field and target
+    field = normalise_design_map(matrix_to_guidance(H, levels))  # 归一化厚度场 / Normalize thickness field
+    target = normalise_design_map(target_grid)  # 归一化目标图 / Normalize target map
+    inverse = 1.0 - target  # 构造反相目标 / Build inverse target
+    field_norm = max(float(np.linalg.norm(field.ravel())), 1.0e-9)  # 计算厚度范数 / Compute field norm
+    target_score = float(np.dot(field.ravel(), target.ravel()) / max(field_norm * float(np.linalg.norm(target.ravel())), 1.0e-9))  # 计算正相余弦 / Compute positive cosine
+    inverse_score = float(np.dot(field.ravel(), inverse.ravel()) / max(field_norm * float(np.linalg.norm(inverse.ravel())), 1.0e-9))  # 计算反相余弦 / Compute inverse cosine
+    return max(target_score, inverse_score)  # 返回两者较好值 / Return better alignment
+
+
+def surrogate_gradient_candidate(parent: np.ndarray, surrogate: dict, levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 沿代理模型梯度生成候选 / Generate candidate along surrogate-model gradient
+    guidance = matrix_to_guidance(parent, levels)  # 读取父代厚度引导 / Read parent thickness guidance
+    gradient = surrogate["coef"].reshape(parent.shape)  # 读取代理模型空间梯度 / Read surrogate spatial gradient
+    gradient = normalise_design_map(gradient) - 0.5  # 归一化梯度到正负范围 / Normalize gradient to signed range
+    signed = 1.0 if rng.random() < 0.65 else -1.0  # 随机选择正向或反向探索 / Randomly choose forward or reverse exploration
+    guidance = normalise_design_map(guidance + signed * rng.uniform(0.25, 0.55) * gradient + rng.normal(0.0, 0.08, size=parent.shape))  # 合成代理梯度引导 / Combine surrogate-gradient guidance
+    H = guidance_to_continuous_thickness(guidance, levels)  # 映射为连续厚度 / Map to continuous thicknesses
+    center_cells = center_cells_for_grid(H.shape[0])  # 获取中心单元 / Get center cells
+    H = enforce_center_constraint(H, center_cells, default_thickness)  # 固定中心厚度 / Fix center thickness
+    H = repair_candidate_matrix(H, levels, max_neighbor_diff, center_cells, passes=32)  # 修复连续相邻约束 / Repair continuous neighbour constraints
+    H = enforce_center_constraint(H, center_cells, default_thickness)  # 再次固定中心 / Fix centre again
+    return H, "surrogate_gradient" if signed > 0 else "surrogate_reverse_gradient"  # 返回候选和名称 / Return candidate and name
+
+
+def choose_pool_parent(history: list[dict], parents: list[np.ndarray], rng: np.random.Generator) -> np.ndarray:  # 选择代理池父代 / Choose parent for surrogate pool
+    if history and rng.random() < 0.75:  # 优先使用高分历史样本 / Prefer high-scoring history samples
+        return history[int(rng.integers(0, min(len(history), 8)))]["H"]  # 返回高分历史矩阵 / Return high-score history matrix
+    if parents:  # 检查是否有进化父代 / Check whether evolutionary parents exist
+        return parents[int(rng.integers(0, len(parents)))]  # 返回进化父代 / Return evolutionary parent
+    return generate_random_H(15, levels=[0.6, 0.8, 0.9, 1.0, 1.3, 1.4, 1.8, 2.0], default_thickness=1.0, max_neighbor_diff=0.7, rng=rng)  # 返回兜底随机矩阵 / Return fallback random matrix
+
+
+def build_surrogate_pool_candidate(pool_index: int, surrogate: dict, history: list[dict], response_records: list[dict], parents: list[np.ndarray], target_grid: np.ndarray, levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 构建代理候选池成员 / Build one surrogate candidate-pool member
+    kind = pool_index % 6  # 选择候选来源类型 / Select candidate source type
+    if response_records and kind in {0, 1}:  # 优先使用真实响应闭环候选 / Prefer real-response closed-loop candidates
+        return generate_response_guided_H(response_records, pool_index, levels, default_thickness, max_neighbor_diff, rng)  # 返回闭环候选 / Return closed-loop candidate
+    if kind == 2:  # 使用目标感知候选 / Use target-aware candidate
+        return generate_target_guided_H(target_grid, pool_index, parents, levels, default_thickness, max_neighbor_diff, rng)  # 返回目标感知候选 / Return target-aware candidate
+    if kind in {3, 4}:  # 使用代理梯度候选 / Use surrogate-gradient candidate
+        return surrogate_gradient_candidate(choose_pool_parent(history, parents, rng), surrogate, levels, default_thickness, max_neighbor_diff, rng)  # 返回代理梯度候选 / Return surrogate-gradient candidate
+    return generate_evolutionary_H([item["H"] for item in history[:8]], levels, default_thickness, max_neighbor_diff, rng), "surrogate_evolutionary_pool"  # 返回代理池进化候选 / Return surrogate-pool evolutionary candidate
+
+
+def is_diverse_candidate(H: np.ndarray, selected: list[tuple[np.ndarray, str]], levels: list[float], threshold: float = 0.055) -> bool:  # 判断候选是否足够多样 / Decide whether candidate is diverse enough
+    if not selected:  # 检查是否尚无已选候选 / Check whether no candidates are selected yet
+        return True  # 第一个候选总是保留 / Always keep first candidate
+    vector = surrogate_vector(H, levels)  # 构建候选向量 / Build candidate vector
+    distances = [float(np.sqrt(np.mean(np.square(vector - surrogate_vector(other, levels))))) for other, _ in selected]  # 计算到已选候选距离 / Compute distances to selected candidates
+    return min(distances) >= threshold  # 返回是否超过阈值 / Return whether distance exceeds threshold
+
+
+def proposal_source_key(name: str) -> str:  # 提取代理提案来源类型 / Extract surrogate proposal source type
+    return name.split("_from_")[0].split("_pred_")[0]  # 返回去掉来源和预测后缀的名称 / Return name without source and prediction suffix
+
+
+def kl_proxy_candidate_score(H: np.ndarray, target_grid: np.ndarray, config: dict) -> float:  # 计算 KL 代理候选分 / Compute KL proxy candidate score
+    from src.physics.kirchhoff_love import score_thickness_with_kl_proxy  # 局部导入 KL 代理评分 / Locally import KL proxy scoring
+    return float(score_thickness_with_kl_proxy(H, target_grid, config, num_modes=6)["kl_proxy_score"])  # 返回 KL 代理分数 / Return KL proxy score
+
+
+def generate_surrogate_proposals(config: dict, candidates_dir: Path, target_grid: np.ndarray | None, response_records: list[dict], parents: list[np.ndarray], levels: list[float], default_thickness: float, max_neighbor_diff: float, population: int, rng: np.random.Generator) -> list[tuple[np.ndarray, str]]:  # 生成代理优化提案 / Generate surrogate-optimised proposals
+    if target_grid is None:  # 检查目标网格是否存在 / Check whether target grid exists
+        return []  # 无目标则不使用代理 / Do not use surrogate without target
+    history = load_surrogate_history(candidates_dir)  # 读取历史评分样本 / Load historical scored samples
+    surrogate = fit_score_surrogate(history, levels)  # 拟合代理模型 / Fit surrogate model
+    if surrogate is None:  # 检查代理模型是否可用 / Check whether surrogate is available
+        return []  # 样本不足则返回空 / Return empty when samples are insufficient
+    pool = []  # 创建候选池 / Create candidate pool
+    pool_size = max(72, population * 28)  # 设置虚拟候选池大小 / Set virtual candidate-pool size
+    for pool_index in range(pool_size):  # 遍历虚拟候选 / Iterate virtual candidates
+        H, name = build_surrogate_pool_candidate(pool_index, surrogate, history, response_records, parents, target_grid, levels, default_thickness, max_neighbor_diff, rng)  # 生成池候选 / Generate pool candidate
+        predicted = predict_surrogate_score(surrogate, H, levels)  # 预测候选分数 / Predict candidate score
+        novelty = surrogate_novelty(surrogate, H, levels)  # 计算候选新颖度 / Compute candidate novelty
+        alignment = target_alignment_score(H, target_grid, levels)  # 计算弱目标对齐 / Compute weak target alignment
+        kl_score = kl_proxy_candidate_score(H, target_grid, config)  # 计算 KL 离散特征代理分 / Compute KL discrete-eigen proxy score
+        acquisition = predicted + 0.18 * novelty + 0.04 * alignment + 0.35 * kl_score  # 合成采集函数 / Combine acquisition function
+        pool.append((acquisition, predicted, novelty, kl_score, H, name))  # 保存池候选 / Store pool candidate
+    selected = []  # 创建已选提案列表 / Create selected proposal list
+    source_counts = {}  # 创建来源计数字典 / Create source-count dictionary
+    source_limit = max(1, population // 2)  # 设置单一来源上限 / Set per-source limit
+    for acquisition, predicted, novelty, kl_score, H, name in sorted(pool, key=lambda item: item[0], reverse=True):  # 按采集函数排序 / Sort by acquisition value
+        source = proposal_source_key(name)  # 提取提案来源 / Extract proposal source
+        if source_counts.get(source, 0) >= source_limit:  # 检查来源是否过度集中 / Check whether one source is overused
+            continue  # 跳过过度集中的来源 / Skip overused source
+        if is_diverse_candidate(H, selected, levels):  # 检查候选多样性 / Check candidate diversity
+            selected.append((H, f"{name}_pred_{predicted:.3f}_kl_{kl_score:.3f}_novel_{novelty:.2f}"))  # 保存多样候选 / Store diverse candidate
+            source_counts[source] = source_counts.get(source, 0) + 1  # 更新来源计数 / Update source count
+        if len(selected) >= population:  # 检查是否已满足数量 / Check whether enough proposals are selected
+            break  # 停止选择 / Stop selecting
+    return selected if len(selected) >= population else [(item[4], f"{item[5]}_fallback") for item in sorted(pool, key=lambda row: row[0], reverse=True)[:population]]  # 返回提案或兜底高分池 / Return proposals or fallback top pool
 
 
 def save_H_csv(H: np.ndarray, path: str | Path) -> None:  # 保存厚度矩阵 CSV / Save thickness matrix CSV
@@ -298,7 +439,7 @@ def save_candidate(candidate_dir: str | Path, H: np.ndarray, metadata: dict) -> 
 
 def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  # 生成一批候选 / Generate a batch of candidates
     grid_size = int(config["project"]["grid_size"])  # 读取网格尺寸 / Read grid size
-    levels = list(config["thickness"]["levels_mm"])  # 读取厚度等级 / Read thickness levels
+    levels = [float(config["thickness"].get("min_mm", min(config["thickness"]["levels_mm"]))), float(config["thickness"].get("max_mm", max(config["thickness"]["levels_mm"])))]  # 读取连续厚度边界 / Read continuous thickness bounds
     default = float(config["thickness"]["default_mm"])  # 读取默认厚度 / Read default thickness
     max_diff = float(config["thickness"]["max_neighbor_difference_mm"])  # 读取最大相邻差 / Read max neighbour difference
     population = int(config["optimisation"]["population_size"])  # 读取候选数量 / Read population size
@@ -308,12 +449,16 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
     parents = load_parent_matrices(candidates_dir) if method == "evolutionary_search" and generation > 0 else []  # 读取进化父代 / Load evolutionary parents
     target_grid = load_target_binary_grid(config, grid_size)  # 读取目标感知网格 / Load target-aware grid
     response_records = load_response_guidance_records(config, candidates_dir, target_grid) if target_grid is not None else []  # 读取真实响应闭环记录 / Load real-response closed-loop records
+    surrogate_proposals = generate_surrogate_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成代理模型优化提案 / Generate surrogate-model optimized proposals
     response_count = max(min(population, len(response_records) * 2), int(population * 0.75)) if response_records else 0  # 计算闭环响应候选数量 / Compute response-guided candidate count
     target_count = max(response_count, max(min(population, 6), int(population * 0.90 if response_records else population * 0.75))) if target_grid is not None else 0  # 计算目标感知候选数量 / Compute target-aware candidate count
     candidate_ids = []  # 创建候选编号列表 / Create candidate id list
     for index in range(population):  # 遍历候选编号 / Iterate candidate index
         candidate_id = f"candidate_{generation:03d}_{index:04d}"  # 构造候选编号 / Build candidate id
-        if response_records and index < response_count:  # 优先生成闭环响应引导候选 / Prefer closed-loop response-guided candidates
+        if index < len(surrogate_proposals):  # 优先使用代理模型优化提案 / Prefer surrogate-model optimized proposals
+            H, variant_name = surrogate_proposals[index]  # 读取代理提案 / Read surrogate proposal
+            created_by = "surrogate_guided_inverse_search"  # 设置生成来源 / Set creation source
+        elif response_records and index < response_count:  # 其次生成闭环响应引导候选 / Then generate closed-loop response-guided candidates
             H, variant_name = generate_response_guided_H(response_records, index, levels, default, max_diff, rng)  # 生成闭环响应引导矩阵 / Generate response-guided matrix
             created_by = "response_guided_inverse_search"  # 设置生成来源 / Set creation source
         elif target_grid is not None and index < target_count:  # 其次生成目标感知候选 / Then generate target-aware candidates
@@ -323,7 +468,7 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
             H = generate_evolutionary_H(parents, levels, default, max_diff, rng) if parents else generate_random_H(grid_size, levels, default, max_diff, rng)  # 生成探索矩阵 / Generate exploration matrix
             variant_name = "evolutionary_explorer" if parents else "random_explorer"  # 设置探索变体名 / Set explorer variant name
             created_by = "evolutionary_search" if parents else "random_search"  # 设置生成来源 / Set creation source
-        metadata = {"candidate_id": candidate_id, "generation": generation, "grid_size": grid_size, "thickness_levels_mm": levels, "center_fixed": True, "created_by": created_by, "target_guidance_variant": variant_name, "target_guided": target_grid is not None}  # 记录元数据 / Record metadata
+        metadata = {"candidate_id": candidate_id, "generation": generation, "grid_size": grid_size, "thickness_mode": "continuous", "thickness_bounds_mm": levels, "center_fixed": True, "created_by": created_by, "target_guidance_variant": variant_name, "target_guided": target_grid is not None}  # 记录元数据 / Record metadata
         save_candidate(candidates_dir / candidate_id, H, metadata)  # 保存候选 / Save candidate
         candidate_ids.append(candidate_id)  # 添加候选编号 / Add candidate id
     return candidate_ids  # 返回候选编号 / Return candidate ids

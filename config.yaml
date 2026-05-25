@@ -8,6 +8,10 @@ project:
 
 # 厚度设计变量 / Thickness design variables
 thickness:
+  design_mode: "continuous" # 厚度优化模式 / Thickness optimisation mode
+  min_mm: 0.6 # 连续厚度下限 / Continuous thickness lower bound
+  max_mm: 2.0 # 连续厚度上限 / Continuous thickness upper bound
+  resolution_mm: 0.001 # 连续厚度输出分辨率 / Continuous thickness output resolution
   levels_mm: [0.6, 0.8, 0.9, 1.0, 1.3, 1.4, 1.8, 2.0] # 可制造厚度等级 / Manufacturable thickness levels
   default_mm: 2.0 # 默认厚度 / Default thickness
   max_neighbor_difference_mm: 1.0 # 相邻单元最大厚度差 / Maximum neighbour thickness difference

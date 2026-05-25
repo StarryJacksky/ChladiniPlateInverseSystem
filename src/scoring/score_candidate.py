@@ -58,7 +58,7 @@ def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], ima
 
 
 def compute_final_score(H: np.ndarray, mode_score: dict, frequency: float, config: dict) -> dict:  # 计算最终分数 / Compute final score
-    levels = config["thickness"]["levels_mm"]  # 读取厚度等级 / Read thickness levels
+    levels = [float(config["thickness"].get("min_mm", min(config["thickness"]["levels_mm"]))), float(config["thickness"].get("max_mm", max(config["thickness"]["levels_mm"])))]  # 读取厚度边界 / Read thickness bounds
     rough = normalized_roughness_penalty(H, min(levels), max(levels))  # 计算归一化粗糙度惩罚 / Compute normalized roughness penalty
     mass = mass_penalty(H, min(levels), max(levels))  # 计算质量惩罚 / Compute mass penalty
     freq = frequency_penalty(frequency, float(config["simulation"]["frequency_min_hz"]), float(config["simulation"]["frequency_max_hz"]))  # 计算频率惩罚 / Compute frequency penalty
