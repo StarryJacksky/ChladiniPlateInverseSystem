@@ -17,12 +17,16 @@ Tasks:
 
 1. Unify visual hierarchy across Target, Tune, Results, and Run tabs.
    统一 Target、Tune、Results、Run 页签的视觉层级。
-2. Tighten spacing, typography, and empty states in Results and Run.
-   收紧 Results 和 Run 页的间距、文字层级和空状态。
-3. Keep the first screen as the usable workspace, not a marketing page.
+2. Keep the first screen as the usable workspace, not a marketing page.
    保持首屏是可用工作区，而不是营销页面。
-4. Verify desktop and narrow layouts in the browser after each visible change.
+3. Verify desktop and narrow layouts in the browser after local server approval is available.
    每次可见改动后，用浏览器检查桌面和窄屏布局。
+
+Recently completed:
+最近完成：
+
+- Run Overview now includes a clear next-action strip so users know whether to run Smoke, Discover paths, check model files, or run Self-test.
+  Run Overview 现在包含清楚的下一步操作提示，让用户知道应该运行 Smoke、发现路径、检查模型文件还是运行 Self-test。
 
 ### 2. Frontend Function Completion / 前端功能补齐
 
@@ -82,9 +86,7 @@ Tasks:
    安装流程优先使用已运行进程，其次查找常见安装目录，最后才进入手动覆盖。
 2. Add manual override fields to the setup wizard when discovery fails.
    当自动发现失败时，在安装向导中提供手动覆盖字段。
-3. Add clearer authentication/license guidance when diagnostics detect risk.
-   当诊断发现风险时，提供更清楚的认证/license 指引。
-4. Keep generated artifacts recoverable and cleanup conservative.
+3. Keep generated artifacts recoverable and cleanup conservative.
    保持生成产物可恢复，清理逻辑保守。
 
 Recently completed:
@@ -96,6 +98,8 @@ Recently completed:
   已完成安装路径样例、配置路径缺失和运行进程优先级的自动发现测试。
 - Non-invasive COMSOL/MATLAB version hints now recognise macOS, Windows, and Linux install-path formats.
   非侵入式 COMSOL/MATLAB 版本提示现在可识别 macOS、Windows 和 Linux 安装路径格式。
+- License diagnostics now tell users to open COMSOL/MATLAB once after install to confirm login or license state.
+  license 诊断现在会提醒用户安装后先打开 COMSOL/MATLAB 一次，以确认登录或授权状态。
 
 ### 5. Documentation Drafts / 文档开发版
 

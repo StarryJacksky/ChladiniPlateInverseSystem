@@ -229,7 +229,7 @@ def check_license_environment() -> dict:  # 检查常见 license 环境变量 / 
     keys = ["LM_LICENSE_FILE", "MLM_LICENSE_FILE", "COMSOL_LICENSE_FILE"]  # 定义常见 license 变量 / Define common license variables
     present = [key for key in keys if os.environ.get(key)]  # 查找已设置变量 / Find configured variables
     ok = bool(present)  # 判断是否有变量 / Decide whether any variable exists
-    message = f"License variables set: {', '.join(present)}. / 已设置 license 变量：{', '.join(present)}。" if ok else "No common license environment variable detected; local login/license files may still work. / 未检测到常见 license 环境变量；本机登录或 license 文件仍可能可用。"  # 生成 license 消息 / Build license message
+    message = f"License variables set: {', '.join(present)}; still open COMSOL/MATLAB once after install to confirm login. / 已设置 license 变量：{', '.join(present)}；安装后仍建议先打开 COMSOL/MATLAB 确认登录。" if ok else "No common license environment variable detected; named-user login or local license files may still work, but open COMSOL/MATLAB once before full automation. / 未检测到常见 license 环境变量；命名用户登录或本机 license 文件仍可能可用，但完整自动化前请先打开 COMSOL/MATLAB 一次。"  # 生成 license 消息 / Build license message
     return self_test_item("License environment hint", ok, message, "", False)  # 返回可选 license 检查 / Return optional license check
 
 
