@@ -133,3 +133,9 @@ Check conservative artifact cleanup behavior:
 ```powershell
 python scripts/check_artifact_cleanup.py
 ```
+
+Run the local quality bundle:
+
+```powershell
+python scripts/check_local_quality.py
+```

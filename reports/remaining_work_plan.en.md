@@ -82,6 +82,7 @@ Tasks:
 Recently completed:
 
 - Added a documentation link checker so README and guide entry links can be validated automatically.
+- Added one local quality bundle command that runs documentation, comments, config, discovery, cleanup, smoke, compile, and frontend syntax checks.
 
 ### 6. Python-Only Smoke Test Path
 

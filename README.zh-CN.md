@@ -133,3 +133,9 @@ python scripts/check_docs_links.py
 ```powershell
 python scripts/check_artifact_cleanup.py
 ```
+
+运行本地质量检查合集：
+
+```powershell
+python scripts/check_local_quality.py
+```

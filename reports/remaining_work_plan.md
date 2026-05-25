@@ -125,6 +125,8 @@ Recently completed:
 
 - Added a documentation link checker so README and guide entry links can be validated automatically.
   已新增文档链接检查脚本，可自动验证 README 和指南入口链接。
+- Added one local quality bundle command that runs documentation, comments, config, discovery, cleanup, smoke, compile, and frontend syntax checks.
+  已新增一个本地质量检查合集命令，可运行文档、注释、配置、发现、清理、烟测、编译和前端语法检查。
 
 ### 6. Python-Only Smoke Test Path / 无 COMSOL 烟测路径
 
