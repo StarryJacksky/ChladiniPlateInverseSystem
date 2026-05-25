@@ -64,5 +64,13 @@ def roughness_penalty(H: np.ndarray) -> float:  # 计算粗糙度惩罚 / Comput
     return float(row_penalty + col_penalty)  # 返回总惩罚 / Return total penalty
 
 
+def normalized_roughness_penalty(H: np.ndarray, h_min: float, h_max: float) -> float:  # 计算归一化粗糙度惩罚 / Compute normalized roughness penalty
+    raw = roughness_penalty(H)  # 计算原始粗糙度 / Compute raw roughness
+    rows, cols = H.shape  # 读取矩阵尺寸 / Read matrix shape
+    edge_count = rows * max(cols - 1, 0) + cols * max(rows - 1, 0)  # 计算相邻边数量 / Count neighbour edges
+    span = max(float(h_max) - float(h_min), 1.0e-9)  # 计算厚度范围 / Compute thickness span
+    return float(raw / max(edge_count * span * span, 1.0e-9))  # 返回 0 附近到 1 附近的惩罚 / Return near-0 to near-1 penalty
+
+
 def mass_penalty(H: np.ndarray, h_min: float, h_max: float) -> float:  # 计算质量惩罚 / Compute mass penalty
     return float((H.mean() - h_min) / (h_max - h_min))  # 返回归一化平均厚度 / Return normalised mean thickness

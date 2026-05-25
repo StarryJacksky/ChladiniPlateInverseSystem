@@ -56,7 +56,7 @@ optimisation:
   method: "evolutionary_search" # 搜索方法 / Search method
   population_size: 20 # 每批候选数量 / Candidates per batch
   num_iterations: 3 # 默认优化代数 / Default optimisation generations
-  roughness_weight: 0.05 # 粗糙度惩罚权重 / Roughness penalty weight
+  roughness_weight: 0.15 # 归一化粗糙度惩罚权重 / Normalized roughness penalty weight
   mass_weight: 0.01 # 质量惩罚权重 / Mass penalty weight
   frequency_weight: 0.01 # 频率惩罚权重 / Frequency penalty weight
 

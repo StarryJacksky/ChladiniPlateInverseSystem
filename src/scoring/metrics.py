@@ -30,6 +30,29 @@ def compute_overlap_balance(A: np.ndarray, B: np.ndarray) -> float:  # 计算覆
     return float(min(precision, recall))  # 返回较弱一侧作为平衡分 / Return weaker side as balance score
 
 
+def coarse_occupancy(binary: np.ndarray, cells: int = 16) -> np.ndarray:  # 计算粗网格占用图 / Compute coarse occupancy map
+    data = binary.astype(float)  # 转为浮点图 / Convert to float map
+    rows, cols = data.shape  # 读取图像尺寸 / Read image shape
+    row_edges = np.linspace(0, rows, cells + 1).astype(int)  # 构造行边界 / Build row edges
+    col_edges = np.linspace(0, cols, cells + 1).astype(int)  # 构造列边界 / Build column edges
+    occupancy = np.zeros((cells, cells), dtype=float)  # 创建占用矩阵 / Create occupancy matrix
+    for row in range(cells):  # 遍历粗网格行 / Iterate coarse rows
+        for col in range(cells):  # 遍历粗网格列 / Iterate coarse columns
+            block = data[row_edges[row]:row_edges[row + 1], col_edges[col]:col_edges[col + 1]]  # 读取局部块 / Read local block
+            occupancy[row, col] = float(block.mean()) if block.size else 0.0  # 保存占用比例 / Store occupancy ratio
+    return occupancy  # 返回粗网格占用 / Return coarse occupancy
+
+
+def layout_similarity(A: np.ndarray, B: np.ndarray, cells: int = 16) -> float:  # 计算粗布局相似度 / Compute coarse layout similarity
+    left = coarse_occupancy(A, cells).ravel()  # 计算第一张图占用向量 / Compute first occupancy vector
+    right = coarse_occupancy(B, cells).ravel()  # 计算第二张图占用向量 / Compute second occupancy vector
+    left_norm = float(np.linalg.norm(left))  # 计算第一向量范数 / Compute first vector norm
+    right_norm = float(np.linalg.norm(right))  # 计算第二向量范数 / Compute second vector norm
+    if left_norm == 0.0 or right_norm == 0.0:  # 检查空布局 / Check empty layout
+        return 0.0  # 空布局返回零 / Return zero for empty layout
+    return float(np.dot(left, right) / (left_norm * right_norm))  # 返回余弦相似度 / Return cosine similarity
+
+
 def chamfer_distance(binary: np.ndarray) -> np.ndarray:  # 计算到最近前景像素的近似距离 / Compute approximate distance to nearest foreground pixel
     data = binary.astype(bool)  # 转为布尔图 / Convert to boolean map
     height, width = data.shape  # 读取图像尺寸 / Read image shape
@@ -85,5 +108,5 @@ def frequency_penalty(frequency: float, f_min: float, f_max: float) -> float:  #
     return float((frequency - f_max) / max(f_max, 1.0))  # 返回高频惩罚 / Return high-frequency penalty
 
 
-def pattern_similarity(iou: float, dice: float, distance_similarity: float = 0.0, overlap_balance: float = 0.0) -> float:  # 合成图案相似度 / Combine pattern similarity
-    return float(0.2 * iou + 0.25 * dice + 0.25 * distance_similarity + 0.3 * overlap_balance)  # 返回加权相似度 / Return weighted similarity
+def pattern_similarity(iou: float, dice: float, distance_similarity: float = 0.0, overlap_balance: float = 0.0, layout: float = 0.0) -> float:  # 合成图案相似度 / Combine pattern similarity
+    return float(0.18 * iou + 0.22 * dice + 0.18 * distance_similarity + 0.24 * overlap_balance + 0.18 * layout)  # 返回加权相似度 / Return weighted similarity

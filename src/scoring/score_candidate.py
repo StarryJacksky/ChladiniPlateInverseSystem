@@ -6,7 +6,7 @@ from pathlib import Path  # 导入路径工具 / Import path utilities
 import numpy as np  # 导入数值计算库 / Import numerical library
 
 from src.candidate.constraints import mass_penalty  # 导入质量惩罚 / Import mass penalty
-from src.candidate.constraints import roughness_penalty  # 导入粗糙度惩罚 / Import roughness penalty
+from src.candidate.constraints import normalized_roughness_penalty  # 导入归一化粗糙度惩罚 / Import normalized roughness penalty
 from src.comsol.import_results import interpolate_to_grid  # 导入插值函数 / Import interpolation function
 from src.comsol.import_results import load_frequencies  # 导入频率读取 / Import frequency loader
 from src.comsol.import_results import load_mode_csv  # 导入模态读取 / Import mode loader
@@ -18,6 +18,7 @@ from src.scoring.metrics import compute_iou  # 导入 IoU 指标 / Import IoU me
 from src.scoring.metrics import compute_overlap_balance  # 导入覆盖平衡分数 / Import overlap balance score
 from src.scoring.metrics import chamfer_similarity  # 导入距离相似度 / Import distance similarity
 from src.scoring.metrics import frequency_penalty  # 导入频率惩罚 / Import frequency penalty
+from src.scoring.metrics import layout_similarity  # 导入布局相似度 / Import layout similarity
 from src.scoring.metrics import pattern_similarity  # 导入相似度合成 / Import similarity combiner
 
 
@@ -44,16 +45,17 @@ def score_candidate_modes(target_binary: np.ndarray, mode_files: list[Path], ima
         dice = compute_dice(nodal, target)  # 计算 Dice / Compute Dice
         distance = chamfer_similarity(nodal, target)  # 计算距离相似度 / Compute distance similarity
         overlap = compute_overlap_balance(nodal, target)  # 计算覆盖平衡 / Compute overlap balance
-        similarity = pattern_similarity(iou, dice, distance, overlap)  # 合成相似度 / Combine similarity
-        best["all_modes"].append({"mode": mode_number, "iou": iou, "dice": dice, "distance_similarity": distance, "overlap_balance": overlap, "similarity": similarity})  # 记录该模态结果 / Record this mode result
+        layout = layout_similarity(nodal, target)  # 计算粗布局相似度 / Compute coarse layout similarity
+        similarity = pattern_similarity(iou, dice, distance, overlap, layout)  # 合成相似度 / Combine similarity
+        best["all_modes"].append({"mode": mode_number, "iou": iou, "dice": dice, "distance_similarity": distance, "overlap_balance": overlap, "layout_similarity": layout, "similarity": similarity})  # 记录该模态结果 / Record this mode result
         if similarity > best["best_similarity"]:  # 检查是否是新最佳 / Check whether this is new best
-            best.update({"best_mode": mode_number, "best_iou": iou, "best_dice": dice, "best_distance_similarity": distance, "best_overlap_balance": overlap, "best_similarity": similarity})  # 更新最佳结果 / Update best result
+            best.update({"best_mode": mode_number, "best_iou": iou, "best_dice": dice, "best_distance_similarity": distance, "best_overlap_balance": overlap, "best_layout_similarity": layout, "best_similarity": similarity})  # 更新最佳结果 / Update best result
     return best  # 返回评分结果 / Return scoring result
 
 
 def compute_final_score(H: np.ndarray, mode_score: dict, frequency: float, config: dict) -> dict:  # 计算最终分数 / Compute final score
     levels = config["thickness"]["levels_mm"]  # 读取厚度等级 / Read thickness levels
-    rough = roughness_penalty(H)  # 计算粗糙度惩罚 / Compute roughness penalty
+    rough = normalized_roughness_penalty(H, min(levels), max(levels))  # 计算归一化粗糙度惩罚 / Compute normalized roughness penalty
     mass = mass_penalty(H, min(levels), max(levels))  # 计算质量惩罚 / Compute mass penalty
     freq = frequency_penalty(frequency, float(config["simulation"]["frequency_min_hz"]), float(config["simulation"]["frequency_max_hz"]))  # 计算频率惩罚 / Compute frequency penalty
     score = mode_score["best_similarity"] - config["optimisation"]["roughness_weight"] * rough - config["optimisation"]["mass_weight"] * mass - config["optimisation"]["frequency_weight"] * freq  # 合成最终分数 / Combine final score
