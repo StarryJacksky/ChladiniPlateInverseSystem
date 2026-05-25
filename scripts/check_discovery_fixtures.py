@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory  # 导入临时目录工具 / Import tem
 
 from src.comsol.discovery import canonical_executable_path  # 导入路径规范化函数 / Import path canonicalizer
 from src.comsol.discovery import config_with_runtime_discovery  # 导入运行时配置补全 / Import runtime config completion
+from src.comsol.discovery import decode_process_bytes  # 导入进程输出解码函数 / Import process-output decoder
 from src.comsol.discovery import discover_install_candidates  # 导入安装路径发现 / Import install path discovery
 from src.comsol.discovery import parse_process_lines  # 导入进程解析函数 / Import process parser
 from src.comsol.discovery import suggested_paths  # 导入路径建议函数 / Import path suggestion helper
@@ -108,6 +109,13 @@ def test_running_process_priority() -> None:  # 测试运行进程优先于安�
         assert_equal(suggestions["matlab_path"], str(process_matlab), "MATLAB process priority")  # 检查 MATLAB 优先级 / Check MATLAB priority
 
 
+def test_process_output_decoding() -> None:  # 测试进程输出容错解码 / Test tolerant process-output decoding
+    mac_text = decode_process_bytes(b"123 /Applications/COMSOL64/bin/comsol \xff bad\n")  # 解码混入坏字节的 POSIX 输出 / Decode POSIX output with bad bytes
+    assert_true("comsol" in mac_text.lower(), "macOS process decode lost COMSOL text")  # 检查文本保留 / Check text preserved
+    windows_text = decode_process_bytes("COMPUTER,1234,comsol.exe\r\n".encode("utf-16"))  # 解码 Windows UTF-16 输出 / Decode Windows UTF-16 output
+    assert_true("comsol.exe" in windows_text.lower(), "Windows process decode lost COMSOL text")  # 检查 Windows 文本 / Check Windows text
+
+
 def main() -> None:  # 主入口 / Main entry point
     test_macos_fixture()  # 运行 macOS 样例 / Run macOS fixture
     test_linux_fixture()  # 运行 Linux 样例 / Run Linux fixture
@@ -115,6 +123,7 @@ def main() -> None:  # 主入口 / Main entry point
     test_install_fixture()  # 运行安装路径样例 / Run install path fixture
     test_runtime_config_fill_from_install()  # 运行配置补全样例 / Run config completion fixture
     test_running_process_priority()  # 运行优先级样例 / Run priority fixture
+    test_process_output_decoding()  # 运行解码样例 / Run decoding fixture
     print("Discovery fixture checks passed. / 自动发现样例检查通过。")  # 打印成功信息 / Print success message
 
 

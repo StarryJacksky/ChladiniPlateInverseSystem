@@ -40,6 +40,17 @@ def process_list_commands() -> list[list[str]]:  # 构造跨平台进程列表�
     return [["ps", "-axo", "pid=,comm=,args="], ["pgrep", "-afil", "comsol|matlab|mphserver"]]  # 返回 POSIX 进程命令 / Return POSIX process commands
 
 
+def decode_process_bytes(data: bytes) -> str:  # 容错解码进程命令输出 / Decode process-command output safely
+    if not data:  # 检查空字节 / Check empty bytes
+        return ""  # 返回空文本 / Return empty text
+    if b"\x00" in data[:200]:  # 检查 Windows UTF-16 常见空字节 / Check common Windows UTF-16 null bytes
+        try:  # 尝试 UTF-16 解码 / Try UTF-16 decoding
+            return data.decode("utf-16", errors="replace")  # 返回 UTF-16 文本 / Return UTF-16 text
+        except UnicodeError:  # 处理异常编码情况 / Handle unusual encoding cases
+            pass  # 继续走 UTF-8 兜底 / Continue to UTF-8 fallback
+    return data.decode("utf-8", errors="replace")  # 用替换策略避免非 UTF-8 字节崩溃 / Avoid crashes on non-UTF-8 bytes with replacement
+
+
 def collect_process_lines() -> tuple[list[str], str, str]:  # 读取系统进程列表文本 / Read system process list text
     last_error = ""  # 记录最近错误 / Track latest error
     for command in process_list_commands():  # 遍历候选命令 / Iterate command candidates
@@ -47,14 +58,16 @@ def collect_process_lines() -> tuple[list[str], str, str]:  # 读取系统进程
             last_error = f"{command[0]} is not available. / {command[0]} 不可用。"  # 记录命令缺失 / Record missing command
             continue  # 尝试下一个命令 / Try next command
         try:  # 捕获命令执行异常 / Catch command execution errors
-            result = subprocess.run(command, capture_output=True, text=True, timeout=3.0)  # 执行只读进程列表命令 / Run read-only process-list command
+            result = subprocess.run(command, capture_output=True, timeout=3.0)  # 执行只读进程列表命令 / Run read-only process-list command
         except (OSError, subprocess.SubprocessError) as exc:  # 处理命令失败 / Handle command failure
             last_error = str(exc)  # 记录异常文本 / Record exception text
             continue  # 尝试下一个命令 / Try next command
-        if result.returncode == 0 and result.stdout.strip():  # 检查是否拿到输出 / Check whether output exists
-            return result.stdout.splitlines(), command[0], ""  # 返回进程行和来源 / Return process lines and source
-        if result.stderr.strip():  # 检查错误输出 / Check stderr output
-            last_error = result.stderr.strip().splitlines()[0]  # 保存首行错误 / Store first error line
+        stdout = decode_process_bytes(result.stdout)  # 解码标准输出 / Decode stdout
+        stderr = decode_process_bytes(result.stderr)  # 解码错误输出 / Decode stderr
+        if result.returncode == 0 and stdout.strip():  # 检查是否拿到输出 / Check whether output exists
+            return stdout.splitlines(), command[0], ""  # 返回进程行和来源 / Return process lines and source
+        if stderr.strip():  # 检查错误输出 / Check stderr output
+            last_error = stderr.strip().splitlines()[0]  # 保存首行错误 / Store first error line
         elif result.returncode != 0:  # 检查非零返回码 / Check non-zero return code
             last_error = f"{command[0]} exited with {result.returncode}. / {command[0]} 返回码 {result.returncode}。"  # 记录返回码 / Record return code
     return [], "", last_error  # 返回空结果和错误 / Return empty result and error
