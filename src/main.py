@@ -22,6 +22,7 @@ def build_parser() -> argparse.ArgumentParser:  # 创建命令行解析器 / Bui
     parser.add_argument("--candidate-id", default="", help="Candidate id for COMSOL simulation. / 用于 COMSOL 仿真的候选编号。")  # 添加候选编号参数 / Add candidate id argument
     parser.add_argument("--num-modes", type=int, default=0, help="Number of COMSOL modes to export. / COMSOL 导出模态数量。")  # 添加模态数量参数 / Add mode-count argument
     parser.add_argument("--limit", type=int, default=0, help="Preview render limit. / 预览渲染数量上限。")  # 添加预览数量参数 / Add preview limit argument
+    parser.add_argument("--iterations", type=int, default=0, help="Optimisation generations to run. / 要运行的优化代数。")  # 添加迭代次数参数 / Add iteration-count argument
     return parser  # 返回解析器 / Return parser
 
 
@@ -51,7 +52,7 @@ def main() -> None:  # 主程序入口 / Main program entry
         run_target_ui(config, args.host, args.port)  # 启动绘图界面服务 / Start drawing UI server
     if args.command == "run-workflow":  # 判断是否运行完整工作流 / Check full-workflow command
         from src.optimisation.workflow import run_design_workflow  # 延迟导入完整工作流 / Lazily import full workflow
-        result = run_design_workflow(config, args.generation, args.limit or None, args.num_modes or None, True)  # 运行完整自动流程 / Run complete automatic workflow
+        result = run_design_workflow(config, args.generation, args.limit or None, args.num_modes or None, True, iterations=args.iterations or None)  # 运行完整自动流程 / Run complete automatic workflow
         print(result)  # 打印工作流结果 / Print workflow result
     if args.command == "generate-candidates":  # 判断是否生成候选 / Check candidate-generation command
         if args.limit:  # 检查是否指定候选数量 / Check candidate-count override

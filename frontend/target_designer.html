@@ -1812,6 +1812,7 @@
           <div class="field-grid"> <!-- 页面结构 / Page structure -->
             <label class="field"><span>Candidates</span><input id="candidateCountInput" type="number" min="1" max="100" step="1" value="2"></label> <!-- 页面结构 / Page structure -->
             <label class="field"><span>Modes</span><input id="modeCountInput" type="number" min="1" max="60" step="1" value="20"></label> <!-- 页面结构 / Page structure -->
+            <label class="field"><span>Iterations</span><input id="iterationCountInput" type="number" min="1" max="50" step="1" value="2"></label> <!-- 页面结构 / Page structure -->
             <label class="toggle">Run COMSOL <input id="simulateToggle" type="checkbox" checked></label> <!-- 页面结构 / Page structure -->
           </div> <!-- 页面结构 / Page structure -->
           <div class="panel-actions"> <!-- 页面结构 / Page structure -->
@@ -2008,6 +2009,8 @@
     // 前端逻辑 / Frontend logic
     const modeCountInput = document.getElementById("modeCountInput");
     // 前端逻辑 / Frontend logic
+    const iterationCountInput = document.getElementById("iterationCountInput");
+    // 前端逻辑 / Frontend logic
     const simulateToggle = document.getElementById("simulateToggle");
     // 前端逻辑 / Frontend logic
     const runWorkflowButton = document.getElementById("runWorkflowButton");
@@ -2160,11 +2163,11 @@
     // 前端逻辑 / Frontend logic
     const runPresets = {
       // 前端逻辑 / Frontend logic
-      smoke: { candidates: 1, modes: 3, simulate: true },
+      smoke: { candidates: 1, modes: 3, iterations: 1, simulate: true },
       // 前端逻辑 / Frontend logic
-      review: { candidates: 3, modes: 10, simulate: true },
+      review: { candidates: 4, modes: 10, iterations: 3, simulate: true },
       // 前端逻辑 / Frontend logic
-      full: { candidates: 12, modes: 20, simulate: true }
+      full: { candidates: 10, modes: 20, iterations: 5, simulate: true }
     // 前端逻辑 / Frontend logic
     };
 
@@ -2700,6 +2703,8 @@
       candidateCountInput.value = String(preset.candidates);
       // 前端逻辑 / Frontend logic
       modeCountInput.value = String(preset.modes);
+      // 前端逻辑 / Frontend logic
+      iterationCountInput.value = String(preset.iterations);
       // 前端逻辑 / Frontend logic
       simulateToggle.checked = Boolean(preset.simulate);
       // 前端逻辑 / Frontend logic
@@ -3833,6 +3838,8 @@
       // 前端逻辑 / Frontend logic
       const modes = Number(modeCountInput.value);
       // 前端逻辑 / Frontend logic
+      const iterations = Number(iterationCountInput.value);
+      // 前端逻辑 / Frontend logic
       if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
         // 前端逻辑 / Frontend logic
         issues.push("Candidates must be an integer from 1 to 100.");
@@ -3842,6 +3849,12 @@
       if (!Number.isInteger(modes) || modes < 1 || modes > 60) {
         // 前端逻辑 / Frontend logic
         issues.push("Modes must be an integer from 1 to 60.");
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (!Number.isInteger(iterations) || iterations < 1 || iterations > 50) {
+        // 前端逻辑 / Frontend logic
+        issues.push("Iterations must be an integer from 1 to 50.");
       // 前端逻辑 / Frontend logic
       }
       // 前端逻辑 / Frontend logic
@@ -3917,6 +3930,8 @@
             limit: Number(candidateCountInput.value),
             // 前端逻辑 / Frontend logic
             num_modes: Number(modeCountInput.value),
+            // 前端逻辑 / Frontend logic
+            iterations: Number(iterationCountInput.value),
             // 前端逻辑 / Frontend logic
             simulate: simulateToggle.checked
           // 前端逻辑 / Frontend logic
@@ -4943,9 +4958,9 @@
     // 前端逻辑 / Frontend logic
     runPresetButtons.forEach((button) => button.addEventListener("click", () => applyRunPreset(button.dataset.runPreset)));
     // 前端逻辑 / Frontend logic
-    [candidateCountInput, modeCountInput, simulateToggle].forEach((control) => control.addEventListener("input", markCustomRunPreset));
+    [candidateCountInput, modeCountInput, iterationCountInput, simulateToggle].forEach((control) => control.addEventListener("input", markCustomRunPreset));
     // 前端逻辑 / Frontend logic
-    [candidateCountInput, modeCountInput, simulateToggle].forEach((control) => control.addEventListener("change", markCustomRunPreset));
+    [candidateCountInput, modeCountInput, iterationCountInput, simulateToggle].forEach((control) => control.addEventListener("change", markCustomRunPreset));
     // 前端逻辑 / Frontend logic
     showTimelineLogsToggle.addEventListener("change", () => renderWorkflowTimeline(latestWorkflowEvents));
     // 前端逻辑 / Frontend logic

@@ -121,13 +121,14 @@ def run_workflow_thread(config: dict, payload: dict) -> None:  # 后台运行自
         limit = workflow_payload["limit"]  # 读取候选数量 / Read candidate limit
         num_modes = workflow_payload["num_modes"]  # 读取模态数量 / Read mode count
         simulate = workflow_payload["simulate"]  # 读取是否仿真 / Read simulation flag
+        iterations = workflow_payload["iterations"]  # 读取迭代次数 / Read iteration count
         def cancel_check() -> bool:  # 定义取消检查函数 / Define cancellation check function
             return WORKFLOW_CANCEL_EVENT.is_set()  # 返回取消事件状态 / Return cancellation event state
         def progress(event: dict) -> None:  # 定义进度回调 / Define progress callback
             if cancel_check():  # 检查是否请求取消 / Check whether cancellation requested
                 raise WorkflowCancelled("Workflow cancelled by user. / 用户已取消工作流。")  # 抛出取消异常 / Raise cancellation exception
             update_and_persist_workflow_state(config, event=event, stage=event.get("stage", ""), message=event.get("message", ""), current_candidate=event.get("current_candidate", ""), current_index=int(event.get("current_index", 0) or 0), total=int(event.get("total", 0) or 0), result=event if event.get("stage") == "done" else workflow_snapshot().get("result"))  # 更新进度状态 / Update progress state
-        result = run_design_workflow(workflow_config, generation, limit, num_modes, simulate, progress, cancel_check)  # 运行完整工作流 / Run complete workflow
+        result = run_design_workflow(workflow_config, generation, limit, num_modes, simulate, progress, cancel_check, iterations)  # 运行完整工作流 / Run complete workflow
         update_and_persist_workflow_state(config, running=False, cancel_requested=False, stage="done", message="Workflow complete. / 工作流完成。", result=result, error="", current_candidate="", current_index=0, total=0)  # 写入完成状态 / Store completion state
     except WorkflowCancelled as exc:  # 处理工作流取消 / Handle workflow cancellation
         WORKFLOW_CANCEL_EVENT.clear()  # 清除取消事件 / Clear cancellation event
@@ -219,6 +220,9 @@ def validate_workflow_payload(payload: dict, config: dict) -> dict:  # 校验工
     num_modes = int(payload.get("num_modes", config["simulation"].get("num_modes", 20)))  # 读取模态数量 / Read mode count
     if num_modes < 1 or num_modes > 60:  # 检查模态数量范围 / Check mode count range
         raise ValueError("Mode count must be between 1 and 60. / 模态数量必须在 1 到 60 之间。")  # 抛出模态数量错误 / Raise mode count error
+    iterations = int(payload.get("iterations", config.get("optimisation", {}).get("num_iterations", 1)))  # 读取迭代次数 / Read iteration count
+    if iterations < 1 or iterations > 50:  # 检查迭代次数范围 / Check iteration count range
+        raise ValueError("Iterations must be between 1 and 50. / 迭代次数必须在 1 到 50 之间。")  # 抛出迭代次数错误 / Raise iteration count error
     generation = payload.get("generation")  # 读取可选代数 / Read optional generation
     if generation in {"", None}:  # 检查是否无代数 / Check whether generation is absent
         generation = None  # 规范为空值 / Normalize empty value
@@ -226,7 +230,7 @@ def validate_workflow_payload(payload: dict, config: dict) -> dict:  # 校验工
         generation = int(generation)  # 转换代数整数 / Convert generation integer
         if generation < 0:  # 检查代数范围 / Check generation range
             raise ValueError("Generation must be non-negative. / 代数必须为非负数。")  # 抛出代数错误 / Raise generation error
-    return {"limit": limit, "num_modes": num_modes, "simulate": bool(payload.get("simulate", True)), "generation": generation}  # 返回规范载荷 / Return normalized payload
+    return {"limit": limit, "num_modes": num_modes, "iterations": iterations, "simulate": bool(payload.get("simulate", True)), "generation": generation}  # 返回规范载荷 / Return normalized payload
 
 
 def format_config_number(value: float) -> str:  # 格式化配置数值 / Format config number

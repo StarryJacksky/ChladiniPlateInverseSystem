@@ -77,9 +77,9 @@ Use this tab to run the automatic pipeline.
 
 Run presets:
 
-- `Smoke`: 1 candidate, 3 modes. Use for quick checks.
-- `Review`: 3 candidates, 10 modes. Use for short comparison runs.
-- `Full`: 12 candidates, 20 modes. Use for a fuller local search.
+- `Smoke`: 1 candidate, 3 modes, 1 generation. Use for quick checks.
+- `Review`: 4 candidates, 10 modes, 3 generations. Use for short evolutionary runs.
+- `Full`: 10 candidates, 20 modes, 5 generations. Use for a fuller local evolutionary search.
 
 `Run COMSOL`:
 
@@ -95,6 +95,7 @@ Preflight checks:
 
 - Candidate count must be from 1 to 100.
 - Mode count must be from 1 to 60.
+- Iteration count must be from 1 to 50.
 - The target should be saved once so preprocessing metrics exist.
 - If `Run COMSOL` is enabled, diagnostics should be ready.
 

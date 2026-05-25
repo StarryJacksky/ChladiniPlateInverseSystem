@@ -37,6 +37,7 @@ def build_smoke_config() -> tuple[dict, TemporaryDirectory]:  # 构造临时烟�
     config["paths"]["candidates_dir"] = str(root / "candidates")  # 设置临时候选目录 / Set temporary candidates directory
     config["paths"]["comsol_exports_dir"] = str(root / "comsol_exports")  # 设置临时导出目录 / Set temporary export directory
     config["optimisation"]["population_size"] = 1  # 限制烟测候选数量 / Limit smoke candidate count
+    config["optimisation"]["num_iterations"] = 1  # 限制烟测代数 / Limit smoke generation count
     return config, temporary  # 返回配置和临时目录 / Return config and temporary directory
 
 

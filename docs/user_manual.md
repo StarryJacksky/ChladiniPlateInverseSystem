@@ -123,12 +123,12 @@ Use this tab to run the automatic pipeline.
 Run presets:
 运行预设：
 
-- `Smoke`: 1 candidate, 3 modes. Use for quick checks.
-  `Smoke`：1 个候选、3 个模态，用于快速检查。
-- `Review`: 3 candidates, 10 modes. Use for short comparison runs.
-  `Review`：3 个候选、10 个模态，用于短对比。
-- `Full`: 12 candidates, 20 modes. Use for a fuller local search.
-  `Full`：12 个候选、20 个模态，用于较完整本地搜索。
+- `Smoke`: 1 candidate, 3 modes, 1 generation. Use for quick checks.
+  `Smoke`：1 个候选、3 个模态、1 代，用于快速检查。
+- `Review`: 4 candidates, 10 modes, 3 generations. Use for short evolutionary runs.
+  `Review`：4 个候选、10 个模态、3 代，用于短进化搜索。
+- `Full`: 10 candidates, 20 modes, 5 generations. Use for a fuller local evolutionary search.
+  `Full`：10 个候选、20 个模态、5 代，用于较完整本地进化搜索。
 
 `Run COMSOL`:
 `Run COMSOL`：
@@ -153,6 +153,8 @@ Preflight checks:
   候选数量必须是 1 到 100。
 - Mode count must be from 1 to 60.
   模态数量必须是 1 到 60。
+- Iteration count must be from 1 to 50.
+  迭代代数必须是 1 到 50。
 - The target should be saved once so preprocessing metrics exist.
   目标图应至少保存一次，以生成预处理指标。
 - If `Run COMSOL` is enabled, diagnostics should be ready.
