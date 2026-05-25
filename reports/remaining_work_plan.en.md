@@ -4,99 +4,45 @@
 
 This document separates tasks Codex can continue now from tasks blocked by real material, COMSOL, or physical-test data.
 
-## A. Can Continue Now
+## A. Can Continue Independently
 
-### 1. Frontend Design Polish
+The independent development queue is now mostly quality maintenance rather than new feature construction.
 
-Goal: make the app feel like a serious engineering design console, not a temporary debug page.
-
-Tasks:
-
-1. Unify visual hierarchy across Target, Tune, Results, and Run tabs.
-2. Keep the first screen as the usable workspace, not a marketing page.
-3. Verify desktop and narrow layouts in the browser after local server approval is available.
-
-Recently completed:
-
-- Run Overview now includes a clear next-action strip so users know whether to run Smoke, Discover paths, check model files, or run Self-test.
-
-### 2. Frontend Function Completion
-
-Goal: let users draw/import, run, inspect, and compare without opening files manually.
+### 1. Quality Gate Maintenance
 
 Tasks:
 
-1. Add deeper multi-candidate visual comparison once more real COMSOL images are available.
-2. Add final screenshot-driven walkthroughs after the UI stops moving.
+1. Run `python scripts/check_local_quality.py` after every meaningful code or documentation change.
+2. Keep the bilingual comment checker passing for hand-written `.py`, `.m`, and `.html` files.
+3. Extend the local quality bundle only when a new repeatable local check appears.
 
-Recently completed:
+Completed foundation:
 
-- Result overview now explains ranking, shows a top-candidate comparison strip, and links to a full run report.
-- Target Quality now gives practical guidance for imported photos, logos, and dense hand drawings.
+- The quality bundle now covers documentation links, bilingual comments, config contracts, discovery fixtures, artifact cleanup, Python-only smoke tests, Python compilation, and optional frontend syntax checks.
 
-### 3. Automation Robustness
-
-Goal: make the Run tab predictable before asking users to trust one-click automation.
+### 2. Documentation Maintenance
 
 Tasks:
 
-1. Validate COMSOL/MATLAB running-process detection and install-path discovery on clean Windows, macOS, and Linux machines.
-2. Add deeper model-specific preflight checks after the final COMSOL model is frozen.
-3. Keep Python-only self-test independent from COMSOL/MATLAB execution.
+1. Keep the root README as the short bilingual entry page that links into user-facing guides.
+2. Keep the deployment guide, user manual, code-structure guide, and planning reports synchronized with any later implementation changes.
+3. Add final screenshots and lab-specific notes only after the UI and COMSOL workflow are stable.
 
-Recently completed:
+Completed foundation:
 
-- Frontend setup assistant for COMSOL/MATLAB discovery, path confirmation, and diagnostics verification.
-- Safe local Stop pathway with persisted cancelling/cancelled workflow state.
-- Backend recovery hints that combine workflow state, diagnostics, and recent COMSOL/MATLAB logs.
+- Beginner-facing bilingual docs now exist for setup, software use, project structure, local checks, run reports, and remaining work.
 
-### 4. Backend Checks and Contracts
-
-Goal: catch configuration problems before expensive COMSOL/MATLAB runs.
+### 3. Visual Verification When Available
 
 Tasks:
 
-1. Prefer already-running processes, then known install folders, then manual override in the setup flow.
-2. Add manual override fields to the setup wizard when discovery fails.
-3. Keep cleanup behavior covered by automated tests as artifact policy evolves.
+1. Re-open the local app in a browser once local server approval or another usable preview route is available.
+2. Check desktop and narrow layouts for Target, Tune, Results, and Run.
+3. Capture final screenshots for README and user manual only after the interface is no longer changing quickly.
 
-Recently completed:
+Current note:
 
-- Config contract diagnostics for geometry, thickness, material, simulation, optimisation, paths, and COMSOL port values.
-- Discovery tests for install-path fixtures, missing configured paths, and running-process priority.
-- Non-invasive COMSOL/MATLAB version hints now recognise macOS, Windows, and Linux install-path formats.
-- License diagnostics now tell users to open COMSOL/MATLAB once after install to confirm login or license state.
-- Artifact cleanup checks now verify that old regenerable files and temporary workflow files are cleanable while newest generations and mode CSV data stay protected.
-
-### 5. Documentation Drafts
-
-Goal: make GitHub understandable before final screenshots and lab-specific values exist.
-
-Tasks:
-
-1. Keep README as a short entry page.
-2. Maintain the Windows/macOS/Linux deployment guide in `docs/deployment_guide.md`.
-3. Maintain the software user manual in `docs/user_manual.md`.
-4. Add final screenshots later after UI stops moving.
-
-Recently completed:
-
-- Added a documentation link checker so README and guide entry links can be validated automatically.
-- Added one local quality bundle command that runs documentation, comments, config, discovery, cleanup, smoke, compile, and frontend syntax checks.
-
-### 6. Python-Only Smoke Test Path
-
-Goal: let new users verify the app without COMSOL first.
-
-Tasks:
-
-1. Confirm clone/install/self-test/launch workflow on a clean environment.
-2. Confirm UI target import and refresh manually after final screenshots are ready.
-
-Recently completed:
-
-- Added `scripts/check_python_smoke.py` to verify target preprocessing and candidate generation in a temporary directory without COMSOL.
-- Documented expected smoke-test files in the deployment guide.
+- The recent local preview attempt was blocked by local server/file preview permissions, so this item is waiting on a usable preview path rather than more implementation code.
 
 ## B. Needs Real Project Data Later
 
@@ -116,14 +62,18 @@ Needs measured plate frequencies, excitation setup, and photographed or extracte
 
 Needs enough COMSOL results to tune scoring weights, random search settings, and genetic algorithm operators.
 
-### 5. Final Release Guide
+### 5. Clean Machine Validation
+
+Needs real Windows, macOS, and Linux machines, or equivalent clean virtual machines, with actual COMSOL/MATLAB installations to confirm discovery behavior.
+
+### 6. Final Release Guide
 
 Needs stable UI screenshots, final install paths, final lab-specific COMSOL/MATLAB notes, and confirmed troubleshooting cases.
 
 ## C. Current Waiting Boundary
 
-Codex is not yet blocked.
+Codex is now close to the planned waiting boundary.
 
-Continue with: frontend polish, Python-only smoke validation, non-invasive version inference, backend config hardening, and documentation refinement.
+Most meaningful new work now needs one of these inputs: the accepted final MPH model, real material values, real COMSOL output images/CSV data, physical validation measurements, clean OS validation machines, or a working local browser preview route.
 
-Only after those are complete should the project wait mainly for real material data, final COMSOL model acceptance, and physical validation data.
+Until then, the safe independent work is maintenance: keep docs synchronized, keep checks passing, and avoid inventing model-specific assumptions that could fight the real COMSOL baseline.

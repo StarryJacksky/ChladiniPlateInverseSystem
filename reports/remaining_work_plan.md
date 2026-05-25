@@ -5,149 +5,64 @@
 This document separates tasks Codex can continue now from tasks blocked by real material, COMSOL, or physical-test data.
 本文把 Codex 现在还能继续做的任务，与需要真实材料、COMSOL 或实体测试数据后才能做的任务分开。
 
-## A. Can Continue Now / 现在可以继续做
+## A. Can Continue Independently / 现在可以独立继续做
 
-### 1. Frontend Design Polish / 前端设计打磨
+The independent development queue is now mostly quality maintenance rather than new feature construction.
+当前可独立推进的队列已经主要是质量维护，而不是继续堆新功能。
 
-Goal: make the app feel like a serious engineering design console, not a temporary debug page.
-目标：让软件像正式工程设计控制台，而不是临时调试页。
-
-Tasks:
-任务：
-
-1. Unify visual hierarchy across Target, Tune, Results, and Run tabs.
-   统一 Target、Tune、Results、Run 页签的视觉层级。
-2. Keep the first screen as the usable workspace, not a marketing page.
-   保持首屏是可用工作区，而不是营销页面。
-3. Verify desktop and narrow layouts in the browser after local server approval is available.
-   每次可见改动后，用浏览器检查桌面和窄屏布局。
-
-Recently completed:
-最近完成：
-
-- Run Overview now includes a clear next-action strip so users know whether to run Smoke, Discover paths, check model files, or run Self-test.
-  Run Overview 现在包含清楚的下一步操作提示，让用户知道应该运行 Smoke、发现路径、检查模型文件还是运行 Self-test。
-
-### 2. Frontend Function Completion / 前端功能补齐
-
-Goal: let users draw/import, run, inspect, and compare without opening files manually.
-目标：让用户不用手动打开文件，也能完成绘制/导入、运行、查看和比较。
+### 1. Quality Gate Maintenance / 质量门维护
 
 Tasks:
 任务：
 
-1. Add deeper multi-candidate visual comparison once more real COMSOL images are available.
-   等更多真实 COMSOL 图像可用后，增加更深入的多候选视觉比较。
-2. Add final screenshot-driven walkthroughs after the UI stops moving.
-   等 UI 稳定后，增加带最终截图的操作 walkthrough。
+1. Run `python scripts/check_local_quality.py` after every meaningful code or documentation change.
+   每次有实质代码或文档改动后，运行 `python scripts/check_local_quality.py`。
+2. Keep the bilingual comment checker passing for hand-written `.py`, `.m`, and `.html` files.
+   保持手写 `.py`、`.m`、`.html` 文件通过中英双语注释检查。
+3. Extend the local quality bundle only when a new repeatable local check appears.
+   只有出现新的可重复本地检查时，才扩展本地质量检查合集。
 
-Recently completed:
-最近完成：
+Completed foundation:
+已完成基础：
 
-- Result overview now explains ranking, shows a top-candidate comparison strip, and links to a full run report.
-  Results 总览现在会解释排名、显示顶部候选对比条，并链接到整次运行报告。
-- Target Quality now gives practical guidance for imported photos, logos, and dense hand drawings.
-  Target Quality 现在会针对导入照片、Logo 和复杂手绘目标给出实用建议。
+- The quality bundle now covers documentation links, bilingual comments, config contracts, discovery fixtures, artifact cleanup, Python-only smoke tests, Python compilation, and optional frontend syntax checks.
+  质量检查合集现在覆盖文档链接、双语注释、配置合同、自动发现样例、产物清理、无 COMSOL 烟测、Python 编译和可选前端语法检查。
 
-### 3. Automation Robustness / 自动化稳健性
-
-Goal: make the Run tab predictable before asking users to trust one-click automation.
-目标：在让用户信任一键自动化前，让 Run 页行为足够可预测。
+### 2. Documentation Maintenance / 文档维护
 
 Tasks:
 任务：
 
-1. Validate COMSOL/MATLAB running-process detection and install-path discovery on clean Windows, macOS, and Linux machines.
-   在干净的 Windows、macOS、Linux 机器上验证 COMSOL/MATLAB 运行进程检测与安装路径发现。
-2. Add deeper model-specific preflight checks after the final COMSOL model is frozen.
-   最终 COMSOL 模型冻结后，增加更深入的模型专属运行前检查。
-3. Keep Python-only self-test independent from COMSOL/MATLAB execution.
-   保持 Python-only 自检不依赖 COMSOL/MATLAB 实际启动。
+1. Keep the root README as the short bilingual entry page that links into user-facing guides.
+   保持根目录 README 是简洁双语入口页，并链接到用户文档。
+2. Keep the deployment guide, user manual, code-structure guide, and planning reports synchronized with any later implementation changes.
+   后续实现变化时，同步维护部署指南、软件说明书、代码结构说明和规划报告。
+3. Add final screenshots and lab-specific notes only after the UI and COMSOL workflow are stable.
+   只有在 UI 和 COMSOL 工作流稳定后，再补最终截图和实验室专属说明。
 
-Recently completed:
-最近完成：
+Completed foundation:
+已完成基础：
 
-- Frontend setup assistant for COMSOL/MATLAB discovery, path confirmation, and diagnostics verification.
-  已完成 COMSOL/MATLAB 自动发现、路径确认与诊断验证的前端安装向导。
-- Safe local Stop pathway with persisted cancelling/cancelled workflow state.
-  已完成本地安全停止入口，并持久化 cancelling/cancelled 工作流状态。
-- Backend recovery hints that combine workflow state, diagnostics, and recent COMSOL/MATLAB logs.
-  已完成结合工作流状态、诊断和最近 COMSOL/MATLAB 日志的后端恢复建议。
+- Beginner-facing bilingual docs now exist for setup, software use, project structure, local checks, run reports, and remaining work.
+  面向零基础用户的双语文档已经覆盖安装、软件使用、项目结构、本地检查、运行报告和剩余工作。
 
-### 4. Backend Checks and Contracts / 后端检查与合同
-
-Goal: catch configuration problems before expensive COMSOL/MATLAB runs.
-目标：在昂贵的 COMSOL/MATLAB 运行前发现配置问题。
+### 3. Visual Verification When Available / 条件允许时的视觉验证
 
 Tasks:
 任务：
 
-1. Prefer already-running processes, then known install folders, then manual override in the setup flow.
-   安装流程优先使用已运行进程，其次查找常见安装目录，最后才进入手动覆盖。
-2. Add manual override fields to the setup wizard when discovery fails.
-   当自动发现失败时，在安装向导中提供手动覆盖字段。
-3. Keep cleanup behavior covered by automated tests as artifact policy evolves.
-   随着产物策略演进，继续用自动测试覆盖清理行为。
+1. Re-open the local app in a browser once local server approval or another usable preview route is available.
+   当本地 server 权限或其他可用预览方式恢复后，重新用浏览器打开本地应用。
+2. Check desktop and narrow layouts for Target, Tune, Results, and Run.
+   检查 Target、Tune、Results、Run 的桌面和窄屏布局。
+3. Capture final screenshots for README and user manual only after the interface is no longer changing quickly.
+   等界面不再快速变化后，再为 README 和软件说明书截最终图。
 
-Recently completed:
-最近完成：
+Current note:
+当前说明：
 
-- Config contract diagnostics for geometry, thickness, material, simulation, optimisation, paths, and COMSOL port values.
-  已完成几何、厚度、材料、仿真、优化、路径和 COMSOL 端口数值的配置合同诊断。
-- Discovery tests for install-path fixtures, missing configured paths, and running-process priority.
-  已完成安装路径样例、配置路径缺失和运行进程优先级的自动发现测试。
-- Non-invasive COMSOL/MATLAB version hints now recognise macOS, Windows, and Linux install-path formats.
-  非侵入式 COMSOL/MATLAB 版本提示现在可识别 macOS、Windows 和 Linux 安装路径格式。
-- License diagnostics now tell users to open COMSOL/MATLAB once after install to confirm login or license state.
-  license 诊断现在会提醒用户安装后先打开 COMSOL/MATLAB 一次，以确认登录或授权状态。
-- Artifact cleanup checks now verify that old regenerable files and temporary workflow files are cleanable while newest generations and mode CSV data stay protected.
-  产物清理检查现在会验证旧的可再生成文件和临时工作流文件可清理，同时保护最新代和模态 CSV 数据。
-
-### 5. Documentation Drafts / 文档开发版
-
-Goal: make GitHub understandable before final screenshots and lab-specific values exist.
-目标：即使最终截图和实验室参数还没定，也让 GitHub 当前可读。
-
-Tasks:
-任务：
-
-1. Keep README as a short entry page.
-   保持 README 是简洁入口页。
-2. Maintain Windows/macOS/Linux deployment guide in `docs/deployment_guide.md`.
-   维护 `docs/deployment_guide.md` 中的 Windows/macOS/Linux 部署指南。
-3. Maintain software user manual in `docs/user_manual.md`.
-   维护 `docs/user_manual.md` 中的软件说明书。
-4. Add final screenshots later after UI stops moving.
-   等 UI 稳定后再补最终截图。
-
-Recently completed:
-最近完成：
-
-- Added a documentation link checker so README and guide entry links can be validated automatically.
-  已新增文档链接检查脚本，可自动验证 README 和指南入口链接。
-- Added one local quality bundle command that runs documentation, comments, config, discovery, cleanup, smoke, compile, and frontend syntax checks.
-  已新增一个本地质量检查合集命令，可运行文档、注释、配置、发现、清理、烟测、编译和前端语法检查。
-
-### 6. Python-Only Smoke Test Path / 无 COMSOL 烟测路径
-
-Goal: let new users verify the app without COMSOL first.
-目标：让新用户先在没有 COMSOL 的情况下验证软件。
-
-Tasks:
-任务：
-
-1. Confirm clone/install/self-test/launch workflow on a clean environment.
-   在干净环境确认 clone、安装、自检、启动流程。
-2. Confirm UI target import and refresh manually after final screenshots are ready.
-   等最终截图准备好后，手动确认 UI 目标导入与刷新。
-
-Recently completed:
-最近完成：
-
-- Added `scripts/check_python_smoke.py` to verify target preprocessing and candidate generation in a temporary directory without COMSOL.
-  已新增 `scripts/check_python_smoke.py`，可在临时目录中无 COMSOL 验证目标预处理和候选生成。
-- Documented expected smoke-test files in the deployment guide.
-  已在部署指南中记录烟测后应出现的文件。
+- The recent local preview attempt was blocked by local server/file preview permissions, so this item is waiting on a usable preview path rather than more implementation code.
+  最近一次本地预览被 server/file 预览权限挡住，所以这一项等待可用预览路径，而不是继续写更多功能代码。
 
 ## B. Needs Real Project Data Later / 需要真实项目数据后再做
 
@@ -171,18 +86,23 @@ Needs measured plate frequencies, excitation setup, and photographed or extracte
 Needs enough COMSOL results to tune scoring weights, random search settings, and genetic algorithm operators.
 需要足够 COMSOL 结果来调整评分权重、随机搜索设置和遗传算法算子。
 
-### 5. Final Release Guide / 最终发布指南
+### 5. Clean Machine Validation / 干净机器验证
+
+Needs real Windows, macOS, and Linux machines, or equivalent clean virtual machines, with actual COMSOL/MATLAB installations to confirm discovery behavior.
+需要真实 Windows、macOS、Linux 机器，或等价干净虚拟机，并安装实际 COMSOL/MATLAB 来确认发现逻辑。
+
+### 6. Final Release Guide / 最终发布指南
 
 Needs stable UI screenshots, final install paths, final lab-specific COMSOL/MATLAB notes, and confirmed troubleshooting cases.
 需要稳定 UI 截图、最终安装路径、实验室专属 COMSOL/MATLAB 注意事项和确认过的故障排查案例。
 
 ## C. Current Waiting Boundary / 当前等待边界
 
-Codex is not yet blocked.
-Codex 目前还没有进入等待阶段。
+Codex is now close to the planned waiting boundary.
+Codex 现在已经接近计划中的等待边界。
 
-Continue with: frontend polish, Python-only smoke validation, non-invasive version inference, backend config hardening, and documentation refinement.
-下一步继续做：前端打磨、无 COMSOL 烟测验证、非侵入式版本推断、后端配置加固和文档细化。
+Most meaningful new work now needs one of these inputs: the accepted final MPH model, real material values, real COMSOL output images/CSV data, physical validation measurements, clean OS validation machines, or a working local browser preview route.
+现在大多数有意义的新工作需要以下输入之一：验收后的最终 MPH 模型、真实材料参数、真实 COMSOL 输出图片/CSV、实体测量数据、干净系统验证机器，或可用的本地浏览器预览路径。
 
-Only after those are complete should the project wait mainly for real material data, final COMSOL model acceptance, and physical validation data.
-只有这些完成后，项目才主要进入等待真实材料数据、最终 COMSOL 模型验收和实体验证数据的阶段。
+Until then, the safe independent work is maintenance: keep docs synchronized, keep checks passing, and avoid inventing model-specific assumptions that could fight the real COMSOL baseline.
+在这些输入到位前，安全的独立工作主要是维护：同步文档、保持检查通过，并避免编造会和真实 COMSOL 基准模型冲突的模型专属假设。
