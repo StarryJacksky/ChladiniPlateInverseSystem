@@ -2,6 +2,11 @@ from __future__ import annotations  # 启用现代类型注解 / Enable modern t
 
 import numpy as np  # 导入数值计算库 / Import numerical library
 
+try:  # 优先使用 SciPy 子空间特征求解 / Prefer SciPy subset eigen solve
+    from scipy.linalg import eigh as scipy_eigh  # 导入 SciPy 对称特征求解器 / Import SciPy symmetric eigensolver
+except Exception:  # 兼容无 SciPy 环境 / Support environments without SciPy
+    scipy_eigh = None  # 标记不可用并回退 NumPy / Mark unavailable and fall back to NumPy
+
 from src.candidate.constraints import center_cells_for_grid  # 导入中心单元工具 / Import centre-cell helper
 from src.scoring.metrics import area_similarity  # 导入面积相似度 / Import area similarity
 from src.scoring.metrics import complexity_similarity  # 导入复杂度相似度 / Import complexity similarity
@@ -67,8 +72,12 @@ def solve_kl_modes(H_mm: np.ndarray, plate_length_mm: float, plate_width_mm: flo
     Mf = np.maximum(M[free], 1.0e-9)  # 截取自由质量并限下界 / Slice free mass and clamp lower bound
     scaled = Kf / np.sqrt(np.outer(Mf, Mf))  # 转换广义特征问题为标准特征问题 / Convert generalized eigenproblem to standard eigenproblem
     scaled = 0.5 * (scaled + scaled.T)  # 强制数值对称 / Enforce numerical symmetry
-    values, vectors = np.linalg.eigh(scaled)  # 求解特征值问题 / Solve eigenvalue problem
-    order = np.argsort(values)[:num_modes]  # 选取最低若干阶 / Select lowest modes
+    if scipy_eigh is not None:  # 检查是否可用 SciPy 快路径 / Check whether SciPy fast path is available
+        values, vectors = scipy_eigh(scaled, subset_by_index=[0, min(max(num_modes - 1, 0), scaled.shape[0] - 1)])  # 只求最低阶模态 / Solve only the lowest modes
+        order = np.arange(len(values))  # SciPy 已按特征值排序 / SciPy already sorts eigenvalues
+    else:  # 回退完整 NumPy 求解 / Fall back to full NumPy solve
+        values, vectors = np.linalg.eigh(scaled)  # 求解特征值问题 / Solve eigenvalue problem
+        order = np.argsort(values)[:num_modes]  # 选取最低若干阶 / Select lowest modes
     modes = []  # 创建模态列表 / Create mode list
     for item in order:  # 遍历选中模态 / Iterate selected modes
         full = np.zeros(rows * cols, dtype=float)  # 创建全自由度向量 / Create full DOF vector

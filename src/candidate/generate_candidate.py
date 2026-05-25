@@ -419,7 +419,82 @@ def proposal_source_key(name: str) -> str:  # 提取代理提案来源类型 / E
 
 def kl_proxy_candidate_score(H: np.ndarray, target_grid: np.ndarray, config: dict) -> float:  # 计算 KL 代理候选分 / Compute KL proxy candidate score
     from src.physics.kirchhoff_love import score_thickness_with_kl_proxy  # 局部导入 KL 代理评分 / Locally import KL proxy scoring
-    return float(score_thickness_with_kl_proxy(H, target_grid, config, num_modes=6)["kl_proxy_score"])  # 返回 KL 代理分数 / Return KL proxy score
+    mode_count = int(config.get("optimisation", {}).get("kl_proxy_num_modes", 10))  # 读取 KL 代理模态数量 / Read KL proxy mode count
+    return float(score_thickness_with_kl_proxy(H, target_grid, config, num_modes=mode_count)["kl_proxy_score"])  # 返回 KL 代理分数 / Return KL proxy score
+
+
+def free_design_cells(shape: tuple[int, int], fixed_cells: list[tuple[int, int]]) -> list[tuple[int, int]]:  # 构建可优化单元列表 / Build optimisable cell list
+    fixed = set(fixed_cells)  # 创建固定单元集合 / Create fixed-cell set
+    return [(row, col) for row in range(shape[0]) for col in range(shape[1]) if (row, col) not in fixed]  # 返回非固定单元 / Return non-fixed cells
+
+
+def perturb_proxy_candidate(H: np.ndarray, levels: list[float], default_thickness: float, max_neighbor_diff: float, fixed_cells: list[tuple[int, int]], free_cells: list[tuple[int, int]], step_scale: float, mutation_cells: int, rng: np.random.Generator) -> np.ndarray:  # 扰动 KL 代理候选 / Perturb KL proxy candidate
+    proposal = H.copy()  # 复制当前厚度场 / Copy current thickness field
+    low = float(min(levels))  # 读取最小厚度 / Read minimum thickness
+    high = float(max(levels))  # 读取最大厚度 / Read maximum thickness
+    for _ in range(max(1, mutation_cells)):  # 遍历扰动单元数量 / Iterate mutation-cell count
+        row, col = free_cells[int(rng.integers(0, len(free_cells)))]  # 随机选择可优化单元 / Choose a random optimisable cell
+        proposal[row, col] = float(np.clip(proposal[row, col] + rng.normal(0.0, step_scale), low, high))  # 应用连续厚度扰动 / Apply continuous thickness perturbation
+    proposal = enforce_center_constraint(proposal, fixed_cells, default_thickness)  # 恢复中心固定 / Restore centre constraint
+    proposal = repair_candidate_matrix(proposal, levels, max_neighbor_diff, fixed_cells, passes=18)  # 修复制造相邻约束 / Repair manufacturable neighbour constraint
+    return enforce_center_constraint(proposal, fixed_cells, default_thickness)  # 返回中心固定后的提案 / Return proposal after centre fixing
+
+
+def optimise_kl_proxy_seed(seed: np.ndarray, target_grid: np.ndarray, levels: list[float], default_thickness: float, max_neighbor_diff: float, config: dict, rng: np.random.Generator) -> tuple[np.ndarray, float]:  # 用 KL 代理直接优化种子 / Directly optimise a seed with KL proxy
+    fixed_cells = center_cells_for_grid(seed.shape[0])  # 读取中心固定单元 / Read centre fixed cells
+    free_cells = free_design_cells(seed.shape, fixed_cells)  # 读取可优化单元 / Read optimisable cells
+    current = repair_candidate_matrix(enforce_center_constraint(seed, fixed_cells, default_thickness), levels, max_neighbor_diff, fixed_cells, passes=32)  # 修复初始种子 / Repair initial seed
+    current_score = kl_proxy_candidate_score(current, target_grid, config)  # 计算当前 KL 代理分 / Compute current KL proxy score
+    best = current.copy()  # 保存最佳厚度场 / Store best thickness field
+    best_score = current_score  # 保存最佳分数 / Store best score
+    optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation config
+    steps = int(optimisation.get("kl_proxy_local_steps", 72))  # 读取局部搜索步数 / Read local-search steps
+    start_temperature = float(optimisation.get("kl_proxy_start_temperature", 0.035))  # 读取初始退火温度 / Read initial annealing temperature
+    end_temperature = float(optimisation.get("kl_proxy_end_temperature", 0.004))  # 读取末端退火温度 / Read final annealing temperature
+    span = max(float(max(levels)) - float(min(levels)), 1.0e-9)  # 计算厚度范围 / Compute thickness span
+    for step in range(max(1, steps)):  # 遍历局部搜索步 / Iterate local-search steps
+        progress = step / max(steps - 1, 1)  # 计算退火进度 / Compute annealing progress
+        step_scale = span * (0.24 * (1.0 - progress) + 0.035)  # 计算当前扰动尺度 / Compute current perturbation scale
+        mutation_cells = 1 + int(rng.random() < 0.35) + int(step % 13 == 0)  # 选择本步扰动单元数 / Choose mutation-cell count for this step
+        proposal = perturb_proxy_candidate(current, levels, default_thickness, max_neighbor_diff, fixed_cells, free_cells, step_scale, mutation_cells, rng)  # 生成局部提案 / Build local proposal
+        proposal_score = kl_proxy_candidate_score(proposal, target_grid, config)  # 计算提案 KL 分数 / Compute proposal KL score
+        temperature = max(1.0e-6, start_temperature * (1.0 - progress) + end_temperature * progress)  # 计算当前温度 / Compute current temperature
+        accept = proposal_score >= current_score or rng.random() < math.exp((proposal_score - current_score) / temperature)  # 判断是否接受提案 / Decide whether to accept proposal
+        if accept:  # 检查是否接受 / Check acceptance
+            current = proposal  # 更新当前厚度场 / Update current thickness field
+            current_score = proposal_score  # 更新当前分数 / Update current score
+        if proposal_score > best_score:  # 检查是否刷新最佳 / Check whether best improves
+            best = proposal.copy()  # 保存最佳厚度场 / Store best thickness field
+            best_score = proposal_score  # 保存最佳分数 / Store best score
+    return best, best_score  # 返回最佳厚度场和 KL 分 / Return best thickness field and KL score
+
+
+def build_kl_proxy_seed(index: int, history: list[dict], parents: list[np.ndarray], target_grid: np.ndarray, levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 构建 KL 代理优化种子 / Build KL proxy optimisation seed
+    if history and index % 4 == 0:  # 优先复用真实高分历史 / Prefer real high-scoring history
+        item = history[int((index // 4) % min(len(history), 12))]  # 选择历史样本 / Select historical sample
+        return item["H"], f"history_{item['candidate_id']}"  # 返回历史种子 / Return history seed
+    if parents and index % 4 == 1:  # 其次复用遗传父代 / Then reuse genetic parents
+        return parents[int(rng.integers(0, len(parents)))], "parent_seed"  # 返回父代种子 / Return parent seed
+    if index % 4 == 2:  # 使用目标感知种子 / Use target-aware seed
+        H, name = generate_target_guided_H(target_grid, index + 1000, parents, levels, default_thickness, max_neighbor_diff, rng)  # 生成目标感知种子 / Generate target-aware seed
+        return H, f"target_{name}"  # 返回目标种子 / Return target seed
+    return generate_random_H(target_grid.shape[0], levels, default_thickness, max_neighbor_diff, rng), "random_seed"  # 返回随机种子 / Return random seed
+
+
+def generate_kl_proxy_optimised_proposals(config: dict, candidates_dir: Path, target_grid: np.ndarray | None, parents: list[np.ndarray], levels: list[float], default_thickness: float, max_neighbor_diff: float, population: int, rng: np.random.Generator) -> list[tuple[np.ndarray, str]]:  # 生成 KL 直接优化提案 / Generate directly KL-optimised proposals
+    if target_grid is None:  # 检查目标网格是否存在 / Check whether target grid exists
+        return []  # 无目标则无法直接优化 / Cannot directly optimise without target
+    optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation config
+    proposal_count = min(population, int(optimisation.get("kl_proxy_optimised_count", max(4, population // 3))))  # 读取 KL 优化候选数量 / Read KL-optimised proposal count
+    history = load_surrogate_history(candidates_dir, limit=80)  # 读取历史真实评分样本 / Load historical real-score samples
+    proposals = []  # 创建提案列表 / Create proposal list
+    for index in range(max(0, proposal_count)):  # 遍历 KL 优化候选 / Iterate KL-optimised proposals
+        seed, seed_name = build_kl_proxy_seed(index, history, parents, target_grid, levels, default_thickness, max_neighbor_diff, rng)  # 构建优化种子 / Build optimisation seed
+        H, score = optimise_kl_proxy_seed(seed, target_grid, levels, default_thickness, max_neighbor_diff, config, rng)  # 执行 KL 局部优化 / Run KL local optimisation
+        name = f"kl_proxy_optimised_{seed_name}_score_{score:.3f}"  # 构造来源名称 / Build source name
+        if is_diverse_candidate(H, proposals, levels, threshold=0.035):  # 检查提案多样性 / Check proposal diversity
+            proposals.append((H, name))  # 保存多样提案 / Store diverse proposal
+    return proposals[:population]  # 返回数量受限的提案 / Return proposal-limited list
 
 
 def generate_surrogate_proposals(config: dict, candidates_dir: Path, target_grid: np.ndarray | None, response_records: list[dict], parents: list[np.ndarray], levels: list[float], default_thickness: float, max_neighbor_diff: float, population: int, rng: np.random.Generator) -> list[tuple[np.ndarray, str]]:  # 生成代理优化提案 / Generate surrogate-optimised proposals
@@ -435,10 +510,12 @@ def generate_surrogate_proposals(config: dict, candidates_dir: Path, target_grid
         return []  # 无集成则返回空 / Return empty without ensemble
     best_score = float(max(item["score"] for item in history))  # 读取历史最佳分 / Read historical best score
     pool = []  # 创建候选池 / Create candidate pool
-    pool_size = int(optimisation.get("bayesian_virtual_pool_size", max(72, population * 28)))  # 设置贝叶斯虚拟候选池大小 / Set Bayesian virtual candidate-pool size
+    configured_pool_size = int(optimisation.get("bayesian_virtual_pool_size", max(72, population * 28)))  # 读取配置候选池大小 / Read configured candidate-pool size
+    pool_size = min(configured_pool_size, max(48, population * 10))  # 将交互式候选池限制到实用规模 / Clamp interactive candidate pool to a practical size
     beta = float(optimisation.get("bayesian_ucb_beta", 0.35))  # 读取 UCB 探索强度 / Read UCB exploration strength
     ei_weight = float(optimisation.get("bayesian_expected_improvement_weight", 0.25))  # 读取期望改进权重 / Read expected-improvement weight
     kl_weight = float(optimisation.get("kl_proxy_weight", 0.35))  # 读取 KL 代理权重 / Read KL proxy weight
+    kl_pool_stride = max(1, int(optimisation.get("kl_proxy_pool_stride", 4)))  # 读取候选池 KL 精算步长 / Read pool KL exact-scoring stride
     novelty_weight = float(optimisation.get("novelty_weight", 0.18))  # 读取新颖度权重 / Read novelty weight
     mutation_rate = float(optimisation.get("genetic_mutation_rate", 0.12))  # 读取遗传算法变异率 / Read genetic algorithm mutation rate
     for pool_index in range(pool_size):  # 遍历虚拟候选 / Iterate virtual candidates
@@ -447,7 +524,7 @@ def generate_surrogate_proposals(config: dict, candidates_dir: Path, target_grid
         improvement = expected_improvement(predicted, uncertainty, best_score)  # 计算期望改进 / Compute expected improvement
         novelty = surrogate_novelty(surrogate, H, levels)  # 计算候选新颖度 / Compute candidate novelty
         alignment = target_alignment_score(H, target_grid, levels)  # 计算弱目标对齐 / Compute weak target alignment
-        kl_score = kl_proxy_candidate_score(H, target_grid, config)  # 计算 KL 离散特征代理分 / Compute KL discrete-eigen proxy score
+        kl_score = kl_proxy_candidate_score(H, target_grid, config) if pool_index % kl_pool_stride == 0 else alignment  # 间隔执行昂贵 KL 精算 / Run expensive KL exact scoring at intervals
         acquisition = predicted + beta * uncertainty + ei_weight * improvement + novelty_weight * novelty + 0.04 * alignment + kl_weight * kl_score  # 合成贝叶斯采集函数 / Combine Bayesian acquisition function
         pool.append((acquisition, predicted, uncertainty, improvement, novelty, kl_score, H, name))  # 保存池候选 / Store pool candidate
     selected = []  # 创建已选提案列表 / Create selected proposal list
@@ -492,15 +569,17 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
     parents = load_parent_matrices(candidates_dir, parent_limit) if ("evolutionary" in method or "genetic" in method or "ga" in method) and generation > 0 else []  # 读取遗传算法父代 / Load genetic algorithm parents
     target_grid = load_target_binary_grid(config, grid_size)  # 读取目标感知网格 / Load target-aware grid
     response_records = load_response_guidance_records(config, candidates_dir, target_grid) if target_grid is not None else []  # 读取真实响应闭环记录 / Load real-response closed-loop records
+    kl_proxy_proposals = generate_kl_proxy_optimised_proposals(config, candidates_dir, target_grid, parents, levels, default, max_diff, population, rng)  # 生成 KL 直接优化提案 / Generate directly KL-optimised proposals
     surrogate_proposals = generate_surrogate_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成代理模型优化提案 / Generate surrogate-model optimized proposals
+    inverse_proposals = kl_proxy_proposals + surrogate_proposals  # 合并直接物理优化和代理提案 / Combine direct physics and surrogate proposals
     response_count = max(min(population, len(response_records) * 2), int(population * 0.75)) if response_records else 0  # 计算闭环响应候选数量 / Compute response-guided candidate count
     target_count = max(response_count, max(min(population, 6), int(population * 0.90 if response_records else population * 0.75))) if target_grid is not None else 0  # 计算目标感知候选数量 / Compute target-aware candidate count
     candidate_ids = []  # 创建候选编号列表 / Create candidate id list
     for index in range(population):  # 遍历候选编号 / Iterate candidate index
         candidate_id = f"candidate_{generation:03d}_{index:04d}"  # 构造候选编号 / Build candidate id
-        if index < len(surrogate_proposals):  # 优先使用代理模型优化提案 / Prefer surrogate-model optimized proposals
-            H, variant_name = surrogate_proposals[index]  # 读取代理提案 / Read surrogate proposal
-            created_by = "surrogate_guided_inverse_search"  # 设置生成来源 / Set creation source
+        if index < len(inverse_proposals):  # 优先使用逆向优化提案 / Prefer inverse-optimised proposals
+            H, variant_name = inverse_proposals[index]  # 读取逆向提案 / Read inverse proposal
+            created_by = "kl_proxy_direct_inverse_search" if variant_name.startswith("kl_proxy_optimised") else "surrogate_guided_inverse_search"  # 设置生成来源 / Set creation source
         elif response_records and index < response_count:  # 其次生成闭环响应引导候选 / Then generate closed-loop response-guided candidates
             H, variant_name = generate_response_guided_H(response_records, index, levels, default, max_diff, rng)  # 生成闭环响应引导矩阵 / Generate response-guided matrix
             created_by = "response_guided_inverse_search"  # 设置生成来源 / Set creation source
