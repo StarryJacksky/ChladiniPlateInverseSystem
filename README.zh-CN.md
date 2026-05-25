@@ -127,3 +127,9 @@ python scripts/check_bilingual_comments.py
 ```powershell
 python scripts/check_docs_links.py
 ```
+
+检查保守的产物清理行为：
+
+```powershell
+python scripts/check_artifact_cleanup.py
+```

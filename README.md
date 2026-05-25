@@ -106,3 +106,10 @@ Check documentation links after editing README or docs:
 ```powershell
 python scripts/check_docs_links.py
 ```
+
+Check conservative artifact cleanup behavior:
+检查保守的产物清理行为：
+
+```powershell
+python scripts/check_artifact_cleanup.py
+```

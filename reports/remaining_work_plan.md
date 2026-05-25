@@ -86,8 +86,8 @@ Tasks:
    安装流程优先使用已运行进程，其次查找常见安装目录，最后才进入手动覆盖。
 2. Add manual override fields to the setup wizard when discovery fails.
    当自动发现失败时，在安装向导中提供手动覆盖字段。
-3. Keep generated artifacts recoverable and cleanup conservative.
-   保持生成产物可恢复，清理逻辑保守。
+3. Keep cleanup behavior covered by automated tests as artifact policy evolves.
+   随着产物策略演进，继续用自动测试覆盖清理行为。
 
 Recently completed:
 最近完成：
@@ -100,6 +100,8 @@ Recently completed:
   非侵入式 COMSOL/MATLAB 版本提示现在可识别 macOS、Windows 和 Linux 安装路径格式。
 - License diagnostics now tell users to open COMSOL/MATLAB once after install to confirm login or license state.
   license 诊断现在会提醒用户安装后先打开 COMSOL/MATLAB 一次，以确认登录或授权状态。
+- Artifact cleanup checks now verify that old regenerable files and temporary workflow files are cleanable while newest generations and mode CSV data stay protected.
+  产物清理检查现在会验证旧的可再生成文件和临时工作流文件可清理，同时保护最新代和模态 CSV 数据。
 
 ### 5. Documentation Drafts / 文档开发版
 

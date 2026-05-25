@@ -58,7 +58,7 @@ Tasks:
 
 1. Prefer already-running processes, then known install folders, then manual override in the setup flow.
 2. Add manual override fields to the setup wizard when discovery fails.
-3. Keep generated artifacts recoverable and cleanup conservative.
+3. Keep cleanup behavior covered by automated tests as artifact policy evolves.
 
 Recently completed:
 
@@ -66,6 +66,7 @@ Recently completed:
 - Discovery tests for install-path fixtures, missing configured paths, and running-process priority.
 - Non-invasive COMSOL/MATLAB version hints now recognise macOS, Windows, and Linux install-path formats.
 - License diagnostics now tell users to open COMSOL/MATLAB once after install to confirm login or license state.
+- Artifact cleanup checks now verify that old regenerable files and temporary workflow files are cleanable while newest generations and mode CSV data stay protected.
 
 ### 5. Documentation Drafts
 
