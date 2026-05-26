@@ -1,58 +1,130 @@
-from __future__ import annotations  # 启用现代类型注解 / Enable modern type hints
+from __future__ import annotations
 
-import subprocess  # 导入进程启动工具 / Import process-launch utilities
-import socket  # 导入 TCP 连接探测工具 / Import TCP connection probe utilities
-import time  # 导入等待工具 / Import waiting utilities
-from pathlib import Path  # 导入路径工具 / Import path utilities
+import subprocess
+import socket
+import time
+from pathlib import Path
 
-from src.comsol.discovery import config_with_runtime_discovery  # 导入运行时路径发现 / Import runtime path discovery
-
-
-DEFAULT_COMSOL_COMMAND = "/Applications/COMSOL64/Multiphysics/bin/comsol"  # 默认 COMSOL 命令路径 / Default COMSOL command path
-STARTED_SERVERS = []  # 保留本进程启动的 server 句柄 / Keep server handles started by this process
+from src.comsol.credentials import ensure_comsol_credentials
+from src.comsol.discovery import config_with_runtime_discovery
 
 
-def is_server_reachable(host: str, port: int, timeout_s: float = 1.0) -> bool:  # 检查 COMSOL server 是否可连接 / Check whether COMSOL server is reachable
-    try:  # 捕获连接错误 / Catch connection errors
-        with socket.create_connection((host, port), timeout=timeout_s):  # 尝试真实 TCP 连接 / Try a real TCP connection
-            return True  # 连接成功 / Connection succeeded
-    except OSError:  # 处理未监听或不可达 / Handle closed or unreachable port
-        return False  # 连接失败 / Connection failed
+DEFAULT_COMSOL_COMMAND = "/Applications/COMSOL64/Multiphysics/bin/comsol"
+STARTED_SERVERS = []
 
 
-def comsol_server_log_path(config: dict) -> Path:  # 获取 COMSOL server 日志路径 / Get COMSOL server log path
-    log_dir = Path(config.get("paths", {}).get("comsol_exports_dir", "data/comsol_exports"))  # 读取日志目录 / Read log directory
-    log_dir.mkdir(parents=True, exist_ok=True)  # 创建日志目录 / Create log directory
-    return log_dir / "mphserver.log"  # 返回日志文件路径 / Return log file path
+def build_runtime_options(config: dict) -> list[str]:
+    runtime_root = Path(config.get("paths", {}).get("comsol_exports_dir", "data/comsol_exports")) / ".comsol_runtime"
+    prefs_dir = runtime_root / "prefs"
+    configuration_dir = runtime_root / "configuration"
+    tmp_dir = runtime_root / "tmp"
+    recovery_dir = runtime_root / "recovery"
+    for path in [prefs_dir, configuration_dir, tmp_dir, recovery_dir]:
+        path.mkdir(parents=True, exist_ok=True)
+    return [
+        "-prefsdir",
+        str(prefs_dir),
+        "-configuration",
+        str(configuration_dir),
+        "-tmpdir",
+        str(tmp_dir),
+        "-recoverydir",
+        str(recovery_dir),
+    ]
 
 
-def start_mphserver(config: dict) -> subprocess.Popen:  # 启动 COMSOL mphserver / Start COMSOL mphserver
-    runtime_config, _applied, _discovery = config_with_runtime_discovery(config)  # 应用运行时路径发现 / Apply runtime path discovery
-    comsol_config = runtime_config.get("comsol", {})  # 读取 COMSOL 配置 / Read COMSOL config
-    command_path = str(comsol_config.get("comsol_command_path", DEFAULT_COMSOL_COMMAND))  # 读取 COMSOL 命令路径 / Read COMSOL command path
-    port = int(comsol_config.get("server_port", 2036))  # 读取 server 端口 / Read server port
-    log_path = comsol_server_log_path(config)  # 获取日志路径 / Get log path
-    log_file = log_path.open("a", encoding="utf-8")  # 打开日志文件 / Open log file
-    command = [command_path, "mphserver", "-port", str(port)]  # 构造启动命令 / Build start command
-    process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=log_file, stderr=subprocess.STDOUT)  # 启动后台 server 并保持 stdin / Start background server and keep stdin
-    STARTED_SERVERS.append(process)  # 保存进程句柄避免被回收 / Store process handle to avoid cleanup
-    return process  # 返回进程对象 / Return process object
+def build_server_options(config: dict) -> list[str]:
+    credentials = ensure_comsol_credentials(config)
+    user_name = credentials.username
+    options = ["-multi", "on", "-silent"]
+    if user_name:
+        options.extend(["-user", user_name, "-passwd", "nostore"])
+    return options
 
 
-def ensure_comsol_server(config: dict, wait_s: float | None = None) -> bool:  # 确保 COMSOL server 可用 / Ensure COMSOL server is available
-    runtime_config, _applied, _discovery = config_with_runtime_discovery(config)  # 应用运行时路径发现 / Apply runtime path discovery
-    comsol_config = runtime_config.get("comsol", {})  # 读取 COMSOL 配置 / Read COMSOL config
-    host = str(comsol_config.get("server_host", "127.0.0.1"))  # 读取 server 主机 / Read server host
-    port = int(comsol_config.get("server_port", 2036))  # 读取 server 端口 / Read server port
-    wait_seconds = float(wait_s if wait_s is not None else comsol_config.get("server_start_timeout_s", 30.0))  # 读取 server 启动等待时间 / Read server startup wait time
-    if is_server_reachable(host, port):  # 检查现有 server / Check existing server
-        return True  # 已经可用 / Already available
-    if not bool(comsol_config.get("auto_start_server", True)):  # 检查是否允许自动启动 / Check whether auto-start is allowed
-        return False  # 不自动启动 / Do not auto-start
-    start_mphserver(runtime_config)  # 启动 server / Start server
-    deadline = time.time() + wait_seconds  # 计算等待截止时间 / Compute wait deadline
-    while time.time() < deadline:  # 等待 server 就绪 / Wait for server readiness
-        if is_server_reachable(host, port):  # 检查连接 / Check connection
-            return True  # server 已就绪 / Server is ready
-        time.sleep(1.0)  # 短暂等待 / Wait briefly
-    return is_server_reachable(host, port)  # 返回最终检查结果 / Return final check result
+def build_mphserver_command(command_path: str, port: int, runtime_options: list[str] | None = None) -> list[str]:
+    executable = Path(command_path)
+    executable_name = executable.name.lower()
+    options = list(runtime_options or [])
+    if executable_name in {"comsolmphserver", "comsolmphserver.exe"}:
+        return [str(executable), "-port", str(port), *options]
+    if executable_name in {"comsol.exe", "comsolui.exe"}:
+        dedicated_server = executable.with_name("comsolmphserver.exe")
+        if dedicated_server.exists():
+            return [str(dedicated_server), "-port", str(port), *options]
+    return [command_path, "mphserver", "-port", str(port), *options]
+
+
+def is_server_reachable(host: str, port: int, timeout_s: float = 1.0) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=timeout_s):
+            return True
+    except OSError:
+        return False
+
+
+def comsol_server_log_path(config: dict) -> Path:
+    log_dir = Path(config.get("paths", {}).get("comsol_exports_dir", "data/comsol_exports"))
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return log_dir / "mphserver.log"
+
+
+def stop_started_servers() -> None:
+    while STARTED_SERVERS:
+        process = STARTED_SERVERS.pop()
+        if process.poll() is not None:
+            continue
+        process.terminate()
+        try:
+            process.wait(timeout=5.0)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5.0)
+
+
+def start_mphserver(config: dict) -> subprocess.Popen:
+    runtime_config, _applied, _discovery = config_with_runtime_discovery(config)
+    comsol_config = runtime_config.get("comsol", {})
+    command_path = str(comsol_config.get("comsol_command_path", DEFAULT_COMSOL_COMMAND))
+    port = int(comsol_config.get("server_port", 2036))
+    log_path = comsol_server_log_path(config)
+    log_file = log_path.open("a", encoding="utf-8")
+    runtime_options = build_runtime_options(runtime_config) + build_server_options(runtime_config)
+    command = build_mphserver_command(command_path, port, runtime_options)
+    log_file.write("command=" + " ".join(command) + "\n")
+    log_file.flush()
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    process = subprocess.Popen(
+        command,
+        stdin=subprocess.PIPE,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+        creationflags=creationflags,
+    )
+    credentials = ensure_comsol_credentials(runtime_config)
+    if credentials.password and process.stdin is not None:
+        process.stdin.write((credentials.password + "\n" + credentials.password + "\n").encode("utf-8"))
+        process.stdin.flush()
+    STARTED_SERVERS.append(process)
+    return process
+
+
+def ensure_comsol_server(config: dict, wait_s: float | None = None) -> bool:
+    runtime_config, _applied, _discovery = config_with_runtime_discovery(config)
+    comsol_config = runtime_config.get("comsol", {})
+    host = str(comsol_config.get("server_host", "127.0.0.1"))
+    port = int(comsol_config.get("server_port", 2036))
+    wait_seconds = float(wait_s if wait_s is not None else comsol_config.get("server_start_timeout_s", 30.0))
+    if is_server_reachable(host, port):
+        return True
+    if not bool(comsol_config.get("auto_start_server", True)):
+        return False
+    process = start_mphserver(runtime_config)
+    deadline = time.time() + wait_seconds
+    while time.time() < deadline:
+        if is_server_reachable(host, port):
+            return True
+        if process.poll() is not None:
+            return False
+        time.sleep(1.0)
+    return is_server_reachable(host, port)
