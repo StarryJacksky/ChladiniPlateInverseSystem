@@ -84,6 +84,17 @@ optimisation:
   latent_physics_count: 10 # 低维潜变量物理候选数量 / Number of low-dimensional latent physics candidates
   latent_physics_frontload_count: 6 # 每代前置潜变量物理候选数量 / Number of latent physics candidates front-loaded per generation
   latent_physics_pool_size: 180 # 潜变量物理虚拟候选池大小 / Latent physics virtual candidate-pool size
+  latent_physics_cma_base_count: 6 # 潜变量进化优化锚点数量 / Number of anchors for latent evolutionary optimisation
+  latent_physics_cma_steps: 5 # 潜变量进化优化轮数 / Number of latent evolutionary optimisation steps
+  latent_physics_cma_population: 22 # 每轮潜变量样本数量 / Latent samples per evolutionary step
+  latent_physics_cma_elite_fraction: 0.28 # 潜变量精英样本比例 / Elite fraction for latent optimisation
+  latent_physics_cma_sigma: 0.82 # 潜变量初始探索尺度 / Initial latent exploration sigma
+  latent_response_correction_weight: 0.075 # 真实响应误差校正权重 / Real-response error correction weight
+  latent_surrogate_optimism_penalty: 0.45 # 潜变量代理过度乐观惩罚 / Penalty for over-optimistic latent surrogate predictions
+  adaptive_family_scheduling: true # 根据真实分数自适应分配算法家族名额 / Adaptively allocate candidate-family slots from real scores
+  adaptive_family_history_limit: 96 # 自适应调度使用的最近真实候选数量 / Recent real candidates used by adaptive scheduling
+  adaptive_family_margin: 0.0012 # 家族切换所需真实分数优势 / Real-score advantage needed for family reallocation
+  adaptive_min_latent_frontload: 2 # 潜变量家族最少前置名额 / Minimum front-loaded slots for latent family
   response_guidance_limit: 10 # 真实响应失败记忆数量 / Number of real-response failure memories
   response_guidance_pool_limit: 36 # 真实响应闭环候选池数量 / Real-response closed-loop pool size
   response_closed_loop_count: 10 # 每批优先进入队列的真实响应闭环候选数 / Real-response closed-loop candidates promoted into each batch

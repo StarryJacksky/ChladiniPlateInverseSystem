@@ -332,6 +332,66 @@ def score_row_from_score_file(score_path: Path) -> dict | None:  # 从评分文�
     return {"candidate_id": candidate_id, "best_mode": score.get("best_mode"), "final_score": score.get("final_score", 0.0), "best_precision": score.get("best_precision", 0.0), "best_recall": score.get("best_recall", 0.0), "source": "score_json"}  # 返回候选行 / Return candidate row
 
 
+def source_performance_record(score_path: Path) -> dict | None:  # 从评分和元数据构造算法家族表现记录 / Build algorithm-family performance record from score and metadata
+    metadata_path = score_path.parent / "metadata.json"  # 构造元数据路径 / Build metadata path
+    if not metadata_path.exists():  # 检查元数据是否存在 / Check metadata existence
+        return None  # 无元数据则跳过 / Skip without metadata
+    row = score_row_from_score_file(score_path)  # 读取评分行 / Read score row
+    if row is None:  # 检查评分是否可用 / Check score usability
+        return None  # 不可用则跳过 / Skip unusable score
+    try:  # 捕获元数据读取失败 / Catch metadata read failures
+        with metadata_path.open("r", encoding="utf-8") as file_obj:  # 打开元数据文件 / Open metadata file
+            metadata = json.load(file_obj)  # 读取元数据 / Read metadata
+    except Exception:  # 元数据损坏时跳过 / Skip broken metadata
+        return None  # 返回空 / Return none
+    created_by = str(metadata.get("created_by", "unknown"))  # 读取创建来源 / Read creation source
+    optimizer = str(metadata.get("latent_optimizer", ""))  # 读取潜变量优化器 / Read latent optimizer
+    family = f"{created_by}:{optimizer}" if optimizer else created_by  # 构造算法家族键 / Build algorithm-family key
+    return {"candidate_id": row["candidate_id"], "generation": candidate_generation_number(row["candidate_id"]), "family": family, "score": safe_float(row.get("final_score", 0.0), 0.0)}  # 返回表现记录 / Return performance record
+
+
+def load_source_performance(candidates_dir: Path, limit: int) -> list[dict]:  # 读取最近算法家族真实表现 / Load recent real performance by algorithm family
+    records = []  # 创建记录列表 / Create record list
+    for score_path in sorted(candidates_dir.glob("candidate_*_*/score.json")):  # 遍历评分文件 / Iterate score files
+        record = source_performance_record(score_path)  # 构造家族表现记录 / Build family performance record
+        if record is not None:  # 检查记录是否有效 / Check record validity
+            records.append(record)  # 保存记录 / Store record
+    ordered = sorted(records, key=lambda item: (int(item["generation"]), float(item["score"])), reverse=True)  # 最近且高分优先排序 / Sort by recency and score
+    return ordered[:max(1, limit)]  # 返回限制后的记录 / Return limited records
+
+
+def top_family_mean(records: list[dict], token: str, count: int = 6) -> float:  # 计算算法家族顶部均分 / Compute top-score mean for an algorithm family
+    scores = sorted([float(record["score"]) for record in records if token in str(record.get("family", ""))], reverse=True)  # 提取家族分数 / Extract family scores
+    return float(np.mean(scores[:count])) if scores else -1.0e9  # 返回顶部均分或极小值 / Return top mean or tiny sentinel
+
+
+def adaptive_frontload_counts(config: dict, candidates_dir: Path, latent_default: int, auxiliary_default: int, population: int) -> tuple[int, int]:  # 自适应分配候选家族前置名额 / Adaptively allocate front-loaded slots by candidate family
+    optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation settings
+    if not optimisation.get("adaptive_family_scheduling", True):  # 检查是否关闭自适应调度 / Check whether adaptive scheduling is disabled
+        return latent_default, auxiliary_default  # 返回配置默认值 / Return configured defaults
+    limit = int(optimisation.get("adaptive_family_history_limit", 96))  # 读取历史窗口数量 / Read history-window size
+    records = load_source_performance(candidates_dir, limit)  # 读取最近真实表现 / Load recent real performance
+    latent_scores = [record for record in records if "latent_physics_inverse_search" in str(record.get("family", ""))]  # 提取潜变量家族记录 / Extract latent-family records
+    auxiliary_scores = [record for record in records if "auxiliary_physics_inverse_search" in str(record.get("family", ""))]  # 提取辅助物理家族记录 / Extract auxiliary-family records
+    if len(latent_scores) < 4 or len(auxiliary_scores) < 4:  # 检查是否样本不足 / Check whether samples are insufficient
+        return latent_default, auxiliary_default  # 样本不足时保持默认 / Keep defaults with insufficient samples
+    margin = float(optimisation.get("adaptive_family_margin", 0.0012))  # 读取切换优势阈值 / Read switching margin
+    min_latent = min(latent_default, int(optimisation.get("adaptive_min_latent_frontload", 2)))  # 读取潜变量最小名额 / Read minimum latent slots
+    latent_mean = top_family_mean(records, "latent_physics_inverse_search")  # 计算潜变量顶部均分 / Compute latent top mean
+    auxiliary_mean = top_family_mean(records, "auxiliary_physics_inverse_search")  # 计算辅助物理顶部均分 / Compute auxiliary top mean
+    latent_count = latent_default  # 初始化潜变量名额 / Initialize latent slot count
+    auxiliary_count = auxiliary_default  # 初始化辅助物理名额 / Initialize auxiliary slot count
+    if auxiliary_mean > latent_mean + margin:  # 检查辅助物理是否显著更好 / Check whether auxiliary physics is clearly better
+        shift = min(max(0, latent_default - min_latent), max(1, latent_default // 2))  # 计算从潜变量转出的名额 / Compute slots shifted away from latent family
+        latent_count = max(min_latent, latent_default - shift)  # 降低潜变量名额 / Reduce latent slots
+        auxiliary_count = auxiliary_default + shift  # 增加辅助物理名额 / Increase auxiliary slots
+    elif latent_mean > auxiliary_mean + margin:  # 检查潜变量是否显著更好 / Check whether latent family is clearly better
+        shift = max(1, auxiliary_default // 4)  # 计算转给潜变量的名额 / Compute slots shifted to latent family
+        latent_count = min(population, latent_default + shift)  # 增加潜变量名额 / Increase latent slots
+        auxiliary_count = max(0, auxiliary_default - shift)  # 降低辅助物理名额 / Reduce auxiliary slots
+    return min(population, latent_count), min(max(0, population - min(population, latent_count)), auxiliary_count)  # 返回受人口约束的名额 / Return population-constrained slots
+
+
 def load_response_guidance_rows(candidates_dir: Path, pool_limit: int) -> list[dict]:  # 读取可用于闭环的候选行 / Load candidate rows usable for closed-loop guidance
     rows = {}  # 创建候选行字典 / Create candidate-row dictionary
     ranking_path = candidates_dir / "ranked_candidates.csv"  # 构造排行文件路径 / Build ranking file path
@@ -680,6 +740,10 @@ def proposal_auxiliary_fields(proposal: tuple) -> dict[str, np.ndarray] | None: 
     return proposal[2] if len(proposal) > 2 else None  # 三元提案返回辅助场 / Return auxiliary fields for three-part proposals
 
 
+def proposal_metadata(proposal: tuple) -> dict:  # 读取提案自带元数据 / Read proposal-owned metadata
+    return dict(proposal[3]) if len(proposal) > 3 else {}  # 四元提案返回元数据副本 / Return metadata copy for four-part proposals
+
+
 def is_diverse_candidate(H: np.ndarray, selected: list[tuple], levels: list[float], threshold: float = 0.055) -> bool:  # 判断候选是否足够多样 / Decide whether candidate is diverse enough
     if not selected:  # 检查是否尚无已选候选 / Check whether no candidates are selected yet
         return True  # 第一个候选总是保留 / Always keep first candidate
@@ -1023,7 +1087,96 @@ def latent_fields_are_diverse(fields: dict[str, np.ndarray], selected: list[tupl
     return True if not distances else min(distances) >= threshold  # 返回多样性判断 / Return diversity decision
 
 
-def generate_latent_physics_proposals(config: dict, candidates_dir: Path, target_grid: np.ndarray | None, levels: list[float], default_thickness: float, max_neighbor_diff: float, population: int, generation: int, rng: np.random.Generator) -> list[tuple[np.ndarray, str, dict[str, np.ndarray]]]:  # 生成潜变量联合物理提案 / Generate latent joint-physics proposals
+def response_record_for_base(base: dict, response_records: list[dict], levels: list[float]) -> dict | None:  # 为潜变量锚点寻找真实响应记录 / Find real-response record for a latent anchor
+    if not response_records:  # 检查是否没有响应记录 / Check whether no response records exist
+        return None  # 无记录则返回空 / Return none without records
+    for record in response_records:  # 优先按候选编号匹配 / Prefer candidate-id matching
+        if str(record.get("candidate_id", "")) == str(base.get("candidate_id", "")):  # 检查是否同一候选 / Check whether candidate ids match
+            return record  # 返回精确匹配记录 / Return exact record
+    anchor = matrix_to_guidance(base["H"], levels).ravel()  # 构建锚点厚度向量 / Build anchor thickness vector
+    distances = [(float(np.sqrt(np.mean(np.square(anchor - matrix_to_guidance(record["H"], levels).ravel())))), record) for record in response_records]  # 计算到响应记录距离 / Compute distances to response records
+    return min(distances, key=lambda item: item[0])[1]  # 返回最近响应记录 / Return nearest response record
+
+
+def latent_response_correction_score(fields: dict[str, np.ndarray], response_record: dict | None, target_grid: np.ndarray, config: dict) -> float:  # 计算真实响应误差校正分 / Compute real-response error correction score
+    if response_record is None:  # 检查是否没有真实响应记录 / Check whether no real-response record exists
+        return auxiliary_alignment_score(fields, target_grid, config)  # 退回辅助变量对齐 / Fall back to auxiliary alignment
+    target = normalise_design_map(response_record.get("target", target_grid))  # 读取目标图 / Read target map
+    missing = normalise_design_map(smooth_design_map(response_record.get("missing", target), 2))  # 平滑缺失响应图 / Smooth missing-response map
+    avoid = normalise_design_map(smooth_design_map(response_record.get("avoid", response_record.get("extra", 1.0 - target)), 2))  # 平滑多余响应规避图 / Smooth extra-response avoidance map
+    edge = target_edge_guidance(target)  # 构建目标边缘图 / Build target edge map
+    channel = normalise_design_map(0.72 * target + 0.28 * edge)  # 构建目标通道图 / Build target channel map
+    density = normalise_auxiliary_field(fields["density_scale"], "density_scale", config)  # 归一化密度倍率场 / Normalize density-scale field
+    loss = normalise_auxiliary_field(fields["loss_factor"], "loss_factor", config)  # 归一化损耗因子场 / Normalize loss-factor field
+    loss_score = float(np.mean(loss * avoid + (1.0 - loss) * channel))  # 奖励多余区高损耗和目标通道低损耗 / Reward high loss on extra areas and low loss on target channel
+    density_positive = float(np.mean(density * missing + (1.0 - density) * avoid))  # 假设缺失区需要更高惯性 / Assume missing areas need higher inertia
+    density_negative = float(np.mean((1.0 - density) * missing + density * avoid))  # 假设缺失区需要更低惯性 / Assume missing areas need lower inertia
+    missing_channel = float(np.mean((1.0 - loss) * missing + density * channel))  # 奖励缺失目标附近形成低损耗惯性通道 / Reward low-loss inertial channel near missing target strokes
+    return float(np.clip(0.46 * loss_score + 0.32 * max(density_positive, density_negative) + 0.22 * missing_channel, 0.0, 1.0))  # 返回校正分 / Return correction score
+
+
+def latent_physics_acquisition(base: dict, H: np.ndarray, target_grid: np.ndarray, levels: list[float], config: dict, coefficients: np.ndarray, surrogate: dict, ensemble: list[dict], best_score: float, beta: float, response_record: dict | None) -> dict:  # 评估潜变量联合物理采集函数 / Evaluate latent joint-physics acquisition
+    fields = compose_latent_auxiliary_fields(H, target_grid, levels, config, coefficients, base.get("auxiliary_fields"))  # 合成显式辅助物理场 / Compose explicit auxiliary physics fields
+    predicted, uncertainty = predict_bayesian_surrogate_stats(ensemble, H, levels, fields, config)  # 预测真实评分分布 / Predict real-score distribution
+    improvement = expected_improvement(predicted, uncertainty, best_score)  # 计算期望改进 / Compute expected improvement
+    novelty = surrogate_novelty(surrogate, H, levels, fields, config)  # 计算联合设计新颖度 / Compute joint-design novelty
+    auxiliary_alignment = auxiliary_alignment_score(fields, target_grid, config)  # 计算辅助场目标对齐 / Compute auxiliary-target alignment
+    response_correction = latent_response_correction_score(fields, response_record, target_grid, config)  # 计算真实响应误差校正 / Compute real-response error correction
+    optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation settings
+    optimism_penalty = float(optimisation.get("latent_surrogate_optimism_penalty", 0.45))  # 读取代理乐观惩罚 / Read surrogate optimism penalty
+    response_weight = float(optimisation.get("latent_response_correction_weight", 0.075))  # 读取响应校正权重 / Read response-correction weight
+    anchor_score = float(base.get("score", best_score))  # 读取锚点真实分数 / Read anchor real score
+    optimism = max(0.0, predicted - anchor_score)  # 计算代理超出锚点的乐观差 / Compute optimistic gap beyond anchor
+    trusted_prediction = predicted - optimism_penalty * optimism  # 压低过度乐观预测 / Damp over-optimistic prediction
+    acquisition = trusted_prediction + beta * uncertainty + 0.44 * improvement + 0.12 * novelty + 0.030 * auxiliary_alignment + response_weight * response_correction  # 合成响应校正采集函数 / Combine response-corrected acquisition
+    return {"acquisition": float(acquisition), "fields": fields, "predicted": float(predicted), "trusted_prediction": float(trusted_prediction), "uncertainty": float(uncertainty), "improvement": float(improvement), "novelty": float(novelty), "auxiliary_alignment": float(auxiliary_alignment), "response_correction": float(response_correction), "surrogate_optimism": float(optimism)}  # 返回评估包 / Return evaluation bundle
+
+
+def latent_proposal_record(H: np.ndarray, base: dict, generation: int, coefficients: np.ndarray, evaluation: dict, optimizer_name: str) -> tuple[float, np.ndarray, str, dict[str, np.ndarray], dict]:  # 构造潜变量提案记录 / Build a latent proposal record
+    fingerprint = latent_coefficients_fingerprint(coefficients)  # 生成系数指纹 / Build coefficient fingerprint
+    predicted = float(evaluation["predicted"])  # 读取预测均值 / Read predicted mean
+    uncertainty = float(evaluation["uncertainty"])  # 读取预测不确定性 / Read predicted uncertainty
+    improvement = float(evaluation["improvement"])  # 读取期望改进 / Read expected improvement
+    auxiliary_alignment = float(evaluation["auxiliary_alignment"])  # 读取辅助场对齐分 / Read auxiliary alignment
+    novelty = float(evaluation["novelty"])  # 读取新颖度 / Read novelty score
+    response_correction = float(evaluation.get("response_correction", auxiliary_alignment))  # 读取响应校正分 / Read response-correction score
+    name = f"latent_physics_{optimizer_name}_from_{base['candidate_id']}_g{generation:03d}_{fingerprint}_mean_{predicted:.3f}_std_{uncertainty:.3f}_ei_{improvement:.3f}_resp_{response_correction:.2f}_aux_{auxiliary_alignment:.2f}_novel_{novelty:.2f}"  # 构造候选名称 / Build candidate name
+    metadata = {"latent_optimizer": optimizer_name, "latent_anchor_candidate": base["candidate_id"], "latent_coefficients": np.round(coefficients.astype(float), 4).tolist(), "latent_predicted_score": predicted, "latent_trusted_prediction": float(evaluation.get("trusted_prediction", predicted)), "latent_uncertainty": uncertainty, "latent_expected_improvement": improvement, "latent_auxiliary_alignment": auxiliary_alignment, "latent_response_correction": response_correction, "latent_surrogate_optimism": float(evaluation.get("surrogate_optimism", 0.0)), "latent_novelty": novelty}  # 构造可追踪元数据 / Build traceable metadata
+    return float(evaluation["acquisition"]), H, name, evaluation["fields"], metadata  # 返回提案记录 / Return proposal record
+
+
+def optimise_latent_coefficients_for_base(base: dict, target_grid: np.ndarray, levels: list[float], default_thickness: float, max_neighbor_diff: float, config: dict, surrogate: dict, ensemble: list[dict], best_score: float, beta: float, basis_count: int, generation: int, rng: np.random.Generator, response_record: dict | None) -> list[tuple[float, np.ndarray, str, dict[str, np.ndarray], dict]]:  # 围绕单个真实锚点优化潜变量系数 / Optimise latent coefficients around one real anchor
+    optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation settings
+    steps = int(optimisation.get("latent_physics_cma_steps", 5))  # 读取潜变量进化轮数 / Read latent evolutionary step count
+    sample_count = int(optimisation.get("latent_physics_cma_population", 22))  # 读取每轮采样数量 / Read samples per step
+    elite_fraction = float(optimisation.get("latent_physics_cma_elite_fraction", 0.28))  # 读取精英比例 / Read elite fraction
+    elite_count = max(2, min(sample_count, int(round(sample_count * elite_fraction))))  # 计算精英数量 / Compute elite count
+    sigma = float(optimisation.get("latent_physics_cma_sigma", 0.82))  # 读取初始探索尺度 / Read initial exploration sigma
+    dimension = basis_count * 2  # 读取潜变量维度 / Read latent dimension
+    mean = np.zeros(dimension, dtype=float)  # 初始化潜变量均值 / Initialize latent mean
+    records = []  # 创建优化记录池 / Create optimisation record pool
+    anchor_H = base["H"].copy().astype(float)  # 复制锚点厚度 / Copy anchor thickness
+    for step in range(max(1, steps)):  # 遍历进化轮数 / Iterate evolutionary steps
+        generation_records = []  # 创建本轮记录 / Create records for this step
+        progress = step / max(steps - 1, 1)  # 计算退火进度 / Compute annealing progress
+        mutation_rate = 0.006 + 0.014 * (1.0 - progress)  # 计算厚度轻扰率 / Compute light thickness mutation rate
+        for sample_index in range(max(2, sample_count)):  # 遍历本轮样本 / Iterate samples in this step
+            coefficients = np.clip(mean + rng.normal(0.0, sigma, size=dimension), -2.8, 2.8)  # 采样并裁剪潜变量系数 / Sample and clip latent coefficients
+            H = anchor_H if sample_index == 0 and step == 0 else lightly_mutate_physics_base(anchor_H, levels, default_thickness, max_neighbor_diff, rng, rate=mutation_rate)  # 保留锚点或轻扰厚度 / Keep anchor or lightly perturb thickness
+            evaluation = latent_physics_acquisition(base, H, target_grid, levels, config, coefficients, surrogate, ensemble, best_score, beta, response_record)  # 评估潜变量采集函数 / Evaluate latent acquisition
+            generation_records.append(latent_proposal_record(H, base, generation, coefficients, evaluation, "cma"))  # 保存本轮提案记录 / Store step proposal record
+        generation_records = sorted(generation_records, key=lambda item: item[0], reverse=True)  # 按采集函数排序 / Sort by acquisition
+        elites = np.asarray([item[4]["latent_coefficients"] for item in generation_records[:elite_count]], dtype=float)  # 提取精英系数 / Extract elite coefficients
+        weights = np.linspace(1.0, 0.35, elite_count, dtype=float)  # 构造线性精英权重 / Build linear elite weights
+        weights = weights / max(float(weights.sum()), 1.0e-9)  # 归一化权重 / Normalize weights
+        mean = np.sum(elites * weights[:, None], axis=0)  # 更新潜变量均值 / Update latent mean
+        elite_spread = float(np.sqrt(np.mean(np.square(elites - mean))))  # 估计精英扩散尺度 / Estimate elite spread
+        sigma = float(np.clip(0.62 * sigma + 0.38 * elite_spread, 0.16, 1.20))  # 更新探索尺度 / Update exploration scale
+        records.extend(generation_records[:max(elite_count, 3)])  # 保存本轮优秀记录 / Store strong records from this step
+    return sorted(records, key=lambda item: item[0], reverse=True)  # 返回排序后的优化记录 / Return sorted optimisation records
+
+
+def generate_latent_physics_proposals(config: dict, candidates_dir: Path, target_grid: np.ndarray | None, response_records: list[dict], levels: list[float], default_thickness: float, max_neighbor_diff: float, population: int, generation: int, rng: np.random.Generator) -> list[tuple[np.ndarray, str, dict[str, np.ndarray], dict]]:  # 生成潜变量联合物理提案 / Generate latent joint-physics proposals
     if target_grid is None or not config.get("design_variables", {}).get("export_auxiliary_fields", True):  # 检查目标和辅助场开关 / Check target and auxiliary-field switch
         return []  # 不满足条件时返回空 / Return empty when unavailable
     optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation settings
@@ -1039,24 +1192,22 @@ def generate_latent_physics_proposals(config: dict, candidates_dir: Path, target
     beta = float(optimisation.get("bayesian_ucb_beta", 0.35))  # 读取 UCB 探索强度 / Read UCB exploration strength
     pool = []  # 创建潜变量候选池 / Create latent candidate pool
     basis_count = len(latent_physics_basis_maps(bases[0]["H"], target_grid, levels))  # 读取潜变量维度 / Read latent basis dimension
+    cma_base_count = min(len(bases), int(optimisation.get("latent_physics_cma_base_count", 6)))  # 读取潜变量优化锚点数量 / Read latent optimisation anchor count
+    for base in bases[:cma_base_count]:  # 遍历高分真实锚点 / Iterate high-score real anchors
+        response_record = response_record_for_base(base, response_records, levels)  # 查找锚点对应真实响应 / Find real response for anchor
+        pool.extend(optimise_latent_coefficients_for_base(base, target_grid, levels, default_thickness, max_neighbor_diff, config, surrogate, ensemble, best_score, beta, basis_count, generation, rng, response_record))  # 加入进化优化记录 / Add evolutionary optimisation records
     for index in range(max(pool_size, count)):  # 遍历虚拟潜变量候选 / Iterate virtual latent candidates
         base = bases[index % len(bases)]  # 选择高分基底 / Select high-score base
         H = base["H"].copy().astype(float) if index < len(bases) * 3 else lightly_mutate_physics_base(base["H"], levels, default_thickness, max_neighbor_diff, rng, rate=0.010 + 0.006 * (index % 4))  # 保留或轻扰厚度基底 / Keep or lightly perturb thickness base
         spread = 0.62 if index < len(bases) * 4 else 0.95  # 设置潜变量探索尺度 / Set latent exploration spread
         coefficients = rng.normal(0.0, spread, size=basis_count * 2)  # 采样潜变量系数 / Sample latent coefficients
-        fields = compose_latent_auxiliary_fields(H, target_grid, levels, config, coefficients, base.get("auxiliary_fields"))  # 合成显式辅助场 / Compose explicit auxiliary fields
-        predicted, uncertainty = predict_bayesian_surrogate_stats(ensemble, H, levels, fields, config)  # 预测真实评分分布 / Predict real-score distribution
-        improvement = expected_improvement(predicted, uncertainty, best_score)  # 计算期望改进 / Compute expected improvement
-        novelty = surrogate_novelty(surrogate, H, levels, fields, config)  # 计算联合设计新颖度 / Compute joint-design novelty
-        auxiliary_alignment = auxiliary_alignment_score(fields, target_grid, config)  # 计算辅助场目标对齐 / Compute auxiliary-target alignment
-        acquisition = predicted + beta * uncertainty + 0.40 * improvement + 0.10 * novelty + 0.045 * auxiliary_alignment  # 合成潜变量采集函数 / Combine latent acquisition function
-        fingerprint = latent_coefficients_fingerprint(coefficients)  # 生成系数指纹 / Build coefficient fingerprint
-        name = f"latent_physics_from_{base['candidate_id']}_g{generation:03d}_{fingerprint}_mean_{predicted:.3f}_std_{uncertainty:.3f}_ei_{improvement:.3f}_aux_{auxiliary_alignment:.2f}_novel_{novelty:.2f}"  # 构造候选名称 / Build candidate name
-        pool.append((acquisition, H, name, fields))  # 保存池候选 / Store pool candidate
+        response_record = response_record_for_base(base, response_records, levels)  # 查找随机样本锚点真实响应 / Find real response for random-sample anchor
+        evaluation = latent_physics_acquisition(base, H, target_grid, levels, config, coefficients, surrogate, ensemble, best_score, beta, response_record)  # 评估随机潜变量采集函数 / Evaluate random latent acquisition
+        pool.append(latent_proposal_record(H, base, generation, coefficients, evaluation, "random"))  # 保存随机潜变量记录 / Store random latent record
     selected = []  # 创建已选潜变量提案 / Create selected latent proposals
-    for _score, H, name, fields in sorted(pool, key=lambda item: item[0], reverse=True):  # 按采集函数排序 / Sort by acquisition value
+    for _score, H, name, fields, metadata in sorted(pool, key=lambda item: item[0], reverse=True):  # 按采集函数排序 / Sort by acquisition value
         if latent_fields_are_diverse(fields, selected, config):  # 检查显式辅助场多样性 / Check explicit auxiliary-field diversity
-            selected.append((H, name, fields))  # 保存显式辅助场提案 / Store explicit auxiliary-field proposal
+            selected.append((H, name, fields, metadata))  # 保存显式辅助场提案 / Store explicit auxiliary-field proposal
         if len(selected) >= count:  # 检查是否达到数量 / Check proposal count
             break  # 停止选择 / Stop selection
     return selected  # 返回潜变量提案 / Return latent proposals
@@ -1093,15 +1244,18 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
     target_grid = load_target_binary_grid(config, grid_size)  # 读取目标感知网格 / Load target-aware grid
     response_records = load_response_guidance_records(config, candidates_dir, target_grid) if target_grid is not None else []  # 读取真实响应闭环记录 / Load real-response closed-loop records
     response_closed_loop_proposals = generate_response_closed_loop_proposals(config, response_records, levels, default, max_diff, population, rng)  # 生成一等真实响应闭环提案 / Generate first-class real-response closed-loop proposals
-    latent_physics_proposals = generate_latent_physics_proposals(config, candidates_dir, target_grid, levels, default, max_diff, population, generation, rng)  # 生成低维潜变量联合物理提案 / Generate low-dimensional latent joint-physics proposals
+    latent_physics_proposals = generate_latent_physics_proposals(config, candidates_dir, target_grid, response_records, levels, default, max_diff, population, generation, rng)  # 生成低维潜变量联合物理提案 / Generate low-dimensional latent joint-physics proposals
     auxiliary_physics_proposals = generate_auxiliary_physics_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, generation, rng)  # 生成独立质量阻尼提案 / Generate independent mass-damping proposals
     modal_compiler_proposals = generate_modal_compiler_proposals(config, target_grid, parents, levels, default, max_diff, population, rng)  # 生成目标模态编译提案 / Generate target-modal compiler proposals
     kl_proxy_proposals = generate_kl_proxy_optimised_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成 KL 直接优化提案 / Generate directly KL-optimised proposals
     surrogate_proposals = generate_surrogate_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成代理模型优化提案 / Generate surrogate-model optimized proposals
-    latent_frontload_count = min(len(latent_physics_proposals), int(config.get("optimisation", {}).get("latent_physics_frontload_count", 0)))  # 读取潜变量前置数量 / Read latent front-load count
+    latent_frontload_default = int(config.get("optimisation", {}).get("latent_physics_frontload_count", 0))  # 读取默认潜变量前置数量 / Read default latent front-load count
+    auxiliary_frontload_default = int(config.get("optimisation", {}).get("auxiliary_physics_frontload_count", 0))  # 读取默认辅助物理前置数量 / Read default auxiliary front-load count
+    latent_frontload_target, auxiliary_frontload_target = adaptive_frontload_counts(config, candidates_dir, latent_frontload_default, auxiliary_frontload_default, population)  # 根据真实表现自适应分配前置名额 / Adapt front-loaded slots from real performance
+    latent_frontload_count = min(len(latent_physics_proposals), latent_frontload_target)  # 读取潜变量前置数量 / Read latent front-load count
     frontloaded_latent_proposals = latent_physics_proposals[:latent_frontload_count]  # 提取前置潜变量提案 / Extract front-loaded latent proposals
     remaining_latent_proposals = latent_physics_proposals[latent_frontload_count:]  # 提取剩余潜变量提案 / Extract remaining latent proposals
-    auxiliary_frontload_count = min(len(auxiliary_physics_proposals), int(config.get("optimisation", {}).get("auxiliary_physics_frontload_count", 0)))  # 读取辅助物理前置数量 / Read auxiliary-physics front-load count
+    auxiliary_frontload_count = min(len(auxiliary_physics_proposals), auxiliary_frontload_target)  # 读取辅助物理前置数量 / Read auxiliary-physics front-load count
     frontloaded_auxiliary_proposals = auxiliary_physics_proposals[:auxiliary_frontload_count]  # 提取前置辅助物理提案 / Extract front-loaded auxiliary proposals
     remaining_auxiliary_proposals = auxiliary_physics_proposals[auxiliary_frontload_count:]  # 提取剩余辅助物理提案 / Extract remaining auxiliary proposals
     remaining_slots = max(0, population - len(frontloaded_latent_proposals) - len(frontloaded_auxiliary_proposals))  # 计算剩余队列名额 / Compute remaining queue slots
@@ -1113,11 +1267,13 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
     for index in range(population):  # 遍历候选编号 / Iterate candidate index
         candidate_id = f"candidate_{generation:03d}_{index:04d}"  # 构造候选编号 / Build candidate id
         proposed_auxiliary_fields = None  # 初始化提案自带辅助场 / Initialize proposal-owned auxiliary fields
+        proposed_metadata = {}  # 初始化提案自带元数据 / Initialize proposal-owned metadata
         if index < len(inverse_proposals):  # 优先使用逆向优化提案 / Prefer inverse-optimised proposals
             proposal = inverse_proposals[index]  # 读取逆向提案对象 / Read inverse proposal object
             H = proposal_matrix(proposal)  # 读取提案厚度矩阵 / Read proposal thickness matrix
             variant_name = proposal_name(proposal)  # 读取提案名称 / Read proposal name
             proposed_auxiliary_fields = proposal_auxiliary_fields(proposal)  # 读取提案自带辅助场 / Read proposal-owned auxiliary fields
+            proposed_metadata = proposal_metadata(proposal)  # 读取提案自带元数据 / Read proposal-owned metadata
             created_by = "latent_physics_inverse_search" if variant_name.startswith("latent_physics") else ("response_guided_inverse_search" if variant_name.startswith("response_closed_loop") else ("auxiliary_physics_inverse_search" if variant_name.startswith("aux_") else ("modal_pde_inverse_compiler" if variant_name.startswith("modal_compiler") else ("kl_proxy_direct_inverse_search" if variant_name.startswith("kl_proxy_optimised") else "surrogate_guided_inverse_search"))))  # 设置生成来源 / Set creation source
         elif response_records and index < response_count:  # 其次生成闭环响应引导候选 / Then generate closed-loop response-guided candidates
             H, variant_name = generate_response_guided_H(response_records, index, levels, default, max_diff, rng)  # 生成闭环响应引导矩阵 / Generate response-guided matrix
@@ -1132,6 +1288,7 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
             created_by = "genetic_search" if parents else "random_search"  # 设置生成来源 / Set creation source
         auxiliary_fields = proposed_auxiliary_fields if proposed_auxiliary_fields is not None else (build_auxiliary_design_fields(H, levels, target_grid, config, None, variant_name) if config.get("design_variables", {}).get("export_auxiliary_fields", True) else {})  # 使用显式辅助场或构建默认辅助场 / Use explicit auxiliary fields or build default fields
         metadata = {"candidate_id": candidate_id, "generation": generation, "grid_size": grid_size, "thickness_mode": "continuous", "thickness_bounds_mm": levels, "center_fixed": True, "created_by": created_by, "target_guidance_variant": variant_name, "target_guided": target_grid is not None, "auxiliary_fields": sorted(auxiliary_fields.keys())}  # 记录元数据 / Record metadata
+        metadata.update(proposed_metadata)  # 合并提案自带元数据 / Merge proposal-owned metadata
         save_candidate(candidates_dir / candidate_id, H, metadata, auxiliary_fields)  # 保存候选 / Save candidate
         candidate_ids.append(candidate_id)  # 添加候选编号 / Add candidate id
     return candidate_ids  # 返回候选编号 / Return candidate ids
