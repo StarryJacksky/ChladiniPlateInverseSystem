@@ -79,7 +79,8 @@ optimisation:
   bayesian_expected_improvement_weight: 0.30 # 期望改进权重 / Expected improvement weight
   target_min_mode: 8 # 目标图案最低匹配模态 / Minimum mode used for target matching
   modal_compiler_count: 4 # 目标模态编译候选数量 / Number of target-modal compiler candidates
-  auxiliary_physics_count: 8 # 独立质量阻尼候选数量 / Number of independent mass-damping candidates
+  auxiliary_physics_count: 16 # 独立质量阻尼候选数量 / Number of independent mass-damping candidates
+  auxiliary_physics_frontload_count: 10 # 每代前置质量阻尼候选数量 / Number of mass-damping candidates front-loaded per generation
   response_guidance_limit: 10 # 真实响应失败记忆数量 / Number of real-response failure memories
   response_guidance_pool_limit: 36 # 真实响应闭环候选池数量 / Real-response closed-loop pool size
   response_closed_loop_count: 10 # 每批优先进入队列的真实响应闭环候选数 / Real-response closed-loop candidates promoted into each batch
