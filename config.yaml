@@ -81,16 +81,20 @@ optimisation:
   modal_compiler_count: 4 # 目标模态编译候选数量 / Number of target-modal compiler candidates
   response_guidance_limit: 10 # 真实响应失败记忆数量 / Number of real-response failure memories
   response_guidance_pool_limit: 36 # 真实响应闭环候选池数量 / Real-response closed-loop pool size
+  response_closed_loop_count: 10 # 每批优先进入队列的真实响应闭环候选数 / Real-response closed-loop candidates promoted into each batch
   feasibility_min_real_candidates: 4 # 可行性诊断最少真实候选数 / Minimum real candidates for feasibility diagnosis
   feasibility_score_floor: 0.08 # 厚度单变量可接受分数下限 / Acceptable score floor for thickness-only search
   feasibility_precision_floor: 0.20 # 厚度单变量可接受精度下限 / Acceptable precision floor for thickness-only search
-  kl_proxy_weight: 0.12 # KL 物理代理权重 / KL physics proxy weight
+  kl_proxy_weight: 0.06 # KL 物理代理权重 / KL physics proxy weight
   kl_proxy_surrogate_cap: 0.10 # 代理采集中的 KL 可信增益上限 / Trusted KL gain cap inside surrogate acquisition
+  kl_proxy_real_history_radius: 0.10 # KL 代理真实历史相似度半径 / Real-history similarity radius for KL proxy
+  kl_proxy_real_penalty_weight: 0.18 # KL 代理靠近坏真实样本的惩罚权重 / Penalty weight when KL proxy is near bad real samples
+  kl_proxy_real_reward_weight: 0.045 # KL 代理靠近好真实样本的奖励权重 / Reward weight when KL proxy is near good real samples
   kl_proxy_objective: "search_soft" # KL 代理搜索目标 / KL proxy search objective
   kl_proxy_grid_size: 31 # KL 代理高分辨率求解网格 / High-resolution solve grid for KL proxy
   kl_proxy_num_modes: 32 # KL 代理参与匹配的模态数量 / Number of KL proxy modes used for matching
   kl_proxy_min_mode: 8 # KL 代理最低匹配模态 / Minimum KL proxy matching mode
-  kl_proxy_optimised_count: 6 # KL 直接优化候选数量 / Number of directly KL-optimised candidates
+  kl_proxy_optimised_count: 3 # KL 直接优化候选数量 / Number of directly KL-optimised candidates
   kl_proxy_local_steps: 14 # KL 直接优化局部搜索步数 / Local search steps for direct KL optimisation
   kl_proxy_pool_stride: 6 # 贝叶斯候选池 KL 精算间隔 / KL exact-scoring interval for Bayesian pool
   kl_proxy_start_temperature: 0.080 # KL 退火初始温度 / Initial KL annealing temperature

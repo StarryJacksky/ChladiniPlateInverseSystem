@@ -12,12 +12,12 @@
     "support_position",
     "actuator_position_phase"
   ],
-  "real_candidate_count": 8,
+  "real_candidate_count": 109,
   "best_candidate": "candidate_159_0000",
   "best_final_score": 0.016091261708721605,
   "best_precision": 0.05972515856236787,
   "best_recall": 0.15081748415081747,
-  "mean_centerline_penalty": 0.11569209528455734,
+  "mean_centerline_penalty": 0.14831838450025117,
   "records": [
     {
       "candidate_id": "candidate_159_0000",
@@ -40,6 +40,36 @@
       "frequency_hz": 303.9359042
     },
     {
+      "candidate_id": "candidate_023_0002",
+      "score_path": "candidates/candidate_023_0002/score.json",
+      "best_mode": 9,
+      "final_score": 0.002025485124057761,
+      "precision": 0.07358326068003487,
+      "recall": 0.14080747414080746,
+      "centerline_penalty": 0.05412604166666667,
+      "frequency_hz": 248.067861872
+    },
+    {
+      "candidate_id": "candidate_142_0001",
+      "score_path": "candidates/candidate_142_0001/score.json",
+      "best_mode": 13,
+      "final_score": 0.0007365922094339735,
+      "precision": 0.10288860979615497,
+      "recall": 0.35535535535535534,
+      "centerline_penalty": 0.23553655404042378,
+      "frequency_hz": 291.393822825
+    },
+    {
+      "candidate_id": "candidate_140_0004",
+      "score_path": "candidates/candidate_140_0004/score.json",
+      "best_mode": 13,
+      "final_score": -0.001692646708084207,
+      "precision": 0.017477477477477476,
+      "recall": 0.0323656990323657,
+      "centerline_penalty": 0.0,
+      "frequency_hz": 285.240954138
+    },
+    {
       "candidate_id": "candidate_160_0005",
       "score_path": "candidates/candidate_160_0005/score.json",
       "best_mode": 8,
@@ -50,54 +80,144 @@
       "frequency_hz": 229.980431089
     },
     {
-      "candidate_id": "candidate_157_0005",
-      "score_path": "candidates/candidate_157_0005/score.json",
-      "best_mode": 8,
-      "final_score": -0.005612139242565612,
-      "precision": 0.03029497741163965,
-      "recall": 0.03803803803803804,
+      "candidate_id": "candidate_165_0004",
+      "score_path": "candidates/candidate_165_0004/score.json",
+      "best_mode": 9,
+      "final_score": -0.0023145873697039583,
+      "precision": 0.03613025909198954,
+      "recall": 0.050717384050717386,
       "centerline_penalty": 0.0,
-      "frequency_hz": 215.330164354
+      "frequency_hz": 253.420959697
     },
     {
-      "candidate_id": "candidate_158_0005",
-      "score_path": "candidates/candidate_158_0005/score.json",
-      "best_mode": 16,
-      "final_score": -0.007522088513007178,
-      "precision": 0.03452996653483419,
-      "recall": 0.07574240907574241,
-      "centerline_penalty": 0.015972825291831888,
-      "frequency_hz": 508.613710261
+      "candidate_id": "candidate_165_0006",
+      "score_path": "candidates/candidate_165_0006/score.json",
+      "best_mode": 9,
+      "final_score": -0.0023804851078230837,
+      "precision": 0.03491019478876802,
+      "recall": 0.04604604604604605,
+      "centerline_penalty": 0.0,
+      "frequency_hz": 245.873704455
     },
     {
-      "candidate_id": "candidate_155_0003",
-      "score_path": "candidates/candidate_155_0003/score.json",
+      "candidate_id": "candidate_139_0000",
+      "score_path": "candidates/candidate_139_0000/score.json",
+      "best_mode": 14,
+      "final_score": -0.0033308502174026855,
+      "precision": 0.016001506024096387,
+      "recall": 0.028361695028361694,
+      "centerline_penalty": 0.0,
+      "frequency_hz": 317.258091198
+    },
+    {
+      "candidate_id": "candidate_139_0001",
+      "score_path": "candidates/candidate_139_0001/score.json",
+      "best_mode": 14,
+      "final_score": -0.0034855528920832036,
+      "precision": 0.01728258871116014,
+      "recall": 0.0313646980313647,
+      "centerline_penalty": 0.0003656249999999994,
+      "frequency_hz": 302.990489568
+    },
+    {
+      "candidate_id": "candidate_165_0000",
+      "score_path": "candidates/candidate_165_0000/score.json",
+      "best_mode": 14,
+      "final_score": -0.003549522654271508,
+      "precision": 0.01598721023181455,
+      "recall": 0.0333667000333667,
+      "centerline_penalty": 0.0,
+      "frequency_hz": 291.143121338
+    },
+    {
+      "candidate_id": "candidate_140_0001",
+      "score_path": "candidates/candidate_140_0001/score.json",
+      "best_mode": 14,
+      "final_score": -0.004064880895293966,
+      "precision": 0.01722338204592902,
+      "recall": 0.03303303303303303,
+      "centerline_penalty": 0.0076104166666666586,
+      "frequency_hz": 322.630556048
+    },
+    {
+      "candidate_id": "candidate_149_0003",
+      "score_path": "candidates/candidate_149_0003/score.json",
+      "best_mode": 14,
+      "final_score": -0.004087132183149784,
+      "precision": 0.010231081319456695,
+      "recall": 0.019352686019352687,
+      "centerline_penalty": 0.0,
+      "frequency_hz": 334.585720938
+    },
+    {
+      "candidate_id": "candidate_140_0007",
+      "score_path": "candidates/candidate_140_0007/score.json",
+      "best_mode": 13,
+      "final_score": -0.0045182460201923505,
+      "precision": 0.016414607156030984,
+      "recall": 0.029696363029696363,
+      "centerline_penalty": 0.001178125000000011,
+      "frequency_hz": 289.002377044
+    },
+    {
+      "candidate_id": "candidate_139_0002",
+      "score_path": "candidates/candidate_139_0002/score.json",
+      "best_mode": 14,
+      "final_score": -0.004945418355135007,
+      "precision": 0.01782905086523335,
+      "recall": 0.03403403403403404,
+      "centerline_penalty": 0.009303124999999997,
+      "frequency_hz": 307.726735836
+    },
+    {
+      "candidate_id": "candidate_132_0001",
+      "score_path": "candidates/candidate_132_0001/score.json",
       "best_mode": 8,
-      "final_score": -0.008904262086977647,
-      "precision": 0.04769630110317975,
-      "recall": 0.0980980980980981,
-      "centerline_penalty": 0.45118656871296986,
-      "frequency_hz": 150.123391913
+      "final_score": -0.005130547457078071,
+      "precision": 0.055286129970902036,
+      "recall": 0.07607607607607608,
+      "centerline_penalty": 0.3034884572217484,
+      "frequency_hz": 132.437337918
     },
     {
-      "candidate_id": "candidate_162_0005",
-      "score_path": "candidates/candidate_162_0005/score.json",
-      "best_mode": 8,
-      "final_score": -0.009778418893747975,
-      "precision": 0.04041666666666666,
-      "recall": 0.0647313980647314,
-      "centerline_penalty": 0.1580107516939786,
-      "frequency_hz": 210.51039913
+      "candidate_id": "candidate_164_0002",
+      "score_path": "candidates/candidate_164_0002/score.json",
+      "best_mode": 14,
+      "final_score": -0.0051504905713227085,
+      "precision": 0.011242116808335619,
+      "recall": 0.027360694027360695,
+      "centerline_penalty": 0.0,
+      "frequency_hz": 382.4065782
     },
     {
-      "candidate_id": "candidate_156_0002",
-      "score_path": "candidates/candidate_156_0002/score.json",
+      "candidate_id": "candidate_141_0005",
+      "score_path": "candidates/candidate_141_0005/score.json",
+      "best_mode": 14,
+      "final_score": -0.00520429754184305,
+      "precision": 0.017766497461928935,
+      "recall": 0.032699366032699365,
+      "centerline_penalty": 0.002599999999999988,
+      "frequency_hz": 306.470288281
+    },
+    {
+      "candidate_id": "candidate_139_0006",
+      "score_path": "candidates/candidate_139_0006/score.json",
       "best_mode": 8,
-      "final_score": -0.010694481596209914,
-      "precision": 0.03931104356636272,
-      "recall": 0.0647313980647314,
-      "centerline_penalty": 0.15597688154811484,
-      "frequency_hz": 216.693908006
+      "final_score": -0.0052613794946550045,
+      "precision": 0.054193838542837866,
+      "recall": 0.08041374708041375,
+      "centerline_penalty": 0.3554174963347776,
+      "frequency_hz": 137.386213194
+    },
+    {
+      "candidate_id": "candidate_139_0004",
+      "score_path": "candidates/candidate_139_0004/score.json",
+      "best_mode": 8,
+      "final_score": -0.005412616395367673,
+      "precision": 0.05887390280453864,
+      "recall": 0.09175842509175842,
+      "centerline_penalty": 0.45048048247562167,
+      "frequency_hz": 141.135022188
     }
   ],
   "recommendations": [

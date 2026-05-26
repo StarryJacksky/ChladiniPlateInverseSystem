@@ -394,6 +394,23 @@ def generate_response_guided_H(records: list[dict], index: int, levels: list[flo
     return H, f"{variant}_from_{record['candidate_id']}"  # 返回矩阵和来源 / Return matrix and source
 
 
+def generate_response_closed_loop_proposals(config: dict, response_records: list[dict], levels: list[float], default_thickness: float, max_neighbor_diff: float, population: int, rng: np.random.Generator) -> list[tuple[np.ndarray, str]]:  # 生成真实响应闭环提案 / Generate real-response closed-loop proposals
+    if not response_records:  # 检查是否存在真实响应记录 / Check whether real-response records exist
+        return []  # 无真实记录则返回空 / Return empty without real records
+    optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation config
+    proposal_count = min(population, int(optimisation.get("response_closed_loop_count", max(4, population // 3))))  # 读取闭环提案数量 / Read closed-loop proposal count
+    reference_designs = [(record["H"], str(record["candidate_id"])) for record in response_records]  # 构造真实响应参考设计 / Build real-response reference designs
+    proposals = []  # 创建提案列表 / Create proposal list
+    for index in range(max(0, proposal_count * 2)):  # 多试几次以通过多样性过滤 / Try extra times to pass diversity filtering
+        H, name = generate_response_guided_H(response_records, index, levels, default_thickness, max_neighbor_diff, rng)  # 生成真实响应闭环候选 / Generate real-response closed-loop candidate
+        proposal_name = f"response_closed_loop_{name}"  # 构造闭环来源名 / Build closed-loop source name
+        if is_diverse_candidate(H, reference_designs, levels, threshold=0.014) and is_diverse_candidate(H, proposals, levels, threshold=0.026):  # 检查与真实历史和本批的差异 / Check diversity against real history and batch
+            proposals.append((H, proposal_name))  # 保存提案 / Store proposal
+        if len(proposals) >= proposal_count:  # 检查是否达到数量 / Check whether enough proposals exist
+            break  # 停止生成 / Stop generation
+    return proposals  # 返回闭环提案 / Return closed-loop proposals
+
+
 def generate_target_guided_H(target_grid: np.ndarray, index: int, parents: list[np.ndarray], levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator) -> tuple[np.ndarray, str]:  # 生成目标感知厚度矩阵 / Generate target-aware thickness matrix
     variants = build_target_guidance_variants(target_grid, rng)  # 构建目标引导变体 / Build target guidance variants
     variant_name, guidance = variants[index % len(variants)]  # 选择当前变体 / Select current variant
@@ -605,6 +622,47 @@ def kl_proxy_candidate_score(H: np.ndarray, target_grid: np.ndarray, config: dic
     return float(score_thickness_with_kl_proxy(H, target_grid, config, num_modes=mode_count)["kl_proxy_score"])  # 返回 KL 代理分数 / Return KL proxy score
 
 
+def nearest_history_item(H: np.ndarray, history: list[dict], levels: list[float]) -> tuple[dict | None, float]:  # 查找最近真实历史样本 / Find nearest real-history sample
+    if not history:  # 检查历史是否为空 / Check whether history is empty
+        return None, 1.0e9  # 返回空和大距离 / Return none and large distance
+    vector = matrix_to_guidance(H, levels).ravel()  # 构建候选厚度向量 / Build candidate thickness vector
+    best_item = None  # 初始化最近样本 / Initialize nearest sample
+    best_distance = 1.0e9  # 初始化最近距离 / Initialize nearest distance
+    for item in history:  # 遍历真实历史样本 / Iterate real-history samples
+        other = matrix_to_guidance(item["H"], levels).ravel()  # 构建历史厚度向量 / Build historical thickness vector
+        distance = float(np.sqrt(np.mean(np.square(vector - other))))  # 计算均方根距离 / Compute root-mean-square distance
+        if distance < best_distance:  # 检查是否更近 / Check whether this sample is nearer
+            best_item = item  # 更新最近样本 / Update nearest sample
+            best_distance = distance  # 更新最近距离 / Update nearest distance
+    return best_item, best_distance  # 返回最近样本和距离 / Return nearest sample and distance
+
+
+def real_history_proxy_adjustment(H: np.ndarray, history: list[dict], levels: list[float], config: dict) -> float:  # 基于真实历史校准代理分 / Calibrate proxy score from real history
+    if not history:  # 检查历史是否为空 / Check whether history is empty
+        return 0.0  # 无历史则不调整 / Do not adjust without history
+    optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation config
+    radius = float(optimisation.get("kl_proxy_real_history_radius", 0.10))  # 读取真实历史影响半径 / Read real-history influence radius
+    penalty_weight = float(optimisation.get("kl_proxy_real_penalty_weight", 0.18))  # 读取坏历史惩罚权重 / Read bad-history penalty weight
+    reward_weight = float(optimisation.get("kl_proxy_real_reward_weight", 0.045))  # 读取好历史奖励权重 / Read good-history reward weight
+    scores = [float(item["score"]) for item in history]  # 提取真实分数 / Extract real scores
+    best_score = max(scores)  # 读取历史最佳真实分 / Read best real score
+    score_span = max(best_score - min(scores), 0.025)  # 计算稳定分数跨度 / Compute stable score span
+    nearest, distance = nearest_history_item(H, history, levels)  # 查找最近历史样本 / Find nearest history sample
+    if nearest is None:  # 检查是否无最近样本 / Check whether no nearest sample exists
+        return 0.0  # 无样本则不调整 / Do not adjust without a sample
+    closeness = math.exp(-float(distance * distance) / max(radius * radius, 1.0e-9))  # 计算距离权重 / Compute distance weight
+    nearest_score = float(nearest["score"])  # 读取最近样本分数 / Read nearest sample score
+    bad_gap = float(np.clip((best_score - nearest_score) / score_span, 0.0, 1.0))  # 计算坏样本差距 / Compute bad-sample gap
+    good_gain = float(np.clip((nearest_score - (best_score - 0.25 * score_span)) / max(0.25 * score_span, 1.0e-9), 0.0, 1.0))  # 计算好样本奖励 / Compute good-sample reward
+    return reward_weight * closeness * good_gain - penalty_weight * closeness * bad_gap  # 返回净调整 / Return net adjustment
+
+
+def calibrated_kl_proxy_candidate_score(H: np.ndarray, target_grid: np.ndarray, config: dict, levels: list[float], history: list[dict]) -> float:  # 计算真实历史校准后的 KL 分 / Compute real-history-calibrated KL score
+    raw_score = kl_proxy_candidate_score(H, target_grid, config)  # 计算原始 KL 代理分 / Compute raw KL proxy score
+    adjustment = real_history_proxy_adjustment(H, history, levels, config)  # 计算真实历史校准量 / Compute real-history calibration
+    return float(np.clip(raw_score + adjustment, 0.0, 1.0))  # 返回校准后分数 / Return calibrated score
+
+
 def free_design_cells(shape: tuple[int, int], fixed_cells: list[tuple[int, int]]) -> list[tuple[int, int]]:  # 构建可优化单元列表 / Build optimisable cell list
     fixed = set(fixed_cells)  # 创建固定单元集合 / Create fixed-cell set
     return [(row, col) for row in range(shape[0]) for col in range(shape[1]) if (row, col) not in fixed]  # 返回非固定单元 / Return non-fixed cells
@@ -622,11 +680,12 @@ def perturb_proxy_candidate(H: np.ndarray, levels: list[float], default_thicknes
     return enforce_center_constraint(proposal, fixed_cells, default_thickness)  # 返回中心固定后的提案 / Return proposal after centre fixing
 
 
-def optimise_kl_proxy_seed(seed: np.ndarray, target_grid: np.ndarray, levels: list[float], default_thickness: float, max_neighbor_diff: float, config: dict, rng: np.random.Generator) -> tuple[np.ndarray, float]:  # 用 KL 代理直接优化种子 / Directly optimise a seed with KL proxy
+def optimise_kl_proxy_seed(seed: np.ndarray, target_grid: np.ndarray, levels: list[float], default_thickness: float, max_neighbor_diff: float, config: dict, rng: np.random.Generator, history: list[dict] | None = None) -> tuple[np.ndarray, float]:  # 用 KL 代理直接优化种子 / Directly optimise a seed with KL proxy
     fixed_cells = center_cells_for_grid(seed.shape[0])  # 读取中心固定单元 / Read centre fixed cells
     free_cells = free_design_cells(seed.shape, fixed_cells)  # 读取可优化单元 / Read optimisable cells
     current = repair_candidate_matrix(enforce_center_constraint(seed, fixed_cells, default_thickness), levels, max_neighbor_diff, fixed_cells, passes=32)  # 修复初始种子 / Repair initial seed
-    current_score = kl_proxy_candidate_score(current, target_grid, config)  # 计算当前 KL 代理分 / Compute current KL proxy score
+    real_history = history or []  # 读取真实历史样本 / Read real-history samples
+    current_score = calibrated_kl_proxy_candidate_score(current, target_grid, config, levels, real_history)  # 计算当前校准 KL 分 / Compute current calibrated KL score
     best = current.copy()  # 保存最佳厚度场 / Store best thickness field
     best_score = current_score  # 保存最佳分数 / Store best score
     optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation config
@@ -641,7 +700,7 @@ def optimise_kl_proxy_seed(seed: np.ndarray, target_grid: np.ndarray, levels: li
         mutation_cells = max(2, int(round(len(free_cells) * global_fraction)))  # 选择本步扰动单元数 / Choose mutation-cell count for this step
         mutation_cells = min(len(free_cells), mutation_cells * (3 if step % 11 == 0 else 1))  # 周期性执行大跳跃 / Periodically run large jumps
         proposal = perturb_proxy_candidate(current, levels, default_thickness, max_neighbor_diff, fixed_cells, free_cells, step_scale, mutation_cells, rng)  # 生成局部提案 / Build local proposal
-        proposal_score = kl_proxy_candidate_score(proposal, target_grid, config)  # 计算提案 KL 分数 / Compute proposal KL score
+        proposal_score = calibrated_kl_proxy_candidate_score(proposal, target_grid, config, levels, real_history)  # 计算提案校准 KL 分 / Compute proposal calibrated KL score
         temperature = max(1.0e-6, start_temperature * (1.0 - progress) + end_temperature * progress)  # 计算当前温度 / Compute current temperature
         accept = proposal_score >= current_score or rng.random() < math.exp((proposal_score - current_score) / temperature)  # 判断是否接受提案 / Decide whether to accept proposal
         if accept:  # 检查是否接受 / Check acceptance
@@ -678,7 +737,7 @@ def generate_kl_proxy_optimised_proposals(config: dict, candidates_dir: Path, ta
     proposals = []  # 创建提案列表 / Create proposal list
     for index in range(max(0, proposal_count)):  # 遍历 KL 优化候选 / Iterate KL-optimised proposals
         seed, seed_name = build_kl_proxy_seed(index, history, response_records, parents, target_grid, levels, default_thickness, max_neighbor_diff, rng)  # 构建优化种子 / Build optimisation seed
-        H, score = optimise_kl_proxy_seed(seed, target_grid, levels, default_thickness, max_neighbor_diff, config, rng)  # 执行 KL 局部优化 / Run KL local optimisation
+        H, score = optimise_kl_proxy_seed(seed, target_grid, levels, default_thickness, max_neighbor_diff, config, rng, history)  # 执行真实校准 KL 局部优化 / Run real-calibrated KL local optimisation
         name = f"kl_proxy_optimised_{seed_name}_score_{score:.3f}"  # 构造来源名称 / Build source name
         if is_diverse_candidate(H, reference_designs, levels, threshold=0.018) and is_diverse_candidate(H, proposals, levels, threshold=0.035):  # 检查历史和本批多样性 / Check historical and batch diversity
             proposals.append((H, name))  # 保存多样提案 / Store diverse proposal
@@ -715,7 +774,7 @@ def generate_surrogate_proposals(config: dict, candidates_dir: Path, target_grid
         novelty = surrogate_novelty(surrogate, H, levels, auxiliary_fields, config)  # 计算候选新颖度 / Compute candidate novelty
         alignment = target_alignment_score(H, target_grid, levels)  # 计算弱目标对齐 / Compute weak target alignment
         auxiliary_alignment = auxiliary_alignment_score(auxiliary_fields, target_grid, config)  # 计算辅助变量对齐 / Compute auxiliary-variable alignment
-        kl_score = kl_proxy_candidate_score(H, target_grid, config) if pool_index % kl_pool_stride == 0 else alignment  # 间隔执行昂贵 KL 精算 / Run expensive KL exact scoring at intervals
+        kl_score = calibrated_kl_proxy_candidate_score(H, target_grid, config, levels, history) if pool_index % kl_pool_stride == 0 else alignment  # 间隔执行昂贵且真实校准的 KL 精算 / Run expensive and real-calibrated KL exact scoring at intervals
         kl_anchor = min(alignment, auxiliary_alignment)  # 使用保守对齐锚点 / Use conservative alignment anchor
         calibrated_kl = min(kl_score, kl_anchor + kl_cap)  # 校准 KL 代理避免压过真实历史 / Calibrate KL proxy so it cannot overpower real history
         acquisition = predicted + beta * uncertainty + ei_weight * improvement + novelty_weight * novelty + 0.04 * alignment + 0.035 * auxiliary_alignment + kl_weight * calibrated_kl  # 合成贝叶斯采集函数 / Combine Bayesian acquisition function
@@ -823,10 +882,11 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
     parents = [parent for parent in parents if tuple(parent.shape) == (grid_size, grid_size)]  # 过滤旧网格父代 / Filter old-grid parents
     target_grid = load_target_binary_grid(config, grid_size)  # 读取目标感知网格 / Load target-aware grid
     response_records = load_response_guidance_records(config, candidates_dir, target_grid) if target_grid is not None else []  # 读取真实响应闭环记录 / Load real-response closed-loop records
+    response_closed_loop_proposals = generate_response_closed_loop_proposals(config, response_records, levels, default, max_diff, population, rng)  # 生成一等真实响应闭环提案 / Generate first-class real-response closed-loop proposals
     modal_compiler_proposals = generate_modal_compiler_proposals(config, target_grid, parents, levels, default, max_diff, population, rng)  # 生成目标模态编译提案 / Generate target-modal compiler proposals
     kl_proxy_proposals = generate_kl_proxy_optimised_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成 KL 直接优化提案 / Generate directly KL-optimised proposals
     surrogate_proposals = generate_surrogate_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成代理模型优化提案 / Generate surrogate-model optimized proposals
-    inverse_proposals = interleave_proposal_groups([modal_compiler_proposals, kl_proxy_proposals, surrogate_proposals], population)  # 交错合并模态编译、直接物理优化和代理提案 / Interleave modal compiler, direct physics, and surrogate proposals
+    inverse_proposals = interleave_proposal_groups([response_closed_loop_proposals, modal_compiler_proposals, kl_proxy_proposals, surrogate_proposals], population)  # 交错合并真实响应、模态编译、直接物理优化和代理提案 / Interleave real response, modal compiler, direct physics, and surrogate proposals
     response_count = max(min(population, len(response_records) * 2), int(population * 0.75)) if response_records else 0  # 计算闭环响应候选数量 / Compute response-guided candidate count
     target_count = max(response_count, max(min(population, 6), int(population * 0.90 if response_records else population * 0.75))) if target_grid is not None else 0  # 计算目标感知候选数量 / Compute target-aware candidate count
     candidate_ids = []  # 创建候选编号列表 / Create candidate id list
@@ -834,7 +894,7 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
         candidate_id = f"candidate_{generation:03d}_{index:04d}"  # 构造候选编号 / Build candidate id
         if index < len(inverse_proposals):  # 优先使用逆向优化提案 / Prefer inverse-optimised proposals
             H, variant_name = inverse_proposals[index]  # 读取逆向提案 / Read inverse proposal
-            created_by = "modal_pde_inverse_compiler" if variant_name.startswith("modal_compiler") else ("kl_proxy_direct_inverse_search" if variant_name.startswith("kl_proxy_optimised") else "surrogate_guided_inverse_search")  # 设置生成来源 / Set creation source
+            created_by = "response_guided_inverse_search" if variant_name.startswith("response_closed_loop") else ("modal_pde_inverse_compiler" if variant_name.startswith("modal_compiler") else ("kl_proxy_direct_inverse_search" if variant_name.startswith("kl_proxy_optimised") else "surrogate_guided_inverse_search"))  # 设置生成来源 / Set creation source
         elif response_records and index < response_count:  # 其次生成闭环响应引导候选 / Then generate closed-loop response-guided candidates
             H, variant_name = generate_response_guided_H(response_records, index, levels, default, max_diff, rng)  # 生成闭环响应引导矩阵 / Generate response-guided matrix
             created_by = "response_guided_inverse_search"  # 设置生成来源 / Set creation source
