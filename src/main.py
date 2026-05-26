@@ -49,7 +49,7 @@ def main() -> None:  # 主程序入口 / Main program entry
         prepare_target(config)  # 处理目标图 / Prepare target image
         print("Target prepared. / 目标图已处理。")  # 打印完成信息 / Print completion message
     if args.command == "target-ui":  # 判断是否启动目标绘图界面 / Check target-UI command
-        from src.frontend.target_ui_server import run_target_ui  # 延迟导入本地 UI 服务 / Lazily import local UI server
+        from src.frontend.credential_ui_server import run_target_ui  # 延迟导入本地 UI 服务 / Lazily import local UI server
         run_target_ui(config, args.host, args.port)  # 启动绘图界面服务 / Start drawing UI server
     if args.command == "run-workflow":  # 判断是否运行完整工作流 / Check full-workflow command
         from src.optimisation.workflow import run_design_workflow  # 延迟导入完整工作流 / Lazily import full workflow
