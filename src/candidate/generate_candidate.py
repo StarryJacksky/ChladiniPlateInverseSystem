@@ -668,11 +668,23 @@ def build_surrogate_pool_candidate(pool_index: int, surrogate: dict, history: li
     return generate_evolutionary_H([item["H"] for item in history[:8]], levels, default_thickness, max_neighbor_diff, rng, mutation_rate), "surrogate_genetic_pool"  # 返回代理池遗传候选 / Return surrogate-pool genetic candidate
 
 
-def is_diverse_candidate(H: np.ndarray, selected: list[tuple[np.ndarray, str]], levels: list[float], threshold: float = 0.055) -> bool:  # 判断候选是否足够多样 / Decide whether candidate is diverse enough
+def proposal_matrix(proposal: tuple) -> np.ndarray:  # 读取提案厚度矩阵 / Read proposal thickness matrix
+    return proposal[0]  # 返回第一项厚度矩阵 / Return first tuple item as thickness matrix
+
+
+def proposal_name(proposal: tuple) -> str:  # 读取提案名称 / Read proposal name
+    return str(proposal[1])  # 返回第二项名称 / Return second tuple item as name
+
+
+def proposal_auxiliary_fields(proposal: tuple) -> dict[str, np.ndarray] | None:  # 读取提案自带辅助场 / Read proposal-owned auxiliary fields
+    return proposal[2] if len(proposal) > 2 else None  # 三元提案返回辅助场 / Return auxiliary fields for three-part proposals
+
+
+def is_diverse_candidate(H: np.ndarray, selected: list[tuple], levels: list[float], threshold: float = 0.055) -> bool:  # 判断候选是否足够多样 / Decide whether candidate is diverse enough
     if not selected:  # 检查是否尚无已选候选 / Check whether no candidates are selected yet
         return True  # 第一个候选总是保留 / Always keep first candidate
     vector = matrix_to_guidance(H, levels).ravel()  # 构建厚度多样性向量 / Build thickness diversity vector
-    distances = [float(np.sqrt(np.mean(np.square(vector - matrix_to_guidance(other, levels).ravel())))) for other, _ in selected]  # 计算到已选候选距离 / Compute distances to selected candidates
+    distances = [float(np.sqrt(np.mean(np.square(vector - matrix_to_guidance(proposal_matrix(item), levels).ravel())))) for item in selected]  # 计算到已选候选距离 / Compute distances to selected candidates
     return min(distances) >= threshold  # 返回是否超过阈值 / Return whether distance exceeds threshold
 
 
@@ -951,6 +963,105 @@ def build_auxiliary_design_fields(H: np.ndarray, levels: list[float], target_gri
     return {"density_scale": np.round(density_scale, 4), "loss_factor": np.round(loss_factor, 5)}  # 返回辅助场 / Return auxiliary fields
 
 
+def latent_physics_basis_maps(H: np.ndarray, target_grid: np.ndarray, levels: list[float]) -> list[np.ndarray]:  # 构建低维潜变量基底图 / Build low-dimensional latent basis maps
+    target = normalise_design_map(target_grid)  # 归一化目标图 / Normalize target map
+    edge = target_edge_guidance(target)  # 构建目标边缘图 / Build target edge map
+    radial = radial_design_bias(H.shape[0])  # 构建径向基底 / Build radial basis
+    thickness = matrix_to_guidance(H, levels)  # 构建厚度基底 / Build thickness basis
+    axis = np.linspace(-1.0, 1.0, H.shape[0])  # 构建归一化坐标轴 / Build normalized coordinate axis
+    yy, xx = np.meshgrid(axis, axis, indexing="ij")  # 构建二维坐标 / Build two-dimensional coordinates
+    horizontal = normalise_design_map(np.abs(xx))  # 构建横向基底 / Build horizontal basis
+    vertical = normalise_design_map(np.abs(yy))  # 构建纵向基底 / Build vertical basis
+    diagonal = normalise_design_map(xx + yy)  # 构建对角基底 / Build diagonal basis
+    angular = angular_design_bias(H.shape[0], 0.73)  # 构建角向破缺基底 / Build angular symmetry-breaking basis
+    return [target, edge, 1.0 - target, radial, 1.0 - radial, thickness, 1.0 - thickness, horizontal, vertical, diagonal, angular]  # 返回基底列表 / Return basis list
+
+
+def latent_field_from_coefficients(basis_maps: list[np.ndarray], coefficients: np.ndarray) -> np.ndarray:  # 从潜变量系数合成场 / Compose a field from latent coefficients
+    field = np.zeros_like(basis_maps[0], dtype=float)  # 创建累加场 / Create accumulator field
+    for index, basis in enumerate(basis_maps):  # 遍历基底图 / Iterate basis maps
+        field = field + float(coefficients[index]) * basis  # 累加当前基底 / Add current basis contribution
+    return normalise_design_map(field)  # 返回归一化合成场 / Return normalized composed field
+
+
+def latent_coefficients_fingerprint(coefficients: np.ndarray) -> str:  # 压缩潜变量系数为短指纹 / Compress latent coefficients into a short fingerprint
+    rounded = np.ascontiguousarray(np.round(coefficients.astype(float), 3))  # 量化系数 / Quantize coefficients
+    return hashlib.blake2b(rounded.tobytes(), digest_size=4).hexdigest()  # 返回短哈希 / Return short hash
+
+
+def compose_latent_auxiliary_fields(H: np.ndarray, target_grid: np.ndarray, levels: list[float], config: dict, coefficients: np.ndarray, anchor_fields: dict[str, np.ndarray] | None) -> dict[str, np.ndarray]:  # 合成潜变量辅助物理场 / Compose latent auxiliary physics fields
+    settings = config.get("design_variables", {})  # 读取设计变量配置 / Read design-variable settings
+    basis_maps = latent_physics_basis_maps(H, target_grid, levels)  # 构建潜变量基底 / Build latent basis maps
+    basis_count = len(basis_maps)  # 读取基底数量 / Read basis count
+    density_source = latent_field_from_coefficients(basis_maps, coefficients[:basis_count])  # 合成密度源场 / Compose density source field
+    loss_source = latent_field_from_coefficients(basis_maps, coefficients[basis_count:basis_count * 2])  # 合成损耗源场 / Compose loss source field
+    if anchor_fields is not None:  # 检查是否有历史锚点场 / Check whether historical anchor fields exist
+        density_source = normalise_design_map(0.46 * normalise_auxiliary_field(anchor_fields["density_scale"], "density_scale", config) + 0.54 * density_source)  # 混合历史密度和潜变量密度 / Blend historical and latent density
+        loss_source = normalise_design_map(0.42 * normalise_auxiliary_field(anchor_fields["loss_factor"], "loss_factor", config) + 0.58 * loss_source)  # 混合历史损耗和潜变量损耗 / Blend historical and latent loss
+    density_low = float(settings.get("density_scale_min", 0.90))  # 读取密度下限 / Read density lower bound
+    density_high = float(settings.get("density_scale_max", 1.15))  # 读取密度上限 / Read density upper bound
+    loss_low = float(settings.get("loss_factor_min", 0.00))  # 读取损耗下限 / Read loss lower bound
+    loss_high = float(settings.get("loss_factor_max", 0.06))  # 读取损耗上限 / Read loss upper bound
+    density_scale = scale_field(density_source, density_low, density_high)  # 缩放密度倍率场 / Scale density field
+    loss_factor = scale_field(loss_source, loss_low, loss_high)  # 缩放损耗因子场 / Scale loss field
+    return {"density_scale": np.round(density_scale, 4), "loss_factor": np.round(loss_factor, 5)}  # 返回潜变量辅助场 / Return latent auxiliary fields
+
+
+def auxiliary_field_distance(left: dict[str, np.ndarray], right: dict[str, np.ndarray], config: dict) -> float:  # 计算辅助场距离 / Compute auxiliary-field distance
+    density_left = normalise_auxiliary_field(left["density_scale"], "density_scale", config)  # 归一化左密度 / Normalize left density
+    density_right = normalise_auxiliary_field(right["density_scale"], "density_scale", config)  # 归一化右密度 / Normalize right density
+    loss_left = normalise_auxiliary_field(left["loss_factor"], "loss_factor", config)  # 归一化左损耗 / Normalize left loss
+    loss_right = normalise_auxiliary_field(right["loss_factor"], "loss_factor", config)  # 归一化右损耗 / Normalize right loss
+    density_distance = float(np.sqrt(np.mean(np.square(density_left - density_right))))  # 计算密度距离 / Compute density distance
+    loss_distance = float(np.sqrt(np.mean(np.square(loss_left - loss_right))))  # 计算损耗距离 / Compute loss distance
+    return float(0.5 * density_distance + 0.5 * loss_distance)  # 返回联合距离 / Return joint distance
+
+
+def latent_fields_are_diverse(fields: dict[str, np.ndarray], selected: list[tuple], config: dict, threshold: float = 0.030) -> bool:  # 判断潜变量辅助场是否多样 / Decide whether latent auxiliary fields are diverse
+    existing_fields = [proposal_auxiliary_fields(item) for item in selected]  # 提取已选辅助场 / Extract selected auxiliary fields
+    distances = [auxiliary_field_distance(fields, item, config) for item in existing_fields if item is not None]  # 计算到已有场的距离 / Compute distances to existing fields
+    return True if not distances else min(distances) >= threshold  # 返回多样性判断 / Return diversity decision
+
+
+def generate_latent_physics_proposals(config: dict, candidates_dir: Path, target_grid: np.ndarray | None, levels: list[float], default_thickness: float, max_neighbor_diff: float, population: int, generation: int, rng: np.random.Generator) -> list[tuple[np.ndarray, str, dict[str, np.ndarray]]]:  # 生成潜变量联合物理提案 / Generate latent joint-physics proposals
+    if target_grid is None or not config.get("design_variables", {}).get("export_auxiliary_fields", True):  # 检查目标和辅助场开关 / Check target and auxiliary-field switch
+        return []  # 不满足条件时返回空 / Return empty when unavailable
+    optimisation = config.get("optimisation", {})  # 读取优化配置 / Read optimisation settings
+    count = min(population, int(optimisation.get("latent_physics_count", max(2, population // 3))))  # 读取潜变量候选数量 / Read latent proposal count
+    history = filter_history_by_shape(load_surrogate_history(candidates_dir, config, limit=120), target_grid.shape)  # 读取真实历史样本 / Load real historical samples
+    surrogate = fit_score_surrogate(history, levels, config)  # 拟合联合代理模型 / Fit joint surrogate model
+    ensemble = fit_bayesian_surrogate_ensemble(history, levels, int(optimisation.get("bayesian_ensemble_size", 12)), rng, config)  # 拟合贝叶斯集成 / Fit Bayesian ensemble
+    if surrogate is None or not ensemble:  # 检查代理模型是否可用 / Check whether surrogate models are usable
+        return []  # 代理不可用时返回空 / Return empty without surrogate
+    bases = history[:max(1, min(len(history), 8))]  # 选择高分历史基底 / Select high-score historical bases
+    best_score = float(max(item["score"] for item in history))  # 读取历史最佳分 / Read best historical score
+    pool_size = int(optimisation.get("latent_physics_pool_size", max(80, population * 12)))  # 读取潜变量池大小 / Read latent pool size
+    beta = float(optimisation.get("bayesian_ucb_beta", 0.35))  # 读取 UCB 探索强度 / Read UCB exploration strength
+    pool = []  # 创建潜变量候选池 / Create latent candidate pool
+    basis_count = len(latent_physics_basis_maps(bases[0]["H"], target_grid, levels))  # 读取潜变量维度 / Read latent basis dimension
+    for index in range(max(pool_size, count)):  # 遍历虚拟潜变量候选 / Iterate virtual latent candidates
+        base = bases[index % len(bases)]  # 选择高分基底 / Select high-score base
+        H = base["H"].copy().astype(float) if index < len(bases) * 3 else lightly_mutate_physics_base(base["H"], levels, default_thickness, max_neighbor_diff, rng, rate=0.010 + 0.006 * (index % 4))  # 保留或轻扰厚度基底 / Keep or lightly perturb thickness base
+        spread = 0.62 if index < len(bases) * 4 else 0.95  # 设置潜变量探索尺度 / Set latent exploration spread
+        coefficients = rng.normal(0.0, spread, size=basis_count * 2)  # 采样潜变量系数 / Sample latent coefficients
+        fields = compose_latent_auxiliary_fields(H, target_grid, levels, config, coefficients, base.get("auxiliary_fields"))  # 合成显式辅助场 / Compose explicit auxiliary fields
+        predicted, uncertainty = predict_bayesian_surrogate_stats(ensemble, H, levels, fields, config)  # 预测真实评分分布 / Predict real-score distribution
+        improvement = expected_improvement(predicted, uncertainty, best_score)  # 计算期望改进 / Compute expected improvement
+        novelty = surrogate_novelty(surrogate, H, levels, fields, config)  # 计算联合设计新颖度 / Compute joint-design novelty
+        auxiliary_alignment = auxiliary_alignment_score(fields, target_grid, config)  # 计算辅助场目标对齐 / Compute auxiliary-target alignment
+        acquisition = predicted + beta * uncertainty + 0.40 * improvement + 0.10 * novelty + 0.045 * auxiliary_alignment  # 合成潜变量采集函数 / Combine latent acquisition function
+        fingerprint = latent_coefficients_fingerprint(coefficients)  # 生成系数指纹 / Build coefficient fingerprint
+        name = f"latent_physics_from_{base['candidate_id']}_g{generation:03d}_{fingerprint}_mean_{predicted:.3f}_std_{uncertainty:.3f}_ei_{improvement:.3f}_aux_{auxiliary_alignment:.2f}_novel_{novelty:.2f}"  # 构造候选名称 / Build candidate name
+        pool.append((acquisition, H, name, fields))  # 保存池候选 / Store pool candidate
+    selected = []  # 创建已选潜变量提案 / Create selected latent proposals
+    for _score, H, name, fields in sorted(pool, key=lambda item: item[0], reverse=True):  # 按采集函数排序 / Sort by acquisition value
+        if latent_fields_are_diverse(fields, selected, config):  # 检查显式辅助场多样性 / Check explicit auxiliary-field diversity
+            selected.append((H, name, fields))  # 保存显式辅助场提案 / Store explicit auxiliary-field proposal
+        if len(selected) >= count:  # 检查是否达到数量 / Check proposal count
+            break  # 停止选择 / Stop selection
+    return selected  # 返回潜变量提案 / Return latent proposals
+
+
 def save_auxiliary_fields(candidate_path: Path, fields: dict[str, np.ndarray]) -> None:  # 保存辅助设计变量场 / Save auxiliary design-variable fields
     for name, values in fields.items():  # 遍历辅助变量场 / Iterate auxiliary fields
         fmt = "%.5f" if name == "loss_factor" else "%.4f"  # 选择保存精度 / Choose save precision
@@ -982,24 +1093,32 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
     target_grid = load_target_binary_grid(config, grid_size)  # 读取目标感知网格 / Load target-aware grid
     response_records = load_response_guidance_records(config, candidates_dir, target_grid) if target_grid is not None else []  # 读取真实响应闭环记录 / Load real-response closed-loop records
     response_closed_loop_proposals = generate_response_closed_loop_proposals(config, response_records, levels, default, max_diff, population, rng)  # 生成一等真实响应闭环提案 / Generate first-class real-response closed-loop proposals
+    latent_physics_proposals = generate_latent_physics_proposals(config, candidates_dir, target_grid, levels, default, max_diff, population, generation, rng)  # 生成低维潜变量联合物理提案 / Generate low-dimensional latent joint-physics proposals
     auxiliary_physics_proposals = generate_auxiliary_physics_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, generation, rng)  # 生成独立质量阻尼提案 / Generate independent mass-damping proposals
     modal_compiler_proposals = generate_modal_compiler_proposals(config, target_grid, parents, levels, default, max_diff, population, rng)  # 生成目标模态编译提案 / Generate target-modal compiler proposals
     kl_proxy_proposals = generate_kl_proxy_optimised_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成 KL 直接优化提案 / Generate directly KL-optimised proposals
     surrogate_proposals = generate_surrogate_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成代理模型优化提案 / Generate surrogate-model optimized proposals
+    latent_frontload_count = min(len(latent_physics_proposals), int(config.get("optimisation", {}).get("latent_physics_frontload_count", 0)))  # 读取潜变量前置数量 / Read latent front-load count
+    frontloaded_latent_proposals = latent_physics_proposals[:latent_frontload_count]  # 提取前置潜变量提案 / Extract front-loaded latent proposals
+    remaining_latent_proposals = latent_physics_proposals[latent_frontload_count:]  # 提取剩余潜变量提案 / Extract remaining latent proposals
     auxiliary_frontload_count = min(len(auxiliary_physics_proposals), int(config.get("optimisation", {}).get("auxiliary_physics_frontload_count", 0)))  # 读取辅助物理前置数量 / Read auxiliary-physics front-load count
     frontloaded_auxiliary_proposals = auxiliary_physics_proposals[:auxiliary_frontload_count]  # 提取前置辅助物理提案 / Extract front-loaded auxiliary proposals
     remaining_auxiliary_proposals = auxiliary_physics_proposals[auxiliary_frontload_count:]  # 提取剩余辅助物理提案 / Extract remaining auxiliary proposals
-    remaining_slots = max(0, population - len(frontloaded_auxiliary_proposals))  # 计算剩余队列名额 / Compute remaining queue slots
-    interleaved_proposals = interleave_proposal_groups([response_closed_loop_proposals, remaining_auxiliary_proposals, modal_compiler_proposals, surrogate_proposals, kl_proxy_proposals], remaining_slots)  # 交错合并其余候选家族 / Interleave remaining proposal families
-    inverse_proposals = (frontloaded_auxiliary_proposals + interleaved_proposals)[:population]  # 合并前置辅助物理与其余逆向提案 / Combine front-loaded auxiliary physics and remaining inverse proposals
+    remaining_slots = max(0, population - len(frontloaded_latent_proposals) - len(frontloaded_auxiliary_proposals))  # 计算剩余队列名额 / Compute remaining queue slots
+    interleaved_proposals = interleave_proposal_groups([remaining_latent_proposals, response_closed_loop_proposals, remaining_auxiliary_proposals, modal_compiler_proposals, surrogate_proposals, kl_proxy_proposals], remaining_slots)  # 交错合并其余候选家族 / Interleave remaining proposal families
+    inverse_proposals = (frontloaded_latent_proposals + frontloaded_auxiliary_proposals + interleaved_proposals)[:population]  # 合并前置潜变量、辅助物理与其余逆向提案 / Combine front-loaded latent, auxiliary, and remaining inverse proposals
     response_count = max(min(population, len(response_records) * 2), int(population * 0.75)) if response_records else 0  # 计算闭环响应候选数量 / Compute response-guided candidate count
     target_count = max(response_count, max(min(population, 6), int(population * 0.90 if response_records else population * 0.75))) if target_grid is not None else 0  # 计算目标感知候选数量 / Compute target-aware candidate count
     candidate_ids = []  # 创建候选编号列表 / Create candidate id list
     for index in range(population):  # 遍历候选编号 / Iterate candidate index
         candidate_id = f"candidate_{generation:03d}_{index:04d}"  # 构造候选编号 / Build candidate id
+        proposed_auxiliary_fields = None  # 初始化提案自带辅助场 / Initialize proposal-owned auxiliary fields
         if index < len(inverse_proposals):  # 优先使用逆向优化提案 / Prefer inverse-optimised proposals
-            H, variant_name = inverse_proposals[index]  # 读取逆向提案 / Read inverse proposal
-            created_by = "response_guided_inverse_search" if variant_name.startswith("response_closed_loop") else ("auxiliary_physics_inverse_search" if variant_name.startswith("aux_") else ("modal_pde_inverse_compiler" if variant_name.startswith("modal_compiler") else ("kl_proxy_direct_inverse_search" if variant_name.startswith("kl_proxy_optimised") else "surrogate_guided_inverse_search")))  # 设置生成来源 / Set creation source
+            proposal = inverse_proposals[index]  # 读取逆向提案对象 / Read inverse proposal object
+            H = proposal_matrix(proposal)  # 读取提案厚度矩阵 / Read proposal thickness matrix
+            variant_name = proposal_name(proposal)  # 读取提案名称 / Read proposal name
+            proposed_auxiliary_fields = proposal_auxiliary_fields(proposal)  # 读取提案自带辅助场 / Read proposal-owned auxiliary fields
+            created_by = "latent_physics_inverse_search" if variant_name.startswith("latent_physics") else ("response_guided_inverse_search" if variant_name.startswith("response_closed_loop") else ("auxiliary_physics_inverse_search" if variant_name.startswith("aux_") else ("modal_pde_inverse_compiler" if variant_name.startswith("modal_compiler") else ("kl_proxy_direct_inverse_search" if variant_name.startswith("kl_proxy_optimised") else "surrogate_guided_inverse_search"))))  # 设置生成来源 / Set creation source
         elif response_records and index < response_count:  # 其次生成闭环响应引导候选 / Then generate closed-loop response-guided candidates
             H, variant_name = generate_response_guided_H(response_records, index, levels, default, max_diff, rng)  # 生成闭环响应引导矩阵 / Generate response-guided matrix
             created_by = "response_guided_inverse_search"  # 设置生成来源 / Set creation source
@@ -1011,7 +1130,7 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
             H = generate_evolutionary_H(parents, levels, default, max_diff, rng, mutation_rate) if parents else generate_random_H(grid_size, levels, default, max_diff, rng)  # 生成探索矩阵 / Generate exploration matrix
             variant_name = "genetic_explorer" if parents else "random_explorer"  # 设置探索变体名 / Set explorer variant name
             created_by = "genetic_search" if parents else "random_search"  # 设置生成来源 / Set creation source
-        auxiliary_fields = build_auxiliary_design_fields(H, levels, target_grid, config, None, variant_name) if config.get("design_variables", {}).get("export_auxiliary_fields", True) else {}  # 构建辅助物理场 / Build auxiliary physical fields
+        auxiliary_fields = proposed_auxiliary_fields if proposed_auxiliary_fields is not None else (build_auxiliary_design_fields(H, levels, target_grid, config, None, variant_name) if config.get("design_variables", {}).get("export_auxiliary_fields", True) else {})  # 使用显式辅助场或构建默认辅助场 / Use explicit auxiliary fields or build default fields
         metadata = {"candidate_id": candidate_id, "generation": generation, "grid_size": grid_size, "thickness_mode": "continuous", "thickness_bounds_mm": levels, "center_fixed": True, "created_by": created_by, "target_guidance_variant": variant_name, "target_guided": target_grid is not None, "auxiliary_fields": sorted(auxiliary_fields.keys())}  # 记录元数据 / Record metadata
         save_candidate(candidates_dir / candidate_id, H, metadata, auxiliary_fields)  # 保存候选 / Save candidate
         candidate_ids.append(candidate_id)  # 添加候选编号 / Add candidate id

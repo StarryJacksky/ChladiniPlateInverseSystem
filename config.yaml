@@ -81,6 +81,9 @@ optimisation:
   modal_compiler_count: 4 # 目标模态编译候选数量 / Number of target-modal compiler candidates
   auxiliary_physics_count: 16 # 独立质量阻尼候选数量 / Number of independent mass-damping candidates
   auxiliary_physics_frontload_count: 10 # 每代前置质量阻尼候选数量 / Number of mass-damping candidates front-loaded per generation
+  latent_physics_count: 10 # 低维潜变量物理候选数量 / Number of low-dimensional latent physics candidates
+  latent_physics_frontload_count: 6 # 每代前置潜变量物理候选数量 / Number of latent physics candidates front-loaded per generation
+  latent_physics_pool_size: 180 # 潜变量物理虚拟候选池大小 / Latent physics virtual candidate-pool size
   response_guidance_limit: 10 # 真实响应失败记忆数量 / Number of real-response failure memories
   response_guidance_pool_limit: 36 # 真实响应闭环候选池数量 / Real-response closed-loop pool size
   response_closed_loop_count: 10 # 每批优先进入队列的真实响应闭环候选数 / Real-response closed-loop candidates promoted into each batch
