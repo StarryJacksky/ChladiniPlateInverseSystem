@@ -203,6 +203,49 @@ def generate_modal_compiler_proposals(config: dict, target_grid: np.ndarray | No
     return proposals  # 返回编译器提案 / Return compiler proposals
 
 
+def lightly_mutate_physics_base(H: np.ndarray, levels: list[float], default_thickness: float, max_neighbor_diff: float, rng: np.random.Generator, rate: float = 0.035) -> np.ndarray:  # 轻微扰动辅助物理基底厚度 / Lightly mutate an auxiliary-physics base thickness
+    proposal = H.copy().astype(float)  # 复制候选矩阵 / Copy candidate matrix
+    center_cells = center_cells_for_grid(proposal.shape[0])  # 获取中心固定单元 / Get fixed centre cells
+    fixed_cells = set(center_cells)  # 创建固定单元集合 / Create fixed-cell set
+    mutation_mask = rng.random(proposal.shape) < rate  # 创建轻微变异掩膜 / Build light mutation mask
+    for row, col in np.argwhere(mutation_mask):  # 遍历变异单元 / Iterate mutated cells
+        if (int(row), int(col)) not in fixed_cells:  # 跳过中心固定单元 / Skip centre fixed cells
+            proposal[row, col] = random_continuous_near(float(proposal[row, col]), levels, rng)  # 应用局部厚度扰动 / Apply local thickness perturbation
+    proposal = enforce_center_constraint(proposal, center_cells, default_thickness)  # 恢复中心固定 / Restore centre constraint
+    proposal = repair_candidate_matrix(proposal, levels, max_neighbor_diff, center_cells, passes=20)  # 修复制造相邻约束 / Repair manufacturable neighbour constraint
+    return enforce_center_constraint(proposal, center_cells, default_thickness)  # 返回最终候选 / Return final candidate
+
+
+def auxiliary_physics_variant_names() -> list[str]:  # 列出辅助物理场强策略 / List strong auxiliary-physics strategies
+    return ["aux_mass_target_heavy", "aux_mass_target_light", "aux_loss_outer_suppress", "aux_inertia_edge_heavy", "aux_inertia_ring_break", "aux_low_loss_target_channel"]  # 返回策略名称 / Return strategy names
+
+
+def generate_auxiliary_physics_proposals(config: dict, candidates_dir: Path, target_grid: np.ndarray | None, response_records: list[dict], parents: list[np.ndarray], levels: list[float], default_thickness: float, max_neighbor_diff: float, population: int, rng: np.random.Generator) -> list[tuple[np.ndarray, str]]:  # 生成独立质量阻尼提案 / Generate independent mass-damping proposals
+    if target_grid is None or not config.get("design_variables", {}).get("export_auxiliary_fields", True):  # 检查辅助物理场是否可用 / Check whether auxiliary physics is available
+        return []  # 无目标或未导出辅助场时返回空 / Return empty without target or auxiliary export
+    count = min(population, int(config.get("optimisation", {}).get("auxiliary_physics_count", max(2, population // 3))))  # 读取辅助候选数量 / Read auxiliary proposal count
+    history = filter_history_by_shape(load_surrogate_history(candidates_dir, config, limit=48), target_grid.shape)  # 读取真实评分历史 / Load real scored history
+    bases = [(item["H"], item["candidate_id"]) for item in history[:10]]  # 使用高分历史作为基底 / Use high-score history as bases
+    bases.extend((record["H"], record["candidate_id"]) for record in response_records)  # 追加真实响应失败记忆 / Add real-response failure memories
+    bases.extend((parent, f"parent_{index}") for index, parent in enumerate(parents[:6]))  # 追加遗传父代 / Add genetic parents
+    variants = auxiliary_physics_variant_names()  # 读取强策略名称 / Read strong strategy names
+    proposals = []  # 创建提案列表 / Create proposal list
+    reference_designs = [(item["H"], item["candidate_id"]) for item in history[:18]]  # 创建历史参考设计 / Create historical reference designs
+    attempt_count = max(count * 4, len(variants))  # 设置尝试次数 / Set attempt count
+    for index in range(attempt_count):  # 遍历辅助物理尝试 / Iterate auxiliary-physics attempts
+        if bases:  # 检查是否有真实基底 / Check whether real bases exist
+            base_H, base_name = bases[index % len(bases)]  # 选择基底 / Select base
+            H = lightly_mutate_physics_base(base_H, levels, default_thickness, max_neighbor_diff, rng, rate=0.025 + 0.01 * (index % 3))  # 轻微扰动基底 / Lightly mutate base
+        else:  # 无基底时使用模态编译器 / Use modal compiler without bases
+            H, base_name = generate_modal_compiler_H(target_grid, index, parents, levels, default_thickness, max_neighbor_diff, rng)  # 构建模态基底 / Build modal base
+        variant_name = f"{variants[index % len(variants)]}_from_{base_name}"  # 构造辅助物理变体名 / Build auxiliary-physics variant name
+        if is_diverse_candidate(H, reference_designs, levels, threshold=0.006) and is_diverse_candidate(H, proposals, levels, threshold=0.008):  # 检查厚度基底多样性 / Check thickness-base diversity
+            proposals.append((H, variant_name))  # 保存辅助提案 / Store auxiliary proposal
+        if len(proposals) >= count:  # 检查是否达到数量 / Check proposal count
+            break  # 停止生成 / Stop generation
+    return proposals  # 返回辅助物理提案 / Return auxiliary-physics proposals
+
+
 def guidance_to_continuous_thickness(guidance: np.ndarray, levels: list[float]) -> np.ndarray:  # 将引导图映射为连续厚度 / Map guidance map to continuous thicknesses
     low = float(min(levels))  # 读取最小厚度 / Read minimum thickness
     high = float(max(levels))  # 读取最大厚度 / Read maximum thickness
@@ -836,6 +879,8 @@ def build_auxiliary_design_fields(H: np.ndarray, levels: list[float], target_gri
     thickness = matrix_to_guidance(H, levels)  # 归一化厚度场 / Normalize thickness field
     target = normalise_design_map(target_grid) if target_grid is not None else thickness  # 读取目标引导图 / Read target guidance map
     edge = target_edge_guidance(target) if target_grid is not None else radial_design_bias(H.shape[0])  # 构造边缘或径向引导 / Build edge or radial guidance
+    radial = radial_design_bias(H.shape[0])  # 构造径向惯性引导 / Build radial inertia guidance
+    anti_target = 1.0 - target  # 构造目标反相区 / Build target inverse region
     density_noise = build_auxiliary_noise(H.shape, random_gen)  # 构造密度探索噪声 / Build density exploration noise
     loss_noise = build_auxiliary_noise(H.shape, random_gen)  # 构造损耗探索噪声 / Build loss exploration noise
     density_low = float(settings.get("density_scale_min", 0.90))  # 读取密度倍率下限 / Read density-scale lower bound
@@ -846,7 +891,25 @@ def build_auxiliary_design_fields(H: np.ndarray, levels: list[float], target_gri
     loss_noise_weight = float(settings.get("loss_noise_weight", 0.20))  # 读取损耗噪声权重 / Read loss-noise weight
     response_bias = 0.12 if any(token in variant_name for token in ("extra", "anti_star", "response")) else 0.0  # 根据真实响应变体增强阻尼 / Increase damping for real-response variants
     density_source = 0.36 * (1.0 - thickness) + 0.30 * target + 0.18 * edge + density_noise_weight * density_noise  # 合成单元密度引导 / Combine per-cell density guidance
-    loss_source = (0.36 - response_bias) * (1.0 - target) + (0.34 + response_bias) * edge + 0.18 * radial_design_bias(H.shape[0]) + loss_noise_weight * loss_noise  # 合成局部阻尼引导 / Combine local damping guidance
+    loss_source = (0.36 - response_bias) * anti_target + (0.34 + response_bias) * edge + 0.18 * radial + loss_noise_weight * loss_noise  # 合成局部阻尼引导 / Combine local damping guidance
+    if "aux_mass_target_heavy" in variant_name:  # 检查目标重质量策略 / Check target-heavy mass strategy
+        density_source = 0.18 * density_source + 1.05 * target + 0.25 * edge - 0.20 * anti_target  # 强化目标笔画惯性 / Strengthen inertia on target strokes
+        loss_source = 0.30 * loss_source + 0.88 * anti_target + 0.18 * edge  # 抑制目标外响应 / Suppress response outside target
+    elif "aux_mass_target_light" in variant_name:  # 检查目标轻质量策略 / Check target-light mass strategy
+        density_source = 0.18 * density_source + 0.95 * anti_target + 0.22 * radial - 0.16 * target  # 让目标笔画相对轻 / Make target strokes relatively light
+        loss_source = 0.30 * loss_source + 0.78 * edge + 0.24 * anti_target  # 强化边缘阻尼 / Strengthen edge damping
+    elif "aux_loss_outer_suppress" in variant_name:  # 检查外区强阻尼策略 / Check outer suppression loss strategy
+        density_source = 0.30 * density_source + 0.52 * target + 0.22 * (1.0 - radial)  # 保留目标附近惯性 / Keep inertia near target
+        loss_source = 0.18 * loss_source + 1.10 * anti_target + 0.30 * radial  # 强力压制非目标区 / Strongly damp non-target region
+    elif "aux_inertia_edge_heavy" in variant_name:  # 检查边缘重惯性策略 / Check edge-heavy inertia strategy
+        density_source = 0.22 * density_source + 0.86 * edge + 0.30 * target  # 将惯性放到目标边界 / Place inertia on target edges
+        loss_source = 0.22 * loss_source + 0.70 * anti_target + 0.34 * (1.0 - edge)  # 降低边缘以外响应 / Reduce response away from edges
+    elif "aux_inertia_ring_break" in variant_name:  # 检查径向破环策略 / Check radial ring-breaking strategy
+        density_source = 0.20 * density_source + 0.72 * np.abs(radial - 0.52) + 0.36 * target  # 打破中心环状模态 / Break central ring-like modes
+        loss_source = 0.20 * loss_source + 0.66 * radial + 0.32 * anti_target  # 增强外圈损耗 / Increase outer-ring loss
+    elif "aux_low_loss_target_channel" in variant_name:  # 检查目标低损耗通道策略 / Check low-loss target-channel strategy
+        density_source = 0.24 * density_source + 0.60 * target + 0.26 * edge  # 沿目标保留惯性通道 / Keep inertia channel along target
+        loss_source = 0.18 * loss_source + 0.92 * anti_target - 0.34 * target + 0.24 * edge  # 让目标线附近相对低损耗 / Make target-line neighborhood relatively low-loss
     density_scale = scale_field(density_source, density_low, density_high)  # 生成密度倍率场 / Generate density-scale field
     loss_factor = scale_field(loss_source, loss_low, loss_high)  # 生成损耗因子场 / Generate loss-factor field
     return {"density_scale": np.round(density_scale, 4), "loss_factor": np.round(loss_factor, 5)}  # 返回辅助场 / Return auxiliary fields
@@ -883,10 +946,11 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
     target_grid = load_target_binary_grid(config, grid_size)  # 读取目标感知网格 / Load target-aware grid
     response_records = load_response_guidance_records(config, candidates_dir, target_grid) if target_grid is not None else []  # 读取真实响应闭环记录 / Load real-response closed-loop records
     response_closed_loop_proposals = generate_response_closed_loop_proposals(config, response_records, levels, default, max_diff, population, rng)  # 生成一等真实响应闭环提案 / Generate first-class real-response closed-loop proposals
+    auxiliary_physics_proposals = generate_auxiliary_physics_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成独立质量阻尼提案 / Generate independent mass-damping proposals
     modal_compiler_proposals = generate_modal_compiler_proposals(config, target_grid, parents, levels, default, max_diff, population, rng)  # 生成目标模态编译提案 / Generate target-modal compiler proposals
     kl_proxy_proposals = generate_kl_proxy_optimised_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成 KL 直接优化提案 / Generate directly KL-optimised proposals
     surrogate_proposals = generate_surrogate_proposals(config, candidates_dir, target_grid, response_records, parents, levels, default, max_diff, population, rng)  # 生成代理模型优化提案 / Generate surrogate-model optimized proposals
-    inverse_proposals = interleave_proposal_groups([response_closed_loop_proposals, modal_compiler_proposals, kl_proxy_proposals, surrogate_proposals], population)  # 交错合并真实响应、模态编译、直接物理优化和代理提案 / Interleave real response, modal compiler, direct physics, and surrogate proposals
+    inverse_proposals = interleave_proposal_groups([response_closed_loop_proposals, auxiliary_physics_proposals, modal_compiler_proposals, kl_proxy_proposals, surrogate_proposals], population)  # 交错合并真实响应、质量阻尼、模态编译、直接物理优化和代理提案 / Interleave real response, mass-damping, modal compiler, direct physics, and surrogate proposals
     response_count = max(min(population, len(response_records) * 2), int(population * 0.75)) if response_records else 0  # 计算闭环响应候选数量 / Compute response-guided candidate count
     target_count = max(response_count, max(min(population, 6), int(population * 0.90 if response_records else population * 0.75))) if target_grid is not None else 0  # 计算目标感知候选数量 / Compute target-aware candidate count
     candidate_ids = []  # 创建候选编号列表 / Create candidate id list
@@ -894,7 +958,7 @@ def generate_candidate_batch(config: dict, generation: int = 0) -> list[str]:  #
         candidate_id = f"candidate_{generation:03d}_{index:04d}"  # 构造候选编号 / Build candidate id
         if index < len(inverse_proposals):  # 优先使用逆向优化提案 / Prefer inverse-optimised proposals
             H, variant_name = inverse_proposals[index]  # 读取逆向提案 / Read inverse proposal
-            created_by = "response_guided_inverse_search" if variant_name.startswith("response_closed_loop") else ("modal_pde_inverse_compiler" if variant_name.startswith("modal_compiler") else ("kl_proxy_direct_inverse_search" if variant_name.startswith("kl_proxy_optimised") else "surrogate_guided_inverse_search"))  # 设置生成来源 / Set creation source
+            created_by = "response_guided_inverse_search" if variant_name.startswith("response_closed_loop") else ("auxiliary_physics_inverse_search" if variant_name.startswith("aux_") else ("modal_pde_inverse_compiler" if variant_name.startswith("modal_compiler") else ("kl_proxy_direct_inverse_search" if variant_name.startswith("kl_proxy_optimised") else "surrogate_guided_inverse_search")))  # 设置生成来源 / Set creation source
         elif response_records and index < response_count:  # 其次生成闭环响应引导候选 / Then generate closed-loop response-guided candidates
             H, variant_name = generate_response_guided_H(response_records, index, levels, default, max_diff, rng)  # 生成闭环响应引导矩阵 / Generate response-guided matrix
             created_by = "response_guided_inverse_search"  # 设置生成来源 / Set creation source

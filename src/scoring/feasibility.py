@@ -6,8 +6,20 @@ from pathlib import Path  # 导入路径工具 / Import path utilities
 from src.scoring.metrics import SCORING_VERSION  # 导入当前评分版本 / Import current scoring version
 
 
-CURRENT_CONTRACT_VARIABLES = ["thickness_mm", "global_material"]  # 定义当前 COMSOL 合约变量 / Define current COMSOL contract variables
-NEXT_CONTRACT_VARIABLES = ["per_cell_density_or_mass", "per_cell_loss_factor", "hole_or_slot_topology", "support_position", "actuator_position_phase"]  # 定义下一阶段变量 / Define next-stage variables
+BASE_CONTRACT_VARIABLES = ["thickness_mm", "global_material"]  # 定义基础 COMSOL 合约变量 / Define base COMSOL contract variables
+EXPANDED_CONTRACT_VARIABLES = ["per_cell_density_or_mass", "per_cell_loss_factor"]  # 定义已支持扩展变量 / Define supported expanded variables
+NEXT_CONTRACT_VARIABLES = ["hole_or_slot_topology", "support_position", "actuator_position_phase"]  # 定义下一阶段变量 / Define next-stage variables
+
+
+def has_expanded_design_variables(config: dict) -> bool:  # 判断是否启用扩展设计变量 / Decide whether expanded design variables are enabled
+    return bool(config.get("design_variables", {}).get("export_auxiliary_fields", False))  # 返回辅助变量开关 / Return auxiliary-variable switch
+
+
+def current_contract_variables(config: dict) -> list[str]:  # 获取当前 COMSOL 合约变量 / Get current COMSOL contract variables
+    variables = list(BASE_CONTRACT_VARIABLES)  # 复制基础变量 / Copy base variables
+    if has_expanded_design_variables(config):  # 检查扩展变量是否启用 / Check whether expanded variables are enabled
+        variables.extend(EXPANDED_CONTRACT_VARIABLES)  # 追加密度和损耗变量 / Add density and loss variables
+    return variables  # 返回当前变量列表 / Return current variable list
 
 
 def safe_float(value, default: float = 0.0) -> float:  # 安全转换浮点数 / Safely convert a float
@@ -58,8 +70,8 @@ def determine_status(records: list[dict], config: dict) -> str:  # 判断当前�
         return "insufficient_real_samples"  # 返回样本不足 / Return insufficient samples
     best = records[0]  # 读取最佳记录 / Read best record
     if best["final_score"] < score_floor or best["precision"] < precision_floor:  # 检查是否低于工程门槛 / Check engineering thresholds
-        return "physics_limited_thickness_only"  # 返回厚度单变量受限 / Return thickness-only limitation
-    return "continue_thickness_search"  # 返回继续厚度搜索 / Return continue thickness search
+        return "physics_limited_current_contract" if has_expanded_design_variables(config) else "physics_limited_thickness_only"  # 返回当前合同受限状态 / Return current-contract limitation status
+    return "continue_current_contract_search"  # 返回继续当前合同搜索 / Return continue current-contract search
 
 
 def build_recommendations(status: str) -> list[str]:  # 构建建议列表 / Build recommendation list
@@ -67,14 +79,16 @@ def build_recommendations(status: str) -> list[str]:  # 构建建议列表 / Bui
         return ["Run a few more real COMSOL candidates before declaring a physical bottleneck. / 先多跑几个真实 COMSOL 候选，再判断是否确实遇到物理瓶颈。"]  # 返回样本建议 / Return sample advice
     if status == "physics_limited_thickness_only":  # 检查厚度受限状态 / Check thickness-limited status
         return ["Expand the COMSOL parameter contract beyond thickness-only fields. / 将 COMSOL 参数合约从单一厚度场扩展出去。", "Add per-cell mass or density loading so the inverse search can reshape modal inertia. / 加入单元级质量或密度加载，让逆向搜索能改变模态惯性分布。", "Add local damping or loss-factor variables to suppress false centre-radiating modes. / 加入局部阻尼或损耗因子变量，压制中心放射类假阳性模态。", "Add optional topology variables such as holes or slots after the mass/damping bridge is stable. / 在质量和阻尼桥接稳定后，再加入孔洞或开槽等拓扑变量。"]  # 返回升级建议 / Return expansion advice
-    return ["Continue thickness search, but keep scoring v5 strictness enabled. / 可以继续厚度搜索，但保持 v5 严格评分。"]  # 返回继续建议 / Return continue advice
+    if status == "physics_limited_current_contract":  # 检查当前合同受限状态 / Check current-contract limitation status
+        return ["Keep thickness, density, and loss-factor search active, but stop treating KL-only scores as proof. / 保持厚度、密度和损耗因子搜索，但不要把纯 KL 分数当作真实证明。", "Prioritize independent mass-damping candidates and real COMSOL feedback. / 优先运行独立质量阻尼候选和真实 COMSOL 反馈。", "Prepare the next COMSOL contract step: topology holes or slots, support position, and actuator position or phase. / 准备下一步 COMSOL 合同：孔槽拓扑、支撑位置、激励位置或相位。"]  # 返回当前合同建议 / Return current-contract recommendations
+    return ["Continue current-contract search, but keep scoring v5 strictness enabled. / 可以继续当前合同搜索，但保持 v5 严格评分。"]  # 返回继续建议 / Return continue advice
 
 
 def build_feasibility_report(config: dict) -> dict:  # 构建可行性报告 / Build feasibility report
     records = collect_score_records(config)  # 收集评分记录 / Collect score records
     status = determine_status(records, config)  # 判断状态 / Determine status
     best = records[0] if records else {}  # 读取最佳结果 / Read best result
-    return {"scoring_version": SCORING_VERSION, "status": status, "current_contract_variables": CURRENT_CONTRACT_VARIABLES, "recommended_next_variables": NEXT_CONTRACT_VARIABLES, "real_candidate_count": len(records), "best_candidate": best.get("candidate_id", ""), "best_final_score": safe_float(best.get("final_score")), "best_precision": safe_float(best.get("precision")), "best_recall": safe_float(best.get("recall")), "mean_centerline_penalty": mean_value(records, "centerline_penalty"), "records": records[:20], "recommendations": build_recommendations(status)}  # 返回报告字典 / Return report dictionary
+    return {"scoring_version": SCORING_VERSION, "status": status, "current_contract_variables": current_contract_variables(config), "recommended_next_variables": NEXT_CONTRACT_VARIABLES, "real_candidate_count": len(records), "best_candidate": best.get("candidate_id", ""), "best_final_score": safe_float(best.get("final_score")), "best_precision": safe_float(best.get("precision")), "best_recall": safe_float(best.get("recall")), "mean_centerline_penalty": mean_value(records, "centerline_penalty"), "records": records[:20], "recommendations": build_recommendations(status)}  # 返回报告字典 / Return report dictionary
 
 
 def save_feasibility_report(config: dict, report_path: str | Path = "reports/feasibility_report.json") -> dict:  # 保存可行性报告 / Save feasibility report
