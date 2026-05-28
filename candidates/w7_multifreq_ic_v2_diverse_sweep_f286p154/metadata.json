@@ -1,0 +1,7 @@
+{
+  "candidate_id": "w7_multifreq_ic_v2_diverse_sweep_f286p154",
+  "source_candidate": "w7_multifreq_ic_v2_diverse",
+  "sweep_frequency_hz": 286.154,
+  "force_sigma_mm": 2.5,
+  "notes": "COMSOL-in-the-loop frequency sweep variant at 286.154 Hz. / COMSOL 闭环频率扫描变体，频率 286.154 Hz。"
+}

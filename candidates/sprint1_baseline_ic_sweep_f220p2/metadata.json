@@ -1,0 +1,7 @@
+{
+  "candidate_id": "sprint1_baseline_ic_sweep_f220p2",
+  "source_candidate": "w8_ic_sprint1_baseline",
+  "sweep_frequency_hz": 220.2,
+  "force_sigma_mm": 2.5,
+  "notes": "COMSOL-in-the-loop frequency sweep variant at 220.200 Hz. / COMSOL 闭环频率扫描变体，频率 220.200 Hz。"
+}

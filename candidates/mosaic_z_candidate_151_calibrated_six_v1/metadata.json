@@ -1,0 +1,15 @@
+{
+  "candidate_id": "mosaic_z_candidate_151_calibrated_six_v1",
+  "source_candidate": "candidate_151_0005",
+  "method": "MOSAIC-Z calibrated direct amplitude-valley actuator optimisation",
+  "actuator_count": 6,
+  "modal_scale_csv": "reports/mosaic_z/modal_calibration/real_comsol_v1/modal_participation_scale.csv",
+  "predicted_metrics": {
+    "iou": 0.24734208880550343,
+    "dice": 0.39659062421659563,
+    "layout": 0.6700505507993817,
+    "valley_area": 0.11171875
+  },
+  "source_result": "reports/mosaic_z/direct_actuator/candidate_151_six_160_calibrated_v1/direct_forced_response_summary.json",
+  "notes": "Real-COMSOL modal participation calibration applied before actuator optimisation."
+}

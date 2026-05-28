@@ -1,0 +1,39 @@
+{
+  "target_pixels_native": 2997,
+  "target_shape": [
+    256,
+    256
+  ],
+  "rows": [
+    {
+      "id": "baseline_w8",
+      "label": "W8 baseline",
+      "surrogate_enrichment": null,
+      "surrogate_recall": null,
+      "comsol_enrichment": 1.7465602931058855,
+      "comsol_recall": 0.3780447113780447,
+      "achievement_enrich": null,
+      "achievement_recall": null
+    },
+    {
+      "id": "w10_tier1_sr3",
+      "label": "W10 tier1 (CF-PETG sr=3.0)",
+      "surrogate_enrichment": 7.554620938525194,
+      "surrogate_recall": 0.5161290322580645,
+      "comsol_enrichment": 0.7173883037753757,
+      "comsol_recall": 0.08541875208541876,
+      "achievement_enrich": 0.09496019848156981,
+      "achievement_recall": 0.16549883216549885
+    },
+    {
+      "id": "w10_tier2_sr12",
+      "label": "W10 tier2 (Continuous CF sr=12.0)",
+      "surrogate_enrichment": 10.487016349186973,
+      "surrogate_recall": 0.6129032258064516,
+      "comsol_enrichment": 2.41109026314646,
+      "comsol_recall": 0.2702702702702703,
+      "achievement_enrich": 0.22991193899811022,
+      "achievement_recall": 0.44096728307254623
+    }
+  ]
+}

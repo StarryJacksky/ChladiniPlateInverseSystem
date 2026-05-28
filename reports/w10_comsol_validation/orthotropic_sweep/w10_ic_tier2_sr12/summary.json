@@ -1,0 +1,143 @@
+{
+  "candidate": "w10_ic_tier2_sr12",
+  "baseline_candidate": "mosaic_z_candidate_151_calibrated_six_v1",
+  "stiffness_ratio": 12.0,
+  "shear_ratio": 1.5,
+  "material_mode": "orthotropic_shell",
+  "material_summary": {
+    "E_iso_pa": 2000000000.0,
+    "E_for_runner_pa": 2000000000.0,
+    "E1_pa": 6928203230.275509,
+    "E2_pa": 577350269.1896257,
+    "G12_pa": 1111111111.111111,
+    "G_iso_pa": 740740740.7407407,
+    "stiffness_ratio": 12.0,
+    "shear_ratio": 1.5,
+    "material_mode": "orthotropic_shell"
+  },
+  "image_size": 256,
+  "frequencies_hz": [
+    240.0,
+    300.0,
+    360.0,
+    400.0,
+    440.0,
+    480.0,
+    520.0,
+    580.0,
+    640.0,
+    700.0,
+    760.0,
+    840.0
+  ],
+  "weights": [
+    9.959274892584589e-05,
+    9.959274892584589e-05,
+    0.9987651778417916,
+    0.9987651778417916,
+    0.9987651778417916,
+    0.9987651778417916,
+    0.0005611709322268933,
+    0.0005611709322268933,
+    0.0005611709322268933,
+    0.00041540029127504457,
+    0.00041540029127504457,
+    0.00011283032574842865
+  ],
+  "variants": [
+    {
+      "variant_id": "w10_ic_tier2_sr12_comsol_f240p0Hz",
+      "frequency_hz": 240.0,
+      "weight": 9.959274892584589e-05,
+      "response_csv": "data/comsol_exports/w10_ic_tier2_sr12_comsol_f240p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 2.64365083579e-06
+    },
+    {
+      "variant_id": "w10_ic_tier2_sr12_comsol_f300p0Hz",
+      "frequency_hz": 300.0,
+      "weight": 9.959274892584589e-05,
+      "response_csv": "data/comsol_exports/w10_ic_tier2_sr12_comsol_f300p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 1.44309362858e-06
+    },
+    {
+      "variant_id": "w10_ic_tier2_sr12_comsol_f360p0Hz",
+      "frequency_hz": 360.0,
+      "weight": 0.9987651778417916,
+      "response_csv": "data/comsol_exports/w10_ic_tier2_sr12_comsol_f360p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 2.0567693254e-07
+    },
+    {
+      "variant_id": "w10_ic_tier2_sr12_comsol_f400p0Hz",
+      "frequency_hz": 400.0,
+      "weight": 0.9987651778417916,
+      "response_csv": "data/comsol_exports/w10_ic_tier2_sr12_comsol_f400p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 1.89887408805e-07
+    },
+    {
+      "variant_id": "w10_ic_tier2_sr12_comsol_f440p0Hz",
+      "frequency_hz": 440.0,
+      "weight": 0.9987651778417916,
+      "response_csv": "data/comsol_exports/w10_ic_tier2_sr12_comsol_f440p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 2.0943796206e-07
+    },
+    {
+      "variant_id": "w10_ic_tier2_sr12_comsol_f480p0Hz",
+      "frequency_hz": 480.0,
+      "weight": 0.9987651778417916,
+      "response_csv": "data/comsol_exports/w10_ic_tier2_sr12_comsol_f480p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 8.60220800975e-07
+    },
+    {
+      "variant_id": "w10_ic_tier2_sr12_comsol_f520p0Hz",
+      "frequency_hz": 520.0,
+      "weight": 0.0005611709322268933,
+      "response_csv": "data/comsol_exports/w10_ic_tier2_sr12_comsol_f520p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 2.29275967507e-07
+    },
+    {
+      "variant_id": "w10_ic_tier2_sr12_comsol_f580p0Hz",
+      "frequency_hz": 580.0,
+      "weight": 0.0005611709322268933,
+      "response_csv": "data/comsol_exports/w10_ic_tier2_sr12_comsol_f580p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 9.23776885875e-08
+    },
+    {
+      "variant_id": "w10_ic_tier2_sr12_comsol_f640p0Hz",
+      "frequency_hz": 640.0,
+      "weight": 0.0005611709322268933,
+      "response_csv": "data/comsol_exports/w10_ic_tier2_sr12_comsol_f640p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 5.31831441161e-07
+    },
+    {
+      "variant_id": "w10_ic_tier2_sr12_comsol_f700p0Hz",
+      "frequency_hz": 700.0,
+      "weight": 0.00041540029127504457,
+      "response_csv": "data/comsol_exports/w10_ic_tier2_sr12_comsol_f700p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 2.23343359609e-07
+    },
+    {
+      "variant_id": "w10_ic_tier2_sr12_comsol_f760p0Hz",
+      "frequency_hz": 760.0,
+      "weight": 0.00041540029127504457,
+      "response_csv": "data/comsol_exports/w10_ic_tier2_sr12_comsol_f760p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 4.57758037454e-07
+    },
+    {
+      "variant_id": "w10_ic_tier2_sr12_comsol_f840p0Hz",
+      "frequency_hz": 840.0,
+      "weight": 0.00011283032574842865,
+      "response_csv": "data/comsol_exports/w10_ic_tier2_sr12_comsol_f840p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 5.62364772401e-08
+    }
+  ],
+  "metrics": {
+    "enrichment_factor": 1.01493404147358,
+    "coverage_recall": 0.19119119119119118,
+    "gaussian_contrast": 1.015660913340217,
+    "directional_alignment": 0.8185928678044725,
+    "composite_recognisability": 0.14825400413035672,
+    "powder_max": 1.0,
+    "powder_mean": 0.15009741287247394
+  },
+  "completed_at": "2026-05-27T21:30:12"
+}

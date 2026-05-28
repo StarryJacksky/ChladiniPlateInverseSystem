@@ -1,0 +1,25 @@
+Wrote frequency-domain validation outputs to reports/frequency_domain_validation/pipeline_w7_ic_v1_comsol_w7_multifreq_ic_v2_diverse. / 已写出频域验证输出到 reports/frequency_domain_validation/pipeline_w7_ic_v1_comsol_w7_multifreq_ic_v2_diverse。
+{
+  "best": {},
+  "rows": [],
+  "combined_frequency_export": "data/comsol_frequency_exports/pipeline_w7_ic_v1_comsol_w7_multifreq_ic_v2_diverse/frequency_response.csv",
+  "frequency_domain_validation_report": "reports/frequency_domain_validation/pipeline_w7_ic_v1_comsol_w7_multifreq_ic_v2_diverse/frequency_domain_validation_summary.md",
+  "amplitude_valley_best": {
+    "target_mean_amplitude": 0.030260367318987846,
+    "target_median_amplitude": 0.031944531947374344,
+    "side_mean_amplitude": 0.03948346525430679,
+    "side_median_amplitude": 0.028750572353601456,
+    "valley_contrast": 1.3047913410334453,
+    "median_valley_contrast": 0.9000154518139555,
+    "contrast_margin": 0.009223097935318947,
+    "median_contrast_margin": -0.003193959593772888,
+    "extra_valley_penalty": 0.1086825504899025,
+    "iou": 0.04408303017333619,
+    "dice": 0.08444353351096537,
+    "layout": 0.35074198613137025,
+    "chamfer": 0.6211486029178594,
+    "final_amplitude_valley_score": 0.15411279651629115,
+    "final_frequency_response_score": 0.15411279651629115,
+    "frequency_hz": 676.77
+  }
+}

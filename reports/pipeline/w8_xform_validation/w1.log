@@ -1,0 +1,16 @@
+Verdict: needs_amplitude_pattern / 判定：needs_amplitude_pattern
+Target kind: open_stroke_pattern / 目标类别：open_stroke_pattern
+Foreground ratio: 0.097 / 前景占比：0.097
+Connected components: 1 / 连通分量：1
+Closed loops: 0 / 闭合环数：0
+Skeleton endpoints: 4 / 骨架端点：4
+Courant min mode index: 1 / Courant 下界 mode：1
+Stroke min feature: 1.66 mm / 最小笔画宽度：1.66 mm
+Stroke min gap: inf mm / 最小笔画间隙：inf mm
+D4 mismatch: 0.000 / D4 对称偏差：0.000
+Near-clamp ratio: 0.117 / 贴夹持区比例：0.117
+Estimated min frequency: 70.7 Hz / 估算所需最低频率：70.7 Hz
+Skeleton has 4 open endpoints; switch from nodal-line matching to amplitude-pattern matching (W2). / 骨架存在 4 个端点，应从节点线匹配切换到振幅模式匹配 (W2)。
+Switch from nodal-line matching to amplitude-valley loss (W2). Target strokes will be matched as low-amplitude bands, not nodal contours. / 从节点线匹配切换到 W2 振幅谷损失；目标笔画将匹配为低振幅带，而非节点等值线。
+Then run W5 homotopy and record lambda_max so the customer sees a quantitative reachability number. / 随后运行 W5 同伦延拓并记录 lambda_max，向客户给出量化可达性指标。
+Report: /Users/apple/Documents/ChladiniPlateProject/reports/target_realizability_w8_xform_validation.json / 报告：/Users/apple/Documents/ChladiniPlateProject/reports/target_realizability_w8_xform_validation.json

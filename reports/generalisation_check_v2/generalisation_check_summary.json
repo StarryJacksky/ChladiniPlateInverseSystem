@@ -1,0 +1,75 @@
+{
+  "verdict": "HIGH-SR GENERIC: tier1/tier2 always beat sr=1 → high sr is generic upgrade",
+  "per_target_best": {
+    "Circle": {
+      "best_sr": 12.0,
+      "best_enrich": 4.784524774791356
+    },
+    "IC": {
+      "best_sr": 3.0,
+      "best_enrich": 17.99295400857872
+    }
+  },
+  "results": [
+    {
+      "target": "Circle",
+      "sr": 1.0,
+      "best_surrogate_enrichment": 8.067707115470102e-29,
+      "best_surrogate_contrast": 6.828506952486898e-29,
+      "best_surrogate_recall": 0.42853863948248366,
+      "best_step": 298,
+      "elapsed_s": 70.90909314155579,
+      "candidate_id": "gencheck_Circle_sr1"
+    },
+    {
+      "target": "Circle",
+      "sr": 3.0,
+      "best_surrogate_enrichment": 4.177843624866079,
+      "best_surrogate_contrast": 9.869640931736178,
+      "best_surrogate_recall": 0.7104240215566338,
+      "best_step": 296,
+      "elapsed_s": 71.73230910301208,
+      "candidate_id": "gencheck_Circle_sr3"
+    },
+    {
+      "target": "Circle",
+      "sr": 12.0,
+      "best_surrogate_enrichment": 4.784524774791356,
+      "best_surrogate_contrast": 15.275999406929138,
+      "best_surrogate_recall": 0.5843008650596249,
+      "best_step": 297,
+      "elapsed_s": 70.06761384010315,
+      "candidate_id": "gencheck_Circle_sr12"
+    },
+    {
+      "target": "IC",
+      "sr": 1.0,
+      "best_surrogate_enrichment": 6.759045859509729,
+      "best_surrogate_contrast": 8.556993744995706,
+      "best_surrogate_recall": 0.6378817432990855,
+      "best_step": 299,
+      "elapsed_s": 70.27004504203796,
+      "candidate_id": "gencheck_IC_sr1"
+    },
+    {
+      "target": "IC",
+      "sr": 3.0,
+      "best_surrogate_enrichment": 17.99295400857872,
+      "best_surrogate_contrast": 47.346776169512204,
+      "best_surrogate_recall": 0.681739387892569,
+      "best_step": 297,
+      "elapsed_s": 71.60259795188904,
+      "candidate_id": "gencheck_IC_sr3"
+    },
+    {
+      "target": "IC",
+      "sr": 12.0,
+      "best_surrogate_enrichment": 17.15006361779098,
+      "best_surrogate_contrast": 41.75028856406173,
+      "best_surrogate_recall": 0.6697411963640034,
+      "best_step": 299,
+      "elapsed_s": 69.59938097000122,
+      "candidate_id": "gencheck_IC_sr12"
+    }
+  ]
+}

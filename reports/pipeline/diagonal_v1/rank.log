@@ -1,0 +1,16 @@
+Primary metric: final_score_amplitude_valley / 主指标：final_score_amplitude_valley
+Target verdict: requires_topology (kind=open_stroke_pattern) / 目标判定：requires_topology（类别=open_stroke_pattern）
+Total candidates scored: 27 / 已评分候选数：27
+Top 10 (primary | nodal | amplitude): / 前 10 名 (主指标 | 节点线 | 振幅谷)：
+   1. w4_pipeline_diagonal_v1_sweep_f640                            primary=    0.1585  nodal=      n/a  amp=   0.1585
+   2. w6_pipeline_diagonal_v1_v1_sweep_f200                         primary=    0.1480  nodal=      n/a  amp=   0.1480
+   3. w6_pipeline_diagonal_v1_v1_sweep_f540                         primary=    0.1395  nodal=      n/a  amp=   0.1395
+   4. w4_pipeline_diagonal_v1_sweep_f400                            primary=    0.1309  nodal=      n/a  amp=   0.1309
+   5. w6_pipeline_diagonal_v1_v1_sweep_f860                         primary=    0.1290  nodal=      n/a  amp=   0.1290
+   6. w4_pipeline_diagonal_v1_sweep_f950                            primary=    0.1257  nodal=      n/a  amp=   0.1257
+   7. w6_pipeline_diagonal_v1_v1_sweep_f640                         primary=    0.1203  nodal=      n/a  amp=   0.1203
+   8. w6_pipeline_diagonal_v1_v2_strong_sweep_f860                  primary=    0.1198  nodal=      n/a  amp=   0.1198
+   9. w6_pipeline_diagonal_v1_v2_strong_sweep_f200                  primary=    0.1196  nodal=      n/a  amp=   0.1196
+  10. w4_pipeline_diagonal_v1_sweep_f300                            primary=    0.1163  nodal=      n/a  amp=   0.1163
+CSV : candidates/ranked_candidates_unified.csv / 排行 CSV：candidates/ranked_candidates_unified.csv
+JSON: reports/leaderboard.json / 排行 JSON：reports/leaderboard.json

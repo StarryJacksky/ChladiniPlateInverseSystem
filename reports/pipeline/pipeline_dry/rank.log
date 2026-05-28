@@ -1,0 +1,6 @@
+Primary metric: final_score_amplitude_valley / 主指标：final_score_amplitude_valley
+Target verdict: requires_topology (kind=open_stroke_pattern) / 目标判定：requires_topology（类别=open_stroke_pattern）
+Total candidates scored: 0 / 已评分候选数：0
+Top 10 (primary | nodal | amplitude): / 前 10 名 (主指标 | 节点线 | 振幅谷)：
+CSV : candidates/ranked_candidates_unified.csv / 排行 CSV：candidates/ranked_candidates_unified.csv
+JSON: reports/leaderboard.json / 排行 JSON：reports/leaderboard.json

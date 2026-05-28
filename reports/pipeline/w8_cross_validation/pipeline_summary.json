@@ -1,0 +1,85 @@
+{
+  "target_tag": "w8_cross_validation",
+  "target_path": "data/processed_targets/target_cross.npy",
+  "verdict_path": "/Users/apple/Documents/ChladiniPlateProject/reports/target_realizability_w8_cross_validation.json",
+  "drive_frequency_hz": 212.18218490057276,
+  "manifold_path": "reports/design_manifold_pca.npz",
+  "candidates": [
+    "w8_cross_v1"
+  ],
+  "sweep_candidates": [
+    "w8_cross_v1_sweep_f345p84",
+    "w8_cross_v1_sweep_f467p09",
+    "w8_cross_v1_sweep_f657p43",
+    "w8_cross_v1_sweep_f765p03",
+    "w8_cross_v1_sweep_f935p24",
+    "w8_cross_v1_sweep_f1073p43"
+  ],
+  "comsol_runs": [
+    {
+      "candidate_id": "w8_cross_v1",
+      "name": "COMSOL_w8_cross_v1",
+      "command": [
+        "/Users/apple/Documents/ChladiniPlateProject/.venv/bin/python",
+        "scripts/run_comsol_frequency_sweep.py",
+        "--config",
+        "config.yaml",
+        "--base-candidate-id",
+        "w8_cross_v1",
+        "--frequencies",
+        "345.84,467.09,657.43,765.03,935.24,1073.43",
+        "--run-name",
+        "pipeline_w8_cross_validation_w8_cross_v1",
+        "--frequency-export-case",
+        "pipeline_w8_cross_validation_w8_cross_v1",
+        "--skip-legacy-epsilon-score"
+      ],
+      "returncode": 0,
+      "elapsed_s": 116.41343879699707,
+      "log_path": "/Users/apple/Documents/ChladiniPlateProject/reports/pipeline/w8_cross_validation/comsol_w8_cross_v1.log",
+      "status": "ok"
+    }
+  ],
+  "stages": [
+    {
+      "name": "W1",
+      "command": [
+        "/Users/apple/Documents/ChladiniPlateProject/.venv/bin/python",
+        "scripts/analyze_target_realizability.py",
+        "--config",
+        "config.yaml",
+        "--output",
+        "/Users/apple/Documents/ChladiniPlateProject/reports/target_realizability_w8_cross_validation.json",
+        "--target",
+        "data/processed_targets/target_cross.npy"
+      ],
+      "returncode": 0,
+      "elapsed_s": 0.25226593017578125,
+      "log_path": "/Users/apple/Documents/ChladiniPlateProject/reports/pipeline/w8_cross_validation/w1.log",
+      "status": "ok"
+    },
+    {
+      "name": "COMSOL_w8_cross_v1",
+      "command": [
+        "/Users/apple/Documents/ChladiniPlateProject/.venv/bin/python",
+        "scripts/run_comsol_frequency_sweep.py",
+        "--config",
+        "config.yaml",
+        "--base-candidate-id",
+        "w8_cross_v1",
+        "--frequencies",
+        "345.84,467.09,657.43,765.03,935.24,1073.43",
+        "--run-name",
+        "pipeline_w8_cross_validation_w8_cross_v1",
+        "--frequency-export-case",
+        "pipeline_w8_cross_validation_w8_cross_v1",
+        "--skip-legacy-epsilon-score"
+      ],
+      "returncode": 0,
+      "elapsed_s": 116.41343879699707,
+      "log_path": "/Users/apple/Documents/ChladiniPlateProject/reports/pipeline/w8_cross_validation/comsol_w8_cross_v1.log",
+      "status": "ok"
+    }
+  ],
+  "rank_payload": null
+}

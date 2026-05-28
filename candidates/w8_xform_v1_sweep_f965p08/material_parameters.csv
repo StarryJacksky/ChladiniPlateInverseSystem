@@ -1,0 +1,7 @@
+name,value,unit
+mat_density,1200,kg/m^3
+mat_poisson_ratio,0.35,1
+mat_youngs_modulus,2000000000,Pa
+mat_thermal_conductivity,0.18,W/(m*K)
+mat_heat_capacity,1200,J/(kg*K)
+mat_thermal_expansion,8e-05,1/K

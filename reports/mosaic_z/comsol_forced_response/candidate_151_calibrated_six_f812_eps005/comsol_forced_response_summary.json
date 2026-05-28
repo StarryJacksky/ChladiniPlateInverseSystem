@@ -1,0 +1,19 @@
+{
+  "response_csv": "data/comsol_exports/mosaic_z_candidate_151_calibrated_six_f812/forced_response/forced_response.csv",
+  "image_size": 160,
+  "epsilon": 0.05,
+  "center_radius_px": 8,
+  "stats": {
+    "sample_count": 1027,
+    "max_abs": 2.16917525811e-09,
+    "mean_abs": 4.4420429270921706e-10,
+    "nonzero_count": 987
+  },
+  "metrics": {
+    "iou": 0.1905191873589165,
+    "dice": 0.3200606750094805,
+    "chamfer": 0.8176501495558474,
+    "layout": 0.539351264965086,
+    "valley_area": 0.0584765625
+  }
+}

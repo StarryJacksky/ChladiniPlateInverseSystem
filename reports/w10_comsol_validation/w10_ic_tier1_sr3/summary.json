@@ -1,0 +1,44 @@
+{
+  "candidate": "w10_ic_tier1_sr3",
+  "baseline_candidate": "mosaic_z_candidate_151_calibrated_six_v1",
+  "stiffness_ratio": 3.0,
+  "shear_ratio": 0.85,
+  "material_mode": "isotropic_baseline",
+  "material_summary": {
+    "E_iso_pa": 2000000000.0,
+    "E_for_runner_pa": 2000000000.0,
+    "E1_pa": 3464101615.1377544,
+    "E2_pa": 1154700538.3792515,
+    "G12_pa": 629629629.6296295,
+    "G_iso_pa": 740740740.7407407,
+    "stiffness_ratio": 3.0,
+    "shear_ratio": 0.85,
+    "material_mode": "isotropic_baseline"
+  },
+  "image_size": 256,
+  "frequencies_hz": [
+    495.27
+  ],
+  "weights": [
+    0.4837264802803969
+  ],
+  "variants": [
+    {
+      "variant_id": "smoke_w10_ic_tier1_sr3_comsol_f495p3Hz",
+      "frequency_hz": 495.27,
+      "weight": 0.4837264802803969,
+      "response_csv": "data/comsol_exports/smoke_w10_ic_tier1_sr3_comsol_f495p3Hz/forced_response/forced_response.csv",
+      "field_max_abs": 9.34877832881e-07
+    }
+  ],
+  "metrics": {
+    "enrichment_factor": 0.5848605210086854,
+    "coverage_recall": 0.12112112112112113,
+    "gaussian_contrast": 0.573452059909122,
+    "directional_alignment": 0.6231510241574936,
+    "composite_recognisability": 0.09865143875208571,
+    "powder_max": 1.0,
+    "powder_mean": 0.21303357261045944
+  },
+  "completed_at": "2026-05-27T21:02:36"
+}

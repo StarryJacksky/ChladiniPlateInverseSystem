@@ -1,0 +1,13 @@
+{
+  "candidate_id": "mosaic_z_candidate_151_direct_eight_safe",
+  "source_candidate": "candidate_151_0005",
+  "method": "MOSAIC-Z direct amplitude-valley actuator optimisation with centre-clamp exclusion",
+  "actuator_count": 8,
+  "predicted_metrics": {
+    "iou": 0.29665629860031106,
+    "dice": 0.45757121439280357,
+    "layout": 0.7378032105543257
+  },
+  "source_result": "reports/mosaic_z/direct_actuator/candidate_151_eight_160_center_safe/direct_forced_response_summary.json",
+  "notes": "Upper-bound multi-actuator candidate with no actuator inside the centre clamp exclusion zone."
+}

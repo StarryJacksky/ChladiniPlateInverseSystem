@@ -1,0 +1,7 @@
+{
+  "candidate_id": "w4_pipeline_diagonal_v1_sweep_f560",
+  "source_candidate": "w4_pipeline_diagonal_v1",
+  "sweep_frequency_hz": 560.0,
+  "force_sigma_mm": 2.5,
+  "notes": "COMSOL-in-the-loop frequency sweep variant at 560.000 Hz. / COMSOL 闭环频率扫描变体，频率 560.000 Hz。"
+}

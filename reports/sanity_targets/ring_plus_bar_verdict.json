@@ -1,0 +1,42 @@
+{
+  "verdict": "easy",
+  "metrics": {
+    "image_size": 256,
+    "plate_size_mm": 150.0,
+    "grid_size": 15,
+    "cell_size_mm": 10.0,
+    "mm_per_pixel": 0.5859375,
+    "foreground_ratio": 0.0773468017578125,
+    "n_connected_components": 1,
+    "n_closed_loops": 2,
+    "n_skeleton_endpoints": 0,
+    "courant_min_mode_index": 3,
+    "stroke_min_gap_mm": Infinity,
+    "stroke_min_feature_mm": 1.6572815184059708,
+    "d4_symmetry_mismatch": 0.29550954745941727,
+    "estimated_min_frequency_hz": 212.1821849005727,
+    "near_clamp_ratio": 0.05523771947129611,
+    "target_kind": "closed_curve_set"
+  },
+  "thresholds": {
+    "infeasible_courant_min_mode_index": 60,
+    "infeasible_stroke_min_gap_mm": 6.0,
+    "requires_topology_courant_min_mode_index": 30,
+    "requires_topology_stroke_min_gap_mm": 7.0,
+    "requires_topology_d4_symmetry_mismatch": 0.55,
+    "borderline_courant_min_mode_index": 18,
+    "borderline_stroke_min_gap_mm": 10.0,
+    "borderline_d4_symmetry_mismatch": 0.35,
+    "filled_target_foreground_ratio": 0.18,
+    "thin_stroke_feature_mm": 8.0,
+    "clamp_buffer_mm": 4.0,
+    "max_endpoints_easy": 0
+  },
+  "diagnosis_notes": [
+    "Target is within easy realizability bounds. / 目标处于易于实现的范围内。"
+  ],
+  "advisory": [
+    "Proceed with current 15x15 search; gradient-based loop (W3) should converge quickly under nodal-line matching. / 可直接使用 15x15 搜索；W3 梯度链路下节点线匹配应快速收敛。"
+  ],
+  "target_path": "reports/sanity_targets/ring_plus_bar.npy"
+}

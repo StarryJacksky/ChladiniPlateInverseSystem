@@ -1,0 +1,21 @@
+{
+  "candidate_id": "tags_ic_case_a_target_thick_sweep_f311",
+  "created_by": "target_aligned_passive_geometry",
+  "tags_case": "case_a_target_thick",
+  "tags_description": "目标骨架带加厚 / Thicken the target skeleton band",
+  "tags_target_radius_px": 6.0,
+  "tags_side_radius_px": 20.8,
+  "tags_background_mm": 1.3,
+  "thickness_mode": "continuous",
+  "grid_size": 15,
+  "center_fixed": true,
+  "python_role": "geometry_generation_only_comsol_is_physics_feedback",
+  "auxiliary_fields": [
+    "density_scale",
+    "loss_factor"
+  ],
+  "source_candidate": "tags_ic_case_a_target_thick",
+  "sweep_frequency_hz": 311.0,
+  "force_sigma_mm": 2.5,
+  "notes": "COMSOL-in-the-loop frequency sweep variant at 311.000 Hz. / COMSOL 闭环频率扫描变体，频率 311.000 Hz。"
+}

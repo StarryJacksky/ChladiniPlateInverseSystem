@@ -1,0 +1,19 @@
+{
+  "response_csv": "data/comsol_exports/mosaic_z_operator_rib_seed_v1/forced_response/forced_response.csv",
+  "image_size": 160,
+  "epsilon": 0.05,
+  "center_radius_px": 8,
+  "stats": {
+    "sample_count": 1027,
+    "max_abs": 2.4603459135e-09,
+    "mean_abs": 4.696672252001597e-10,
+    "nonzero_count": 987
+  },
+  "metrics": {
+    "iou": 0.17600276625172892,
+    "dice": 0.29932372831520143,
+    "chamfer": 0.7984271960089581,
+    "layout": 0.5452850812792667,
+    "valley_area": 0.0883203125
+  }
+}

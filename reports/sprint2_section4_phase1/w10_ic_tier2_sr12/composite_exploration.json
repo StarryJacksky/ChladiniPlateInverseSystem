@@ -1,0 +1,329 @@
+{
+  "scoring": {
+    "broad": {
+      "sigma_rel": 0.05,
+      "percentile": 20.0
+    },
+    "tight": {
+      "sigma_rel": 0.012,
+      "percentile": 92.0
+    }
+  },
+  "per_freq": [
+    {
+      "f": 132.012442579,
+      "mode": 5,
+      "w": 0.3054351927322366,
+      "broad": {
+        "enrich": 2.8825681179534355,
+        "recall": 0.5648982315648983,
+        "contrast": 3.1684114389948466,
+        "composite_recog": 0.9215331480115467
+      },
+      "tight": {
+        "enrich": 2.446540725993968,
+        "recall": 1.0,
+        "contrast": 2.628770351536309,
+        "composite_recog": 0.9499426119655785
+      }
+    },
+    {
+      "f": 61.572283189,
+      "mode": 3,
+      "w": 0.23097799008170605,
+      "broad": {
+        "enrich": 2.5905612496560937,
+        "recall": 0.5622288955622289,
+        "contrast": 2.8043145500659574,
+        "composite_recog": 0.7624739852177933
+      },
+      "tight": {
+        "enrich": 2.9866295848867486,
+        "recall": 1.0,
+        "contrast": 3.3008850537857417,
+        "composite_recog": 0.9883847445475293
+      }
+    },
+    {
+      "f": 246.104618932,
+      "mode": 8,
+      "w": 0.1258849385835312,
+      "broad": {
+        "enrich": 1.8164332135317063,
+        "recall": 0.330663997330664,
+        "contrast": 1.8903952798250734,
+        "composite_recog": 0.483436056190592
+      },
+      "tight": {
+        "enrich": 1.8622714349918035,
+        "recall": 1.0,
+        "contrast": 1.9425407823776284,
+        "composite_recog": 0.703781683827641
+      }
+    },
+    {
+      "f": 50.7773801853,
+      "mode": 2,
+      "w": 0.1170815733804365,
+      "broad": {
+        "enrich": 2.3724377067209628,
+        "recall": 0.4574574574574575,
+        "contrast": 2.5394580604721653,
+        "composite_recog": 0.6820589143036488
+      },
+      "tight": {
+        "enrich": 3.265444167696367,
+        "recall": 1.0,
+        "contrast": 3.663131188828235,
+        "composite_recog": 1.0375651764714873
+      }
+    },
+    {
+      "f": 211.373353562,
+      "mode": 6,
+      "w": 0.1163985417923583,
+      "broad": {
+        "enrich": 1.8079305439638313,
+        "recall": 0.3520186853520187,
+        "contrast": 1.8807488477596117,
+        "composite_recog": 0.5674196778103512
+      },
+      "tight": {
+        "enrich": 1.014262684186649,
+        "recall": 1.0,
+        "contrast": 1.0149563769324004,
+        "composite_recog": 0.4063757531650304
+      }
+    },
+    {
+      "f": 87.30952523,
+      "mode": 4,
+      "w": 0.1042217634297314,
+      "broad": {
+        "enrich": 2.332402065358646,
+        "recall": 0.5268601935268602,
+        "contrast": 2.491487253466103,
+        "composite_recog": 0.756880392485522
+      },
+      "tight": {
+        "enrich": 2.537360379308959,
+        "recall": 1.0,
+        "contrast": 2.739164248533462,
+        "composite_recog": 0.9565368199692728
+      }
+    },
+    {
+      "f": 180.0,
+      "mode": "—",
+      "w": 0.0,
+      "broad": {
+        "enrich": 3.141681105560476,
+        "recall": 0.6496496496496497,
+        "contrast": 3.50100244516966,
+        "composite_recog": 1.0031711505947378
+      },
+      "tight": {
+        "enrich": 3.1611799103140235,
+        "recall": 1.0,
+        "contrast": 3.5264033756565487,
+        "composite_recog": 1.1122676856908555
+      }
+    }
+  ],
+  "composite_ranking": [
+    {
+      "name": "BEST_BROAD_RMS_132-180",
+      "broad": {
+        "enrich": 3.820831317011564,
+        "recall": 0.8902235568902236,
+        "contrast": 4.418066115146314,
+        "composite_recog": 1.1994888396439678
+      },
+      "tight": {
+        "enrich": 2.2213580157811332,
+        "recall": 1.0,
+        "contrast": 2.359457039442653,
+        "composite_recog": 0.8903671150559049
+      }
+    },
+    {
+      "name": "just_180+50+87_SUM",
+      "broad": {
+        "enrich": 2.9599636262734825,
+        "recall": 0.6900233566900233,
+        "contrast": 3.266799585948186,
+        "composite_recog": 0.9367871902848771
+      },
+      "tight": {
+        "enrich": 3.0789535163179185,
+        "recall": 1.0,
+        "contrast": 3.419645116754158,
+        "composite_recog": 1.0338097955578958
+      }
+    },
+    {
+      "name": "BEST_TIGHT_MAX_246-51-87-180",
+      "broad": {
+        "enrich": 2.746470615019735,
+        "recall": 0.667334000667334,
+        "contrast": 2.9973307589253873,
+        "composite_recog": 0.8473500304350378
+      },
+      "tight": {
+        "enrich": 3.3959859259552005,
+        "recall": 1.0,
+        "contrast": 3.8364945398398045,
+        "composite_recog": 1.0681501780967753
+      }
+    },
+    {
+      "name": "just_180+62+87_MAX",
+      "broad": {
+        "enrich": 2.723678339516801,
+        "recall": 0.6700033366700033,
+        "contrast": 2.968917642240607,
+        "composite_recog": 0.8310036526844733
+      },
+      "tight": {
+        "enrich": 3.336463290479829,
+        "recall": 1.0,
+        "contrast": 3.7571437371364094,
+        "composite_recog": 1.0514786631885755
+      }
+    },
+    {
+      "name": "P1_uniform_SUM",
+      "broad": {
+        "enrich": 2.374402638956298,
+        "recall": 0.8188188188188188,
+        "contrast": 2.541817489696029,
+        "composite_recog": 0.8771581733198923
+      },
+      "tight": {
+        "enrich": 1.8263218580392828,
+        "recall": 1.0,
+        "contrast": 1.9016242682464548,
+        "composite_recog": 0.7052363275746064
+      }
+    },
+    {
+      "name": "P1_uniform_RMS",
+      "broad": {
+        "enrich": 2.3324568056018236,
+        "recall": 0.8358358358358359,
+        "contrast": 2.4915526479007752,
+        "composite_recog": 0.8631713047717005
+      },
+      "tight": {
+        "enrich": 1.6009753667000388,
+        "recall": 1.0,
+        "contrast": 1.6484506062573154,
+        "composite_recog": 0.6409852914886689
+      }
+    },
+    {
+      "name": "P1_enrW_RMS",
+      "broad": {
+        "enrich": 2.32564887250298,
+        "recall": 0.8368368368368369,
+        "contrast": 2.483414866994573,
+        "composite_recog": 0.8633523362292845
+      },
+      "tight": {
+        "enrich": 1.587630985865875,
+        "recall": 1.0,
+        "contrast": 1.6336348357260335,
+        "composite_recog": 0.6294184143298385
+      }
+    },
+    {
+      "name": "P1_orig_RMS",
+      "broad": {
+        "enrich": 2.267717416318151,
+        "recall": 0.8355021688355022,
+        "contrast": 2.4143959468232183,
+        "composite_recog": 0.8478486163566656
+      },
+      "tight": {
+        "enrich": 1.4637174677513018,
+        "recall": 1.0,
+        "contrast": 1.4969837801961774,
+        "composite_recog": 0.5881164112515145
+      }
+    },
+    {
+      "name": "P1+180_MAX",
+      "broad": {
+        "enrich": 2.1289382627663347,
+        "recall": 0.8395061728395061,
+        "contrast": 2.2507037087303856,
+        "composite_recog": 0.8081046294807728
+      },
+      "tight": {
+        "enrich": 1.1594912064641212,
+        "recall": 1.0,
+        "contrast": 1.168421521580886,
+        "composite_recog": 0.4562837859717567
+      }
+    },
+    {
+      "name": "P1_MAX",
+      "broad": {
+        "enrich": 2.128938262381105,
+        "recall": 0.8395061728395061,
+        "contrast": 2.2507037082791963,
+        "composite_recog": 0.8081046293664114
+      },
+      "tight": {
+        "enrich": 1.1594911961743226,
+        "recall": 1.0,
+        "contrast": 1.1684215106312408,
+        "composite_recog": 0.4562837805022893
+      }
+    }
+  ],
+  "best_subset_broad": {
+    "freqs": [
+      "132",
+      "180"
+    ],
+    "combo": "RMS",
+    "scores": {
+      "broad": {
+        "enrich": 3.820831317011564,
+        "recall": 0.8902235568902236,
+        "contrast": 4.418066115146314,
+        "composite_recog": 1.1994888396439678
+      },
+      "tight": {
+        "enrich": 2.2213580157811332,
+        "recall": 1.0,
+        "contrast": 2.359457039442653,
+        "composite_recog": 0.8903671150559049
+      }
+    }
+  },
+  "best_subset_tight": {
+    "freqs": [
+      "246",
+      "51",
+      "87",
+      "180"
+    ],
+    "combo": "MAX",
+    "scores": {
+      "broad": {
+        "enrich": 2.746470615019735,
+        "recall": 0.667334000667334,
+        "contrast": 2.9973307589253873,
+        "composite_recog": 0.8473500304350378
+      },
+      "tight": {
+        "enrich": 3.3959859259552005,
+        "recall": 1.0,
+        "contrast": 3.8364945398398045,
+        "composite_recog": 1.0681501780967753
+      }
+    }
+  }
+}

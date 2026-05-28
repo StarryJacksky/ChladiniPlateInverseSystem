@@ -1,0 +1,19 @@
+{
+  "response_csv": "data/comsol_exports/w9_ic_v1_iter0_sweep_f381p8/forced_response/forced_response.csv",
+  "image_size": 160,
+  "epsilon": 0.05,
+  "center_radius_px": 8,
+  "stats": {
+    "sample_count": 1027,
+    "max_abs": 1.27166107823e-12,
+    "mean_abs": 1.8524810998133e-13,
+    "nonzero_count": 1014
+  },
+  "metrics": {
+    "iou": 0.0783928069682495,
+    "dice": 0.1453882230328296,
+    "chamfer": 0.5706101947132133,
+    "layout": 0.33667855095000043,
+    "valley_area": 0.2553125
+  }
+}

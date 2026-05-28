@@ -1,0 +1,4 @@
+W3 gradient optimisation start / 启动 W3 梯度优化: candidate=w3_pipeline_pipeline_dry, drive_hz=636.5, proxy=25x25, steps=5
+steps=5  best_loss=2.585629@step4  first/last=2.5864 / 2.5856
+output dir: candidates/w3_pipeline_pipeline_dry / 输出目录：candidates/w3_pipeline_pipeline_dry
+summary json: candidates/w3_pipeline_pipeline_dry/w3_optimization_summary.json / 摘要 JSON: candidates/w3_pipeline_pipeline_dry/w3_optimization_summary.json

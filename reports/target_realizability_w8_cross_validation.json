@@ -1,0 +1,43 @@
+{
+  "verdict": "needs_amplitude_pattern",
+  "metrics": {
+    "image_size": 256,
+    "plate_size_mm": 150.0,
+    "grid_size": 15,
+    "cell_size_mm": 10.0,
+    "mm_per_pixel": 0.5859375,
+    "foreground_ratio": 0.0706634521484375,
+    "n_connected_components": 1,
+    "n_closed_loops": 0,
+    "n_skeleton_endpoints": 4,
+    "courant_min_mode_index": 1,
+    "stroke_min_gap_mm": Infinity,
+    "stroke_min_feature_mm": 2.34375,
+    "d4_symmetry_mismatch": 0.08374366289112845,
+    "estimated_min_frequency_hz": 70.72739496685759,
+    "near_clamp_ratio": 0.16389548693586697,
+    "target_kind": "open_stroke_pattern"
+  },
+  "thresholds": {
+    "infeasible_courant_min_mode_index": 60,
+    "infeasible_stroke_min_gap_mm": 6.0,
+    "requires_topology_courant_min_mode_index": 30,
+    "requires_topology_stroke_min_gap_mm": 7.0,
+    "requires_topology_d4_symmetry_mismatch": 0.55,
+    "borderline_courant_min_mode_index": 18,
+    "borderline_stroke_min_gap_mm": 10.0,
+    "borderline_d4_symmetry_mismatch": 0.35,
+    "filled_target_foreground_ratio": 0.18,
+    "thin_stroke_feature_mm": 8.0,
+    "clamp_buffer_mm": 4.0,
+    "max_endpoints_easy": 0
+  },
+  "diagnosis_notes": [
+    "Skeleton has 4 open endpoints; switch from nodal-line matching to amplitude-pattern matching (W2). / 骨架存在 4 个端点，应从节点线匹配切换到振幅模式匹配 (W2)。"
+  ],
+  "advisory": [
+    "Switch from nodal-line matching to amplitude-valley loss (W2). Target strokes will be matched as low-amplitude bands, not nodal contours. / 从节点线匹配切换到 W2 振幅谷损失；目标笔画将匹配为低振幅带，而非节点等值线。",
+    "Then run W5 homotopy and record lambda_max so the customer sees a quantitative reachability number. / 随后运行 W5 同伦延拓并记录 lambda_max，向客户给出量化可达性指标。"
+  ],
+  "target_path": "data/processed_targets/target_cross.npy"
+}

@@ -1,0 +1,310 @@
+probe_orthotropic_emm1 start
+mphstart_ok
+model_loaded=/Users/apple/Documents/ChladiniPlateProject/comsol_templates/Chladni_15x15_design_bound.mph
+
+=== Phase A: probe Evector_mat / nuvector_mat / Gvector_mat / D_mat ---
+Evector_mat_current=from_mat
+set_Evector_mat_userdef=ok
+set_Evector_mat_from_mat=ok
+set_Evector_mat_fromMaterial_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 杨氏模量 (Evector_mat)
+	- 所有者: 线弹性材料 1
+	- : "from_mat", "userdef"
+	- 参数: 杨氏模量 (Evector_mat)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.me
+set_Evector_mat_from_material_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 杨氏模量 (Evector_mat)
+	- 所有者: 线弹性材料 1
+	- : "from_mat", "userdef"
+	- 参数: 杨氏模量 (Evector_mat)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.me
+nuvector_mat_current=from_mat
+set_nuvector_mat_userdef=ok
+set_nuvector_mat_from_mat=ok
+set_nuvector_mat_fromMaterial_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 泊松比 (nuvector_mat)
+	- 所有者: 线弹性材料 1
+	- : "from_mat", "userdef"
+	- 参数: 泊松比 (nuvector_mat)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.me
+set_nuvector_mat_from_material_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 泊松比 (nuvector_mat)
+	- 所有者: 线弹性材料 1
+	- : "from_mat", "userdef"
+	- 参数: 泊松比 (nuvector_mat)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.me
+Gvector_mat_current=from_mat
+set_Gvector_mat_userdef=ok
+set_Gvector_mat_from_mat=ok
+set_Gvector_mat_fromMaterial_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 剪切模量 (Gvector_mat)
+	- 所有者: 线弹性材料 1
+	- : "from_mat", "userdef"
+	- 参数: 剪切模量 (Gvector_mat)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.me
+set_Gvector_mat_from_material_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 剪切模量 (Gvector_mat)
+	- 所有者: 线弹性材料 1
+	- : "from_mat", "userdef"
+	- 参数: 剪切模量 (Gvector_mat)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.me
+D_mat_current=from_mat
+set_D_mat_userdef=ok
+set_D_mat_from_mat=ok
+set_D_mat_fromMaterial_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 弹性矩阵 (D_mat)
+	- 所有者: 线弹性材料 1
+	- : "from_mat", "userdef"
+	- 参数: 弹性矩阵 (D_mat)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.method.ParamVa
+set_D_mat_from_material_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 弹性矩阵 (D_mat)
+	- 所有者: 线弹性材料 1
+	- : "from_mat", "userdef"
+	- 参数: 弹性矩阵 (D_mat)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.method.ParamVa
+E_mat_current=from_mat
+set_E_mat_userdef=ok
+set_E_mat_from_mat=ok
+set_E_mat_fromMaterial_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 杨氏模量 (E_mat)
+	- 所有者: 线弹性材料 1
+	- : "from_mat", "userdef"
+	- 参数: 杨氏模量 (E_mat)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.method.ParamVa
+set_E_mat_from_material_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 杨氏模量 (E_mat)
+	- 所有者: 线弹性材料 1
+	- : "from_mat", "userdef"
+	- 参数: 杨氏模量 (E_mat)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.method.ParamVa
+nu_mat_current=from_mat
+set_nu_mat_userdef=ok
+set_nu_mat_from_mat=ok
+set_nu_mat_fromMaterial_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 泊松比 (nu_mat)
+	- 所有者: 线弹性材料 1
+	- : "from_mat", "userdef"
+	- 参数: 泊松比 (nu_mat)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.method.ParamVa
+set_nu_mat_from_material_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 泊松比 (nu_mat)
+	- 所有者: 线弹性材料 1
+	- : "from_mat", "userdef"
+	- 参数: 泊松比 (nu_mat)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.method.ParamVa
+
+=== Phase B: SolidModel=Orthotropic + Evector population ---
+SolidModel=Orthotropic_ok
+Evector_mat=userdef_ok
+set_Evector_cell_ok
+Evector_readback=2.5e9
+set_nuvector_ok
+set_Gvector_ok
+
+=== Phase C: shellsys coord system probe ---
+shellsys_class=com.comsol.clientapi.impl.CoordsysClient
+shellsys_property_count=10
+  name=shellsys
+  coord=xl, yl, zl
+  base=root.comp1.shell.dsdX11, root.comp1.shell.dsdX12, root.comp1.shell.dsdX13; root.comp1.shell.dsdX21, root.comp1.shell.dsdX22, root.comp1.shell.dsdX23; root.comp1.shell.dsdX31, root.comp1.shell.dsdX32, root.comp1.shell.dsdX33
+  orthonormal=on
+  makeorthonormal=off
+  frametype=spatial
+  origin=0, 0, 0
+  workplanesrc=this
+  workplane=xyplane
+  transposedCoord=
+
+=== Phase D: shellsys rotation attempts ---
+shellsys_base=rotation_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 属性值无效。
+Messages:
+	属性值无效。
+	- 属性: base (基矢)
+
+	“基矢”为字符串矩阵。
+	- : 非空模型表达式
+
+Stack trace:
+at com.comsol.nativeutil.properties.Property.c(SourceFile:1351)
+	at com.comsol.nativeutil
+shellsys_base=manualvectors_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 属性值无效。
+Messages:
+	属性值无效。
+	- 属性: base (基矢)
+
+	“基矢”为字符串矩阵。
+	- : 非空模型表达式
+
+Stack trace:
+at com.comsol.nativeutil.properties.Property.c(SourceFile:1351)
+	at com.comsol.nativeutil
+shellsys_base=simrot_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 属性值无效。
+Messages:
+	属性值无效。
+	- 属性: base (基矢)
+
+	“基矢”为字符串矩阵。
+	- : 非空模型表达式
+
+Stack trace:
+at com.comsol.nativeutil.properties.Property.c(SourceFile:1351)
+	at com.comsol.nativeutil
+shellsys_base=rotated_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 属性值无效。
+Messages:
+	属性值无效。
+	- 属性: base (基矢)
+
+	“基矢”为字符串矩阵。
+	- : 非空模型表达式
+
+Stack trace:
+at com.comsol.nativeutil.properties.Property.c(SourceFile:1351)
+	at com.comsol.nativeutil
+shellsys_base=plane_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 属性值无效。
+Messages:
+	属性值无效。
+	- 属性: base (基矢)
+
+	“基矢”为字符串矩阵。
+	- : 非空模型表达式
+
+Stack trace:
+at com.comsol.nativeutil.properties.Property.c(SourceFile:1351)
+	at com.comsol.nativeutil
+shellsys_rot_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知属性。
+Messages:
+	未知属性。
+	- 属性: rot
+
+Stack trace:
+at com.comsol.model.dbmodel.PropFeatureDb.getPropValue(SourceFile:1763)
+	at com.comsol.model.dbmodel.PropFeatureDb.a(SourceF
+shellsys_rotationAngle_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知属性。
+Messages:
+	未知属性。
+	- 属性: rotationAngle
+
+Stack trace:
+at com.comsol.model.dbmodel.PropFeatureDb.getPropValue(SourceFile:1763)
+	at com.comsol.model.dbmodel.PropFeatureDb
+shellsys_theta_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知属性。
+Messages:
+	未知属性。
+	- 属性: θ
+
+Stack trace:
+at com.comsol.model.dbmodel.PropFeatureDb.getPropValue(SourceFile:1763)
+	at com.comsol.model.dbmodel.PropFeatureDb.a(SourceFil
+shellsys_angle_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知属性。
+Messages:
+	未知属性。
+	- 属性: angle
+
+Stack trace:
+at com.comsol.model.dbmodel.PropFeatureDb.getPropValue(SourceFile:1763)
+	at com.comsol.model.dbmodel.PropFeatureDb.a(Sourc
+
+probe_done

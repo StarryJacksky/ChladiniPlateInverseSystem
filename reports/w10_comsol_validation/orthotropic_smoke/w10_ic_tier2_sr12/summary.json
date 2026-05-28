@@ -1,0 +1,44 @@
+{
+  "candidate": "w10_ic_tier2_sr12",
+  "baseline_candidate": "mosaic_z_candidate_151_calibrated_six_v1",
+  "stiffness_ratio": 12.0,
+  "shear_ratio": 1.5,
+  "material_mode": "orthotropic_shell",
+  "material_summary": {
+    "E_iso_pa": 2000000000.0,
+    "E_for_runner_pa": 2000000000.0,
+    "E1_pa": 6928203230.275509,
+    "E2_pa": 577350269.1896257,
+    "G12_pa": 1111111111.111111,
+    "G_iso_pa": 740740740.7407407,
+    "stiffness_ratio": 12.0,
+    "shear_ratio": 1.5,
+    "material_mode": "orthotropic_shell"
+  },
+  "image_size": 256,
+  "frequencies_hz": [
+    398.58
+  ],
+  "weights": [
+    0.9987651778417916
+  ],
+  "variants": [
+    {
+      "variant_id": "w10_ic_tier2_sr12_comsol_f398p6Hz",
+      "frequency_hz": 398.58,
+      "weight": 0.9987651778417916,
+      "response_csv": "data/comsol_exports/w10_ic_tier2_sr12_comsol_f398p6Hz/forced_response/forced_response.csv",
+      "field_max_abs": 2.02351661887e-07
+    }
+  ],
+  "metrics": {
+    "enrichment_factor": 1.2963554604704763,
+    "coverage_recall": 0.25825825825825827,
+    "gaussian_contrast": 1.3150314979030369,
+    "directional_alignment": 0.23056312020693123,
+    "composite_recognisability": 0.25912864727351304,
+    "powder_max": 1.0,
+    "powder_mean": 0.18691099433949948
+  },
+  "completed_at": "2026-05-27T21:24:23"
+}

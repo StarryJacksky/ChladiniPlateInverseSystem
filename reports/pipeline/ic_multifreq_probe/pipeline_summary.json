@@ -1,0 +1,86 @@
+{
+  "target_tag": "ic_multifreq_probe",
+  "target_path": "data/processed_targets/target_binary.npy",
+  "verdict_path": "/Users/apple/Documents/ChladiniPlateProject/reports/target_realizability_ic_multifreq_probe.json",
+  "drive_frequency_hz": 636.5465547017182,
+  "manifold_path": "reports/design_manifold_pca.npz",
+  "candidates": [
+    "w6_pipeline_ic_full_v1"
+  ],
+  "sweep_candidates": [
+    "w6_pipeline_ic_full_v1_sweep_f180",
+    "w6_pipeline_ic_full_v1_sweep_f250",
+    "w6_pipeline_ic_full_v1_sweep_f320",
+    "w6_pipeline_ic_full_v1_sweep_f420",
+    "w6_pipeline_ic_full_v1_sweep_f540",
+    "w6_pipeline_ic_full_v1_sweep_f636p547",
+    "w6_pipeline_ic_full_v1_sweep_f720",
+    "w6_pipeline_ic_full_v1_sweep_f820",
+    "w6_pipeline_ic_full_v1_sweep_f920"
+  ],
+  "comsol_runs": [
+    {
+      "candidate_id": "w6_pipeline_ic_full_v1",
+      "name": "COMSOL_w6_pipeline_ic_full_v1",
+      "command": [
+        "/Users/apple/Documents/ChladiniPlateProject/.venv/bin/python",
+        "scripts/run_comsol_frequency_sweep.py",
+        "--config",
+        "config.yaml",
+        "--base-candidate-id",
+        "w6_pipeline_ic_full_v1",
+        "--frequencies",
+        "180,250,320,420,540,636.547,720,820,920",
+        "--run-name",
+        "pipeline_ic_multifreq_probe_w6_pipeline_ic_full_v1",
+        "--frequency-export-case",
+        "pipeline_ic_multifreq_probe_w6_pipeline_ic_full_v1",
+        "--skip-legacy-epsilon-score"
+      ],
+      "returncode": 0,
+      "elapsed_s": 159.98084020614624,
+      "log_path": "/Users/apple/Documents/ChladiniPlateProject/reports/pipeline/ic_multifreq_probe/comsol_w6_pipeline_ic_full_v1.log",
+      "status": "ok"
+    }
+  ],
+  "stages": [
+    {
+      "name": "W1",
+      "command": [
+        "/Users/apple/Documents/ChladiniPlateProject/.venv/bin/python",
+        "scripts/analyze_target_realizability.py",
+        "--config",
+        "config.yaml",
+        "--output",
+        "/Users/apple/Documents/ChladiniPlateProject/reports/target_realizability_ic_multifreq_probe.json"
+      ],
+      "returncode": 0,
+      "elapsed_s": 0.4193379878997803,
+      "log_path": "/Users/apple/Documents/ChladiniPlateProject/reports/pipeline/ic_multifreq_probe/w1.log",
+      "status": "ok"
+    },
+    {
+      "name": "COMSOL_w6_pipeline_ic_full_v1",
+      "command": [
+        "/Users/apple/Documents/ChladiniPlateProject/.venv/bin/python",
+        "scripts/run_comsol_frequency_sweep.py",
+        "--config",
+        "config.yaml",
+        "--base-candidate-id",
+        "w6_pipeline_ic_full_v1",
+        "--frequencies",
+        "180,250,320,420,540,636.547,720,820,920",
+        "--run-name",
+        "pipeline_ic_multifreq_probe_w6_pipeline_ic_full_v1",
+        "--frequency-export-case",
+        "pipeline_ic_multifreq_probe_w6_pipeline_ic_full_v1",
+        "--skip-legacy-epsilon-score"
+      ],
+      "returncode": 0,
+      "elapsed_s": 159.98084020614624,
+      "log_path": "/Users/apple/Documents/ChladiniPlateProject/reports/pipeline/ic_multifreq_probe/comsol_w6_pipeline_ic_full_v1.log",
+      "status": "ok"
+    }
+  ],
+  "rank_payload": null
+}

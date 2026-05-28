@@ -1,0 +1,19 @@
+{
+  "candidate": "candidate_151_0005",
+  "actuator_count": 1,
+  "projection_loss": 0.8776296377182007,
+  "drive_frequency_hz": 520.6029663085938,
+  "damping_ratio": 0.015,
+  "actuators": [
+    {
+      "id": 1,
+      "row_px": 56.93425369262695,
+      "col_px": 29.794893264770508,
+      "x_mm": -46.8916130065918,
+      "y_mm": -21.28843879699707,
+      "amplitude": 1.7996753454208374,
+      "phase_deg": 139.95814514160156
+    }
+  ],
+  "best_restart": 1
+}

@@ -1,0 +1,7 @@
+{
+  "candidate_id": "w3_pipeline_ic_full_sweep_f636p547",
+  "source_candidate": "w3_pipeline_ic_full",
+  "sweep_frequency_hz": 636.547,
+  "force_sigma_mm": 2.5,
+  "notes": "COMSOL-in-the-loop frequency sweep variant at 636.547 Hz. / COMSOL 闭环频率扫描变体，频率 636.547 Hz。"
+}

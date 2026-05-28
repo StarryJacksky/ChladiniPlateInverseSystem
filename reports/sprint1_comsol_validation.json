@@ -1,0 +1,220 @@
+{
+  "baseline": {
+    "freqs_hz": [
+      220.20540738456992,
+      318.5287876758068,
+      481.5788580453178,
+      714.5260101366258,
+      837.7035166731231,
+      882.6193364268212
+    ],
+    "weights": [
+      0.9887238075616462,
+      0.00038115456216511847,
+      0.0006756622734956536,
+      0.002656269886636973,
+      0.006671862731282306,
+      0.0008912429847736994
+    ],
+    "surrogate": {
+      "enrichment": 9.191679111790382,
+      "contrast": 13.10975479801605,
+      "recall": 0.27225145857191
+    },
+    "comsol_rms_composite": {
+      "enrichment_factor": 1.9727449305252533,
+      "coverage_recall": 0.5632298965632299,
+      "gaussian_contrast": 2.069202834430385,
+      "directional_alignment": 0.7234100643344631,
+      "composite_recognisability": 0.6585130366617543,
+      "sigma_rel": 0.05,
+      "percentile": 20.0
+    },
+    "comsol_best_single": {
+      "freq_hz": 220.20540738456992,
+      "metrics": {
+        "enrichment_factor": 1.7207544697906534,
+        "coverage_recall": 0.5472138805472139,
+        "gaussian_contrast": 1.7823157689488038,
+        "directional_alignment": 0.5884510992491548,
+        "composite_recognisability": 0.555697112546663,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      }
+    },
+    "per_freq_metrics": {
+      "220.21": {
+        "enrichment_factor": 1.7207544697906534,
+        "coverage_recall": 0.5472138805472139,
+        "gaussian_contrast": 1.7823157689488038,
+        "directional_alignment": 0.5884510992491548,
+        "composite_recognisability": 0.555697112546663,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "318.53": {
+        "enrichment_factor": 1.2292514511927706,
+        "coverage_recall": 0.2365699032365699,
+        "gaussian_contrast": 1.2429062734375689,
+        "directional_alignment": 0.43728572870823523,
+        "composite_recognisability": 0.24075218822122568,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "481.58": {
+        "enrichment_factor": 1.1268463961722885,
+        "coverage_recall": 0.11878545211878545,
+        "gaussian_contrast": 1.1337380977075935,
+        "directional_alignment": 0.8683625010513139,
+        "composite_recognisability": 0.19534510312024198,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "714.53": {
+        "enrichment_factor": 1.4253919395289403,
+        "coverage_recall": 0.27260593927260596,
+        "gaussian_contrast": 1.455054195740169,
+        "directional_alignment": 0.7368293460439296,
+        "composite_recognisability": 0.3722520744328305,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "837.70": {
+        "enrichment_factor": 0.8895908133973827,
+        "coverage_recall": 0.2002002002002002,
+        "gaussian_contrast": 0.8849087232973682,
+        "directional_alignment": 0.4358044804161259,
+        "composite_recognisability": 0.10364050810167266,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "882.62": {
+        "enrichment_factor": 1.107295932587083,
+        "coverage_recall": 0.2385719052385719,
+        "gaussian_contrast": 1.113018901862817,
+        "directional_alignment": 0.6621537612297652,
+        "composite_recognisability": 0.19997053726323527,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      }
+    }
+  },
+  "+SBS": {
+    "freqs_hz": [
+      233.27743288962313,
+      301.28887773302586,
+      491.68618390886957,
+      687.6716330478895,
+      843.2320646807073,
+      950.2298760130717
+    ],
+    "weights": [
+      0.00930968751169231,
+      0.00016558085651077506,
+      8.352890705869092e-05,
+      3.0585868210575766e-05,
+      0.9897950618296091,
+      0.0006155550269185487
+    ],
+    "surrogate": {
+      "enrichment": 10.411740843303887,
+      "contrast": 15.85657494631174,
+      "recall": 0.5802156476612721
+    },
+    "comsol_rms_composite": {
+      "enrichment_factor": 1.5982610676244058,
+      "coverage_recall": 0.3113113113113113,
+      "gaussian_contrast": 1.645435567653247,
+      "directional_alignment": 0.5920463824059794,
+      "composite_recognisability": 0.4397655402132982,
+      "sigma_rel": 0.05,
+      "percentile": 20.0
+    },
+    "comsol_best_single": {
+      "freq_hz": 233.27743288962313,
+      "metrics": {
+        "enrichment_factor": 1.788324613107882,
+        "coverage_recall": 0.3863863863863864,
+        "gaussian_contrast": 1.8585367168052909,
+        "directional_alignment": 0.4784982237287796,
+        "composite_recognisability": 0.5202353161221066,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      }
+    },
+    "per_freq_metrics": {
+      "233.28": {
+        "enrichment_factor": 1.788324613107882,
+        "coverage_recall": 0.3863863863863864,
+        "gaussian_contrast": 1.8585367168052909,
+        "directional_alignment": 0.4784982237287796,
+        "composite_recognisability": 0.5202353161221066,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "301.29": {
+        "enrichment_factor": 0.7910523901086117,
+        "coverage_recall": 0.14514514514514515,
+        "gaussian_contrast": 0.7832099444402222,
+        "directional_alignment": 0.6113519700376313,
+        "composite_recognisability": 0.10467874054730666,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "491.69": {
+        "enrichment_factor": 1.612438860468673,
+        "coverage_recall": 0.355689022355689,
+        "gaussian_contrast": 1.6611938196675893,
+        "directional_alignment": 0.6875440807042865,
+        "composite_recognisability": 0.46806755844238684,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "687.67": {
+        "enrichment_factor": 1.0615176365766672,
+        "coverage_recall": 0.30563897230563897,
+        "gaussian_contrast": 1.0646562996603497,
+        "directional_alignment": 0.8977532855605278,
+        "composite_recognisability": 0.21787727171464738,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "843.23": {
+        "enrichment_factor": 1.577644249470799,
+        "coverage_recall": 0.3089756423089756,
+        "gaussian_contrast": 1.6225598127817047,
+        "directional_alignment": 0.5927561029883093,
+        "composite_recognisability": 0.43114241091993905,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "950.23": {
+        "enrichment_factor": 0.40879273327199134,
+        "coverage_recall": 0.07307307307307308,
+        "gaussian_contrast": 0.3975299554499197,
+        "directional_alignment": 0.5140428893414539,
+        "composite_recognisability": 0.07332621085606732,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      }
+    }
+  },
+  "+Sinkhorn(A1)": {
+    "surrogate": {
+      "enrichment": 8.831992263540288,
+      "contrast": 12.36530863525853,
+      "recall": 0.3165686745253997
+    },
+    "comsol_rms_composite": null,
+    "per_freq_metrics": {}
+  },
+  "+SBS+Sinkhorn": {
+    "surrogate": {
+      "enrichment": 9.246416086264619,
+      "contrast": 13.225494187354077,
+      "recall": 0.4929820605597686
+    },
+    "comsol_rms_composite": null,
+    "per_freq_metrics": {}
+  }
+}

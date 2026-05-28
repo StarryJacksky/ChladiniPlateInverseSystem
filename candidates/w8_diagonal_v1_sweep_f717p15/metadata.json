@@ -1,0 +1,7 @@
+{
+  "candidate_id": "w8_diagonal_v1_sweep_f717p15",
+  "source_candidate": "w8_diagonal_v1",
+  "sweep_frequency_hz": 717.15,
+  "force_sigma_mm": 2.5,
+  "notes": "COMSOL-in-the-loop frequency sweep variant at 717.150 Hz. / COMSOL 闭环频率扫描变体，频率 717.150 Hz。"
+}

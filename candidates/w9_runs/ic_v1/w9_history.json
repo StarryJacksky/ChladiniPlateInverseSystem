@@ -1,0 +1,128 @@
+{
+  "run_name": "ic_v1",
+  "target_path": "data/processed_targets/target_binary.npy",
+  "outer_iterations": 4,
+  "inner_steps": 80,
+  "total_seconds": 531.0980741977692,
+  "best_comsol_enrichment": 1.404186953819834,
+  "best_iteration": 3,
+  "best_H_path": "/Users/apple/Documents/ChladiniPlateProject/candidates/w9_runs/ic_v1/H_iter3.npy",
+  "history": [
+    {
+      "iteration": 0,
+      "comsol_enrichment": 0.914135380129365,
+      "surrogate_enrichment": 5.097762736444193,
+      "gap_comsol_minus_surrogate": -4.183627356314828,
+      "trust_radius_mm": 0.5,
+      "trust_decision": "expand (ratio=1.00 > 0.75)",
+      "frequencies_hz": [
+        225.54147697118393,
+        381.84716794348435,
+        594.5219464302231,
+        706.8204525917532,
+        775.8236478039184,
+        938.7002117648618
+      ],
+      "weights": [
+        0.9364532631480541,
+        0.012394033717153575,
+        0.01626874690027488,
+        0.0034099349903787737,
+        0.013085378497554019,
+        0.018388642746584673
+      ],
+      "residual_rms": 1.5792031931340456e-06,
+      "residual_max": 2.860066719812347e-06,
+      "iter_seconds": 143.0737612247467,
+      "target_path": "data/processed_targets/target_binary.npy",
+      "adapted_lr_H": 0.05
+    },
+    {
+      "iteration": 1,
+      "comsol_enrichment": 1.2366653587738268,
+      "surrogate_enrichment": 4.4671471241813885,
+      "gap_comsol_minus_surrogate": -3.2304817654075615,
+      "trust_radius_mm": 0.75,
+      "trust_decision": "shrink (ratio=-0.51 < 0.25)",
+      "frequencies_hz": [
+        225.54147697118393,
+        381.84716794348435,
+        594.5219464302231,
+        706.8204525917532,
+        775.8236478039184,
+        938.7002117648618
+      ],
+      "weights": [
+        0.9364532631480541,
+        0.012394033717153575,
+        0.01626874690027488,
+        0.0034099349903787737,
+        0.013085378497554019,
+        0.018388642746584673
+      ],
+      "residual_rms": 7.033605086115077e-07,
+      "residual_max": 1.1819209821043677e-06,
+      "iter_seconds": 130.72931218147278,
+      "target_path": "data/processed_targets/target_binary.npy",
+      "adapted_lr_H": 0.07500000000000001
+    },
+    {
+      "iteration": 2,
+      "comsol_enrichment": 1.2314014794603507,
+      "surrogate_enrichment": 3.4393884622997004,
+      "gap_comsol_minus_surrogate": -2.2079869828393495,
+      "trust_radius_mm": 0.375,
+      "trust_decision": "shrink (ratio=0.01 < 0.25)",
+      "frequencies_hz": [
+        225.54147697118393,
+        381.84716794348435,
+        594.5219464302231,
+        706.8204525917532,
+        775.8236478039184,
+        938.7002117648618
+      ],
+      "weights": [
+        0.9364532631480541,
+        0.012394033717153575,
+        0.01626874690027488,
+        0.0034099349903787737,
+        0.013085378497554019,
+        0.018388642746584673
+      ],
+      "residual_rms": 6.625873903126731e-07,
+      "residual_max": 1.3847018104400347e-06,
+      "iter_seconds": 128.64106702804565,
+      "target_path": "data/processed_targets/target_binary.npy",
+      "adapted_lr_H": 0.037500000000000006
+    },
+    {
+      "iteration": 3,
+      "comsol_enrichment": 1.404186953819834,
+      "surrogate_enrichment": 5.1404169013061285,
+      "gap_comsol_minus_surrogate": -3.7362299474862946,
+      "trust_radius_mm": 0.1875,
+      "trust_decision": "shrink (ratio=0.10 < 0.25)",
+      "frequencies_hz": [
+        225.54147697118393,
+        381.84716794348435,
+        594.5219464302231,
+        706.8204525917532,
+        775.8236478039184,
+        938.7002117648618
+      ],
+      "weights": [
+        0.9364532631480541,
+        0.012394033717153575,
+        0.01626874690027488,
+        0.0034099349903787737,
+        0.013085378497554019,
+        0.018388642746584673
+      ],
+      "residual_rms": 6.9078996892586e-07,
+      "residual_max": 1.1047810788575706e-06,
+      "iter_seconds": 128.65383410453796,
+      "target_path": "data/processed_targets/target_binary.npy",
+      "adapted_lr_H": 0.018750000000000003
+    }
+  ]
+}

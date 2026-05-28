@@ -1,0 +1,9 @@
+{
+  "candidate_kind": "w10_tier1_sr3",
+  "label": "W10 tier1 (CF-PETG sr=3.0)",
+  "drive_frequency_hz": 495.2724806571861,
+  "stiffness_ratio_design": 3.0,
+  "shear_ratio_design": 0.85,
+  "actuator_pattern": "single_center_uniform",
+  "material_mode": "isotropic_baseline"
+}

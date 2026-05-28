@@ -1,0 +1,98 @@
+{
+  "candidate": "phase2_iter3",
+  "baseline_candidate": "mosaic_z_candidate_151_calibrated_six_v1",
+  "stiffness_ratio": 3.0,
+  "shear_ratio": 1.0,
+  "material_mode": "orthotropic_shell",
+  "material_summary": {
+    "E_iso_pa": 2000000000.0,
+    "E_for_runner_pa": 2000000000.0,
+    "E1_pa": 3464101615.1377544,
+    "E2_pa": 1154700538.3792515,
+    "G12_pa": 740740740.7407407,
+    "G_iso_pa": 740740740.7407407,
+    "stiffness_ratio": 3.0,
+    "shear_ratio": 1.0,
+    "material_mode": "orthotropic_shell"
+  },
+  "image_size": 256,
+  "frequencies_hz": [
+    57.4,
+    105.5,
+    714.5,
+    210.4,
+    187.4,
+    42.6,
+    165.0
+  ],
+  "weights": [
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666
+  ],
+  "variants": [
+    {
+      "variant_id": "p2it3_phase2_iter3_comsol_f57p4Hz",
+      "frequency_hz": 57.4,
+      "weight": 0.16666666666666666,
+      "response_csv": "data/comsol_exports/p2it3_phase2_iter3_comsol_f57p4Hz/forced_response/forced_response.csv",
+      "field_max_abs": 0.000118278245447
+    },
+    {
+      "variant_id": "p2it3_phase2_iter3_comsol_f105p5Hz",
+      "frequency_hz": 105.5,
+      "weight": 0.16666666666666666,
+      "response_csv": "data/comsol_exports/p2it3_phase2_iter3_comsol_f105p5Hz/forced_response/forced_response.csv",
+      "field_max_abs": 8.92003490499e-06
+    },
+    {
+      "variant_id": "p2it3_phase2_iter3_comsol_f714p5Hz",
+      "frequency_hz": 714.5,
+      "weight": 0.16666666666666666,
+      "response_csv": "data/comsol_exports/p2it3_phase2_iter3_comsol_f714p5Hz/forced_response/forced_response.csv",
+      "field_max_abs": 2.91416379556e-06
+    },
+    {
+      "variant_id": "p2it3_phase2_iter3_comsol_f210p4Hz",
+      "frequency_hz": 210.4,
+      "weight": 0.16666666666666666,
+      "response_csv": "data/comsol_exports/p2it3_phase2_iter3_comsol_f210p4Hz/forced_response/forced_response.csv",
+      "field_max_abs": 1.49320257335e-06
+    },
+    {
+      "variant_id": "p2it3_phase2_iter3_comsol_f187p4Hz",
+      "frequency_hz": 187.4,
+      "weight": 0.16666666666666666,
+      "response_csv": "data/comsol_exports/p2it3_phase2_iter3_comsol_f187p4Hz/forced_response/forced_response.csv",
+      "field_max_abs": 1.34740738865e-06
+    },
+    {
+      "variant_id": "p2it3_phase2_iter3_comsol_f42p6Hz",
+      "frequency_hz": 42.6,
+      "weight": 0.16666666666666666,
+      "response_csv": "data/comsol_exports/p2it3_phase2_iter3_comsol_f42p6Hz/forced_response/forced_response.csv",
+      "field_max_abs": 2.6999458823e-05
+    },
+    {
+      "variant_id": "p2it3_phase2_iter3_comsol_f165p0Hz",
+      "frequency_hz": 165.0,
+      "weight": 0.16666666666666666,
+      "response_csv": "data/comsol_exports/p2it3_phase2_iter3_comsol_f165p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 1.21458586788e-06
+    }
+  ],
+  "metrics": {
+    "enrichment_factor": 1.5067863043982699,
+    "coverage_recall": 0.32799466132799465,
+    "gaussian_contrast": 1.5442913589620084,
+    "directional_alignment": 0.35984406143119285,
+    "composite_recognisability": 0.38528747513880945,
+    "powder_max": 1.0,
+    "powder_mean": 0.14911348367960636
+  },
+  "completed_at": "2026-05-28T01:10:27"
+}

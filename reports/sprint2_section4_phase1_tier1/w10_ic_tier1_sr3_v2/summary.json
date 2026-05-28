@@ -1,0 +1,284 @@
+{
+  "version": "sprint2_section4_phase1",
+  "candidate": "w10_ic_tier1_sr3_v2",
+  "drive_freqs_hz": [
+    55.5857429568,
+    104.072806087,
+    204.181942724,
+    181.189227737,
+    356.444064958,
+    201.036362255
+  ],
+  "drive_mode_indices": [
+    3,
+    5,
+    8,
+    6,
+    11,
+    7
+  ],
+  "drive_weights": [
+    0.26298788431329456,
+    0.18795568549118274,
+    0.18620195740539483,
+    0.13330112077303666,
+    0.1285526514463837,
+    0.1010007005707076
+  ],
+  "all_comsol_ic_rankings": [
+    {
+      "mode_index": 3,
+      "frequency_hz": 54.0857429568,
+      "enrichment": 2.767324212750473,
+      "recall": 0.6269602936269603,
+      "contrast": 3.0233864835396713,
+      "ic_likeness": 1.331361011968741
+    },
+    {
+      "mode_index": 5,
+      "frequency_hz": 102.572806087,
+      "enrichment": 2.339483066020662,
+      "recall": 0.5652318985652319,
+      "contrast": 2.4999574011742367,
+      "ic_likeness": 1.1325459422906032
+    },
+    {
+      "mode_index": 8,
+      "frequency_hz": 202.681942724,
+      "enrichment": 2.3285431669854932,
+      "recall": 0.4904904904904905,
+      "contrast": 2.486873891970639,
+      "ic_likeness": 1.0904880670516006
+    },
+    {
+      "mode_index": 6,
+      "frequency_hz": 179.689227737,
+      "enrichment": 1.970194365840808,
+      "recall": 0.38471805138471804,
+      "contrast": 2.06626264861175,
+      "ic_likeness": 0.8704912264387503
+    },
+    {
+      "mode_index": 11,
+      "frequency_hz": 354.944064958,
+      "enrichment": 1.9347849103678232,
+      "recall": 0.32932932932932935,
+      "contrast": 2.0255219030423923,
+      "ic_likeness": 0.824660827535315
+    },
+    {
+      "mode_index": 7,
+      "frequency_hz": 199.536362255,
+      "enrichment": 1.7149614629841858,
+      "recall": 0.34367701034367704,
+      "contrast": 1.7758048826044126,
+      "ic_likeness": 0.7112291149741179
+    },
+    {
+      "mode_index": 19,
+      "frequency_hz": 714.72279964,
+      "enrichment": 1.6865414049177339,
+      "recall": 0.3630296963630297,
+      "contrast": 1.7439171494213739,
+      "ic_likeness": 0.7041947741958828
+    },
+    {
+      "mode_index": 4,
+      "frequency_hz": 70.3826109081,
+      "enrichment": 1.6329632080420002,
+      "recall": 0.3103103103103103,
+      "contrast": 1.6840452130143613,
+      "ic_likeness": 0.6455514386030836
+    },
+    {
+      "mode_index": 22,
+      "frequency_hz": 834.794596503,
+      "enrichment": 1.492311513597877,
+      "recall": 0.30697364030697366,
+      "contrast": 1.528369716863528,
+      "ic_likeness": 0.5538130894163252
+    },
+    {
+      "mode_index": 2,
+      "frequency_hz": 37.8031331476,
+      "enrichment": 1.4071560598999286,
+      "recall": 0.3600266933600267,
+      "contrast": 1.435158528074794,
+      "ic_likeness": 0.5215840354346806
+    },
+    {
+      "mode_index": 20,
+      "frequency_hz": 735.666479077,
+      "enrichment": 1.399816197902687,
+      "recall": 0.30163496830163494,
+      "contrast": 1.4271606336200013,
+      "ic_likeness": 0.4871584249407436
+    },
+    {
+      "mode_index": 1,
+      "frequency_hz": 33.7635611674,
+      "enrichment": 1.4136773615266836,
+      "recall": 0.2649315982649316,
+      "contrast": 1.4422693053443774,
+      "ic_likeness": 0.4786601662618525
+    },
+    {
+      "mode_index": 18,
+      "frequency_hz": 634.527320754,
+      "enrichment": 1.2806155648137436,
+      "recall": 0.2716049382716049,
+      "contrast": 1.298071616762695,
+      "ic_likeness": 0.38314334147790696
+    },
+    {
+      "mode_index": 28,
+      "frequency_hz": 1114.44497333,
+      "enrichment": 1.2547679739622744,
+      "recall": 0.24958291624958293,
+      "contrast": 1.2702767950743052,
+      "ic_likeness": 0.3517421323109228
+    },
+    {
+      "mode_index": 25,
+      "frequency_hz": 1055.97263049,
+      "enrichment": 1.2353702862455749,
+      "recall": 0.2659325992659326,
+      "contrast": 1.2494635256850992,
+      "ic_likeness": 0.3443370516932922
+    },
+    {
+      "mode_index": 15,
+      "frequency_hz": 545.586128372,
+      "enrichment": 1.2217440020487542,
+      "recall": 0.22322322322322322,
+      "contrast": 1.2348662209995698,
+      "ic_likeness": 0.311890959456253
+    },
+    {
+      "mode_index": 29,
+      "frequency_hz": 1194.32834166,
+      "enrichment": 1.1907335342753627,
+      "recall": 0.2652652652652653,
+      "contrast": 1.201717647528835,
+      "ic_likeness": 0.30720216520760846
+    },
+    {
+      "mode_index": 30,
+      "frequency_hz": 1198.87218376,
+      "enrichment": 1.1502460561594685,
+      "recall": 0.22489155822489157,
+      "contrast": 1.1585880061475717,
+      "ic_likeness": 0.25242166047882514
+    },
+    {
+      "mode_index": 16,
+      "frequency_hz": 590.511287633,
+      "enrichment": 1.1018634574136994,
+      "recall": 0.2559225892559226,
+      "contrast": 1.10726859123532,
+      "ic_likeness": 0.22496409333862127
+    },
+    {
+      "mode_index": 27,
+      "frequency_hz": 1098.72475657,
+      "enrichment": 1.076966724355331,
+      "recall": 0.2275608942275609,
+      "contrast": 1.080953715091461,
+      "ic_likeness": 0.18792894820471542
+    },
+    {
+      "mode_index": 23,
+      "frequency_hz": 871.684044339,
+      "enrichment": 0.8459704370250741,
+      "recall": 0.17550884217550886,
+      "contrast": 0.8397717224422404,
+      "ic_likeness": -0.07951644331353562
+    },
+    {
+      "mode_index": 24,
+      "frequency_hz": 967.526681311,
+      "enrichment": 0.7286726678595485,
+      "recall": 0.1738405071738405,
+      "contrast": 0.7193196534491032,
+      "ic_likeness": -0.22961040950593292
+    },
+    {
+      "mode_index": 13,
+      "frequency_hz": 408.513165333,
+      "enrichment": 0.7376572189412461,
+      "recall": 0.1454788121454788,
+      "contrast": 0.7284985197503243,
+      "ic_likeness": -0.23153662918925336
+    },
+    {
+      "mode_index": 9,
+      "frequency_hz": 234.796041527,
+      "enrichment": 0.6820940534985137,
+      "recall": 0.1454788121454788,
+      "contrast": 0.6718584706262248,
+      "ic_likeness": -0.3098483162188267
+    },
+    {
+      "mode_index": 10,
+      "frequency_hz": 313.481629983,
+      "enrichment": 0.6565280383155325,
+      "recall": 0.10276943610276944,
+      "contrast": 0.6458966401632515,
+      "ic_likeness": -0.36940515931766776
+    },
+    {
+      "mode_index": 12,
+      "frequency_hz": 377.001701795,
+      "enrichment": 0.636097824272883,
+      "recall": 0.13747080413747081,
+      "contrast": 0.6251950686178838,
+      "ic_likeness": -0.3836675136512779
+    },
+    {
+      "mode_index": 17,
+      "frequency_hz": 604.050885818,
+      "enrichment": 0.6211152521944238,
+      "recall": 0.12012012012012012,
+      "contrast": 0.6100388014180796,
+      "ic_likeness": -0.4161785629131638
+    },
+    {
+      "mode_index": 21,
+      "frequency_hz": 773.86233983,
+      "enrichment": 0.5300583864433055,
+      "recall": 0.10343677010343677,
+      "contrast": 0.5183840699854786,
+      "ic_likeness": -0.5830497303511835
+    },
+    {
+      "mode_index": 26,
+      "frequency_hz": 1073.67756915,
+      "enrichment": 0.4575094207428275,
+      "recall": 0.10443777110443778,
+      "contrast": 0.4459167910785133,
+      "ic_likeness": -0.7297389171387489
+    },
+    {
+      "mode_index": 14,
+      "frequency_hz": 438.94913554,
+      "enrichment": 0.4571446295622536,
+      "recall": 0.09175842509175842,
+      "contrast": 0.4455536500161797,
+      "ic_likeness": -0.7368762495438397
+    }
+  ],
+  "metrics": {
+    "enrichment_factor": 1.4532069533536756,
+    "coverage_recall": 0.34100767434100765,
+    "gaussian_contrast": 1.4854692978117086,
+    "directional_alignment": 0.2488597939245638,
+    "composite_recognisability": 0.35584355373711435
+  },
+  "comparison": {
+    "baseline_w8_comsol_enrichment": 1.75,
+    "w10_tier2_isotropic_comsol_enrichment": 2.41,
+    "w10_tier2_orthotropic_sweep_composite": 1.6,
+    "s4p1_modal_calibrated_enrichment": 1.4532069533536756
+  },
+  "completed_at": "2026-05-28T00:41:15"
+}

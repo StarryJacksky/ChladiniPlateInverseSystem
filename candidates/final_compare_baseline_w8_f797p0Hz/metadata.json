@@ -1,0 +1,9 @@
+{
+  "candidate_kind": "baseline_w8",
+  "label": "W8 baseline (isotropic optim, calibrated 6-actuator)",
+  "drive_frequency_hz": 796.96,
+  "stiffness_ratio_design": 1.0,
+  "shear_ratio_design": 1.0,
+  "actuator_pattern": "single_center_uniform",
+  "material_mode": "isotropic_baseline"
+}

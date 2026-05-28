@@ -1,0 +1,186 @@
+mphstart_ok
+model_loaded
+
+=== existing coordSystem tags ===
+  sys1
+  shellsys
+
+--- type=Rotated tag=probe_cs_1 ---
+create=ok
+props_count=9
+  name=probe_cs_1
+  coord=x1, x2, x3
+  rotationSequence=ZXZ
+  angle=0, 0, 0
+  image=coordsys_drawing_zxz.png
+  frametype=spatial
+  origin=0, 0, 0
+  workplanesrc=this
+  workplane=xyplane
+
+--- type=BaseVectorSystem tag=probe_cs_2 ---
+create_failed=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.UnexpectedServerException: java.lang.NullPointerException: Cannot invoke "com.comsol.model.operations.CoordsysID.appliesToSDimType(com.comsol.model.applapi.SDimType)" because the return value of "com.comsol.model.operations.CoordsysID.get(String)" is null
+	(rethrown as com.comsol.util.exceptions.FlException)
+Messages:
+	java.lang.NullPointerException: Cannot invoke "com.comsol.model.operations.CoordsysID.appliesToSDimType(com.comsol.model.applapi.SDimType)" because the return value of "com.comsol.model.operations.CoordsysID.get(String)" is null
+
+Stack trace:
+at com.comsol.model.method.CoordsysListMethod.create(SourceFile:85)
+	at com.comsol.model.dbmodel.CoordsysListDb.a(SourceFile:85)
+	at com.comsol.model.dbmodel.CoordsysListDb.create(SourceFile:80)
+	at com.comsol.model.dbmodel.ComponentCoordsysListDb.create(SourceFile:49)
+	at jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source)
+	at java.lang.reflect.Method.invoke(Unknown Source)
+	at com.comsol.bridge.command.b.a(SourceFile:161)
+	at com.comsol.bridge.command.b.run(SourceFile:103)
+	at com.comsol.bridge.command.k.c(SourceFile:227)
+	at com.comsol.bridge.command.k$1.run(SourceFile:100)
+	at com.comsol.util.thread.SuspendableTasks$1.run(SourceFile:111)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.lang.Thread.run(Unknown Source)
+
+--- type=CartesianSystem tag=probe_cs_3 ---
+create_failed=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.UnexpectedServerException: java.lang.NullPointerException: Cannot invoke "com.comsol.model.operations.CoordsysID.appliesToSDimType(com.comsol.model.applapi.SDimType)" because the return value of "com.comsol.model.operations.CoordsysID.get(String)" is null
+	(rethrown as com.comsol.util.exceptions.FlException)
+Messages:
+	java.lang.NullPointerException: Cannot invoke "com.comsol.model.operations.CoordsysID.appliesToSDimType(com.comsol.model.applapi.SDimType)" because the return value of "com.comsol.model.operations.CoordsysID.get(String)" is null
+
+Stack trace:
+at com.comsol.model.method.CoordsysListMethod.create(SourceFile:85)
+	at com.comsol.model.dbmodel.CoordsysListDb.a(SourceFile:85)
+	at com.comsol.model.dbmodel.CoordsysListDb.create(SourceFile:80)
+	at com.comsol.model.dbmodel.ComponentCoordsysListDb.create(SourceFile:49)
+	at jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source)
+	at java.lang.reflect.Method.invoke(Unknown Source)
+	at com.comsol.bridge.command.b.a(SourceFile:161)
+	at com.comsol.bridge.command.b.run(SourceFile:103)
+	at com.comsol.bridge.command.k.c(SourceFile:227)
+	at com.comsol.bridge.command.k$1.run(SourceFile:100)
+	at com.comsol.util.thread.SuspendableTasks$1.run(SourceFile:111)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.lang.Thread.run(Unknown Source)
+
+--- type=Cylindrical tag=probe_cs_4 ---
+create=ok
+props_count=10
+  name=probe_cs_4
+  frametype=spatial
+  coord=r, phi, a
+  origin=0, 0, 0
+  axis=0, 0, 1
+  radialbasevector=1, 0, 0
+  image=coordsys_drawing_cylindrical.png
+  angleRanges=\[-\pi \leq \varphi \leq \pi\]
+  workplanesrc=this
+  workplane=xyplane
+
+--- type=Spherical tag=probe_cs_5 ---
+create=ok
+props_count=10
+  name=probe_cs_5
+  frametype=spatial
+  coord=r, theta, phi
+  origin=0, 0, 0
+  axis=0, 0, 1
+  radialbasevector=1, 0, 0
+  image=coordsys_drawing_spherical.png
+  angleRanges=\[-\pi \leq \varphi \leq \pi\ \quad , \quad 0 \leq \theta \leq \pi\]
+  workplanesrc=this
+  workplane=xyplane
+
+=== full Rotated CS workflow ===
+rot_set_theta_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知属性。
+Messages:
+	未知属性。
+	- 属性: θ
+
+Stack trace:
+at com.comsol.model.dbmodel.PropFeatureDb.getPropValue(SourceFile:1763)
+	at 
+rot_set_thetaXY_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知属性。
+Messages:
+	未知属性。
+	- 属性: thetaXY
+
+Stack trace:
+at com.comsol.model.dbmodel.PropFeatureDb.getPropValue(SourceFile:1763
+rot_set_rot1_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知属性。
+Messages:
+	未知属性。
+	- 属性: rot1
+
+Stack trace:
+at com.comsol.model.dbmodel.PropFeatureDb.getPropValue(SourceFile:1763)
+	
+rot_set_rot2_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知属性。
+Messages:
+	未知属性。
+	- 属性: rot2
+
+Stack trace:
+at com.comsol.model.dbmodel.PropFeatureDb.getPropValue(SourceFile:1763)
+	
+rot_set_rot3_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知属性。
+Messages:
+	未知属性。
+	- 属性: rot3
+
+Stack trace:
+at com.comsol.model.dbmodel.PropFeatureDb.getPropValue(SourceFile:1763)
+	
+rot_set_phi_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知属性。
+Messages:
+	未知属性。
+	- 属性: phi
+
+Stack trace:
+at com.comsol.model.dbmodel.PropFeatureDb.getPropValue(SourceFile:1763)
+	a
+rot_set_psi_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知属性。
+Messages:
+	未知属性。
+	- 属性: psi
+
+Stack trace:
+at com.comsol.model.dbmodel.PropFeatureDb.getPropValue(SourceFile:1763)
+	a
+rot_set_eulerXYZ_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知属性。
+Messages:
+	未知属性。
+	- 属性: eulerXYZ
+
+Stack trace:
+at com.comsol.model.dbmodel.PropFeatureDb.getPropValue(SourceFile:176
+rot_set_eulerAngles_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知属性。
+Messages:
+	未知属性。
+	- 属性: eulerAngles
+
+Stack trace:
+at com.comsol.model.dbmodel.PropFeatureDb.getPropValue(SourceFile:
+
+probe_done

@@ -1,0 +1,14 @@
+started_at=2026-05-27T21:17:20
+timeout_s=1800.0
+command=/Applications/MATLAB_R2024a.app/bin/matlab -nosplash -noFigureWindows -sd /Users/apple/Documents/ChladiniPlateProject -batch setenv('COMSOL_MLI_PATH','/Applications/COMSOL64/Multiphysics/mli'); addpath('/Applications/COMSOL64/Multiphysics/mli'); addpath('/Users/apple/Documents/ChladiniPlateProject/comsol_templates'); probe_orthotropic_api('/Users/apple/Documents/ChladiniPlateProject/comsol_templates/Chladni_15x15_design_bound.mph','/Users/apple/Documents/ChladiniPlateProject/data/comsol_logs/orthotropic_api_probe.log')
+
+WARNING: package sun.awt.X11 not in java.desktop
+WARNING: package sun.awt.X11 not in java.desktop
+
+MATLAB is now connected to a COMSOL Multiphysics Server at 127.0.0.1:2036
+
+Run the commands below to access the COMSOL ModelUtil commands:
+import com.comsol.model.util.*
+orthotropic probe complete, log=/Users/apple/Documents/ChladiniPlateProject/data/comsol_logs/orthotropic_api_probe.log
+
+returncode=0

@@ -1,0 +1,406 @@
+{
+  "w8_diagonal_v1": {
+    "target": "target_diagonal.npy",
+    "frequencies_hz": [
+      228.35673459004823,
+      448.5056631790415,
+      628.4959167345474,
+      717.1486200006519,
+      898.0883255966196,
+      1058.7944247478777
+    ],
+    "weights": [
+      0.006143178578468491,
+      0.3794657332554676,
+      0.0003961342512279374,
+      0.0005797578543765119,
+      0.612531564424113,
+      0.0008836316363463721
+    ],
+    "surrogate": {
+      "enrichment": 12.734779193116712,
+      "contrast": 21.511350721203847,
+      "recall": 0.38047992912467116
+    },
+    "comsol_rms_composite": {
+      "enrichment_factor": 0.9417541797445379,
+      "coverage_recall": 0.18100247524752475,
+      "gaussian_contrast": 0.9389172548347984,
+      "directional_alignment": 0.01220933048644085,
+      "composite_recognisability": 0.05552167562290151,
+      "sigma_rel": 0.05,
+      "percentile": 20.0
+    },
+    "comsol_best_single_freq": {
+      "frequency_hz": 228.35673459004823,
+      "metrics": {
+        "enrichment_factor": 1.6592206115491173,
+        "coverage_recall": 0.4712252475247525,
+        "gaussian_contrast": 1.717969882123927,
+        "directional_alignment": 0.04170758930345203,
+        "composite_recognisability": 0.45630618411335505,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      }
+    },
+    "per_freq_metrics": {
+      "228.36": {
+        "enrichment_factor": 1.6592206115491173,
+        "coverage_recall": 0.4712252475247525,
+        "gaussian_contrast": 1.717969882123927,
+        "directional_alignment": 0.04170758930345203,
+        "composite_recognisability": 0.45630618411335505,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "448.51": {
+        "enrichment_factor": 1.116754233977706,
+        "coverage_recall": 0.20389851485148514,
+        "gaussian_contrast": 1.1235591701330057,
+        "directional_alignment": 0.2629396254236262,
+        "composite_recognisability": 0.15493440146081058,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "628.50": {
+        "enrichment_factor": 1.0499767663966606,
+        "coverage_recall": 0.19275990099009901,
+        "gaussian_contrast": 1.0527058796887963,
+        "directional_alignment": 0.926422504104043,
+        "composite_recognisability": 0.18025021090094281,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "717.15": {
+        "enrichment_factor": 1.0343032360682407,
+        "coverage_recall": 0.2589727722772277,
+        "gaussian_contrast": 1.036146963844415,
+        "directional_alignment": 0.3523096635323129,
+        "composite_recognisability": 0.133515795449752,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "898.09": {
+        "enrichment_factor": 0.7321996910225291,
+        "coverage_recall": 0.07487623762376237,
+        "gaussian_contrast": 0.7221673455483479,
+        "directional_alignment": 0.5630521177325738,
+        "composite_recognisability": 0.0787680830603861,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "1058.79": {
+        "enrichment_factor": 1.2575463513755398,
+        "coverage_recall": 0.21967821782178218,
+        "gaussian_contrast": 1.274574813005813,
+        "directional_alignment": 0.8678875085065954,
+        "composite_recognisability": 0.2928797376981136,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      }
+    }
+  },
+  "w8_xform_v1": {
+    "target": "target_xform.npy",
+    "frequencies_hz": [
+      213.92244528203793,
+      439.7084265359603,
+      641.3640041407468,
+      724.2806637418886,
+      791.9683009518275,
+      965.0792611034732
+    ],
+    "weights": [
+      0.015100707650178867,
+      0.8254716536671551,
+      0.0006418600717860162,
+      0.0014178261182128467,
+      0.012577656510481839,
+      0.14479029598218537
+    ],
+    "surrogate": {
+      "enrichment": 8.433893312224738,
+      "contrast": 17.640437462984597,
+      "recall": 0.2194662457359774
+    },
+    "comsol_rms_composite": {
+      "enrichment_factor": 2.930218726769139,
+      "coverage_recall": 0.4272670025188917,
+      "gaussian_contrast": 3.6958663353858343,
+      "directional_alignment": 0.8217508708892258,
+      "composite_recognisability": 0.9018290139428977,
+      "sigma_rel": 0.05,
+      "percentile": 20.0
+    },
+    "comsol_best_single_freq": {
+      "frequency_hz": 439.7084265359603,
+      "metrics": {
+        "enrichment_factor": 2.8410600412662284,
+        "coverage_recall": 0.43356423173803527,
+        "gaussian_contrast": 3.5406771163335704,
+        "directional_alignment": 0.81335248367581,
+        "composite_recognisability": 0.8819390094193056,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      }
+    },
+    "per_freq_metrics": {
+      "213.92": {
+        "enrichment_factor": 1.5890960094586095,
+        "coverage_recall": 0.38019521410579343,
+        "gaussian_contrast": 1.696348719889256,
+        "directional_alignment": 0.6967342983490415,
+        "composite_recognisability": 0.4746937427569012,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "439.71": {
+        "enrichment_factor": 2.8410600412662284,
+        "coverage_recall": 0.43356423173803527,
+        "gaussian_contrast": 3.5406771163335704,
+        "directional_alignment": 0.81335248367581,
+        "composite_recognisability": 0.8819390094193056,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "641.36": {
+        "enrichment_factor": 1.0779927979844524,
+        "coverage_recall": 0.34304156171284633,
+        "gaussian_contrast": 1.087092526981844,
+        "directional_alignment": 0.6679168489334307,
+        "composite_recognisability": 0.2164458152179859,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "724.28": {
+        "enrichment_factor": 1.0029920432241672,
+        "coverage_recall": 0.255352644836272,
+        "gaussian_contrast": 1.0033141359286328,
+        "directional_alignment": 0.697323087163859,
+        "composite_recognisability": 0.14819486381257502,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "791.97": {
+        "enrichment_factor": 1.6724884563704985,
+        "coverage_recall": 0.4003463476070529,
+        "gaussian_contrast": 1.8025919926115512,
+        "directional_alignment": 0.7653767617123332,
+        "composite_recognisability": 0.5202117498431851,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "965.08": {
+        "enrichment_factor": 0.975877246345613,
+        "coverage_recall": 0.16420025188916876,
+        "gaussian_contrast": 0.9733571727958593,
+        "directional_alignment": 0.5009618777087629,
+        "composite_recognisability": 0.09935626333762693,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      }
+    }
+  },
+  "w8_cross_v1": {
+    "target": "target_cross.npy",
+    "frequencies_hz": [
+      345.8402251587406,
+      467.08683410078385,
+      657.4266105392567,
+      765.02781988573,
+      935.2394975944464,
+      1073.4344055579754
+    ],
+    "weights": [
+      0.003907906523841212,
+      0.06141398637060676,
+      0.0072893456389143746,
+      0.5749581438516834,
+      0.34833452740682364,
+      0.004096090208130621
+    ],
+    "surrogate": {
+      "enrichment": 15.243902185417262,
+      "contrast": 119208467.66250128,
+      "recall": 0.51112057395978
+    },
+    "comsol_rms_composite": {
+      "enrichment_factor": 1.370100334284475,
+      "coverage_recall": 0.33686028935435114,
+      "gaussian_contrast": 1.409772911655547,
+      "directional_alignment": 0.9485103176591375,
+      "composite_recognisability": 0.39054843528831956,
+      "sigma_rel": 0.05,
+      "percentile": 20.0
+    },
+    "comsol_best_single_freq": {
+      "frequency_hz": 935.2394975944464,
+      "metrics": {
+        "enrichment_factor": 1.6331700791492267,
+        "coverage_recall": 0.3554307924854243,
+        "gaussian_contrast": 1.71577441161453,
+        "directional_alignment": 0.9498708160651155,
+        "composite_recognisability": 0.5057984094489804,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      }
+    },
+    "per_freq_metrics": {
+      "345.84": {
+        "enrichment_factor": 0.8528648538458721,
+        "coverage_recall": 0.08788598574821853,
+        "gaussian_contrast": 0.8434288967914796,
+        "directional_alignment": 0.04141931864979148,
+        "composite_recognisability": 0.030507727589444707,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "467.09": {
+        "enrichment_factor": 1.2475835266216864,
+        "coverage_recall": 0.2792053552148564,
+        "gaussian_contrast": 1.27152032208532,
+        "directional_alignment": 0.9964615128975438,
+        "composite_recognisability": 0.31993381620157535,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "657.43": {
+        "enrichment_factor": 1.0061860241088847,
+        "coverage_recall": 0.1725329302526452,
+        "gaussian_contrast": 1.0066594870587176,
+        "directional_alignment": 0.8967469717940095,
+        "composite_recognisability": 0.14522884606330785,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "765.03": {
+        "enrichment_factor": 0.8854009253244314,
+        "coverage_recall": 0.046858129993521916,
+        "gaussian_contrast": 0.8777523843906926,
+        "directional_alignment": 0.9474204618697837,
+        "composite_recognisability": 0.10879948518503495,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "935.24": {
+        "enrichment_factor": 1.6331700791492267,
+        "coverage_recall": 0.3554307924854243,
+        "gaussian_contrast": 1.71577441161453,
+        "directional_alignment": 0.9498708160651155,
+        "composite_recognisability": 0.5057984094489804,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "1073.43": {
+        "enrichment_factor": 0.9530558407805751,
+        "coverage_recall": 0.1692938890088534,
+        "gaussian_contrast": 0.9496660159411959,
+        "directional_alignment": 0.9647637675444821,
+        "composite_recognisability": 0.14726454345710424,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      }
+    }
+  },
+  "w8_ic_v1": {
+    "target": "target_binary.npy",
+    "frequencies_hz": [
+      220.20540738456992,
+      318.5287876758068,
+      481.5788580453178,
+      714.5260101366258,
+      837.7035166731231,
+      882.6193364268212
+    ],
+    "weights": [
+      0.9887238075616462,
+      0.00038115456216511847,
+      0.0006756622734956536,
+      0.002656269886636973,
+      0.006671862731282306,
+      0.0008912429847736994
+    ],
+    "surrogate": {
+      "enrichment": 9.191679111790382,
+      "contrast": 13.10975479801605,
+      "recall": 0.27225145857191
+    },
+    "comsol_rms_composite": {
+      "enrichment_factor": 1.7111561880761554,
+      "coverage_recall": 0.5121788455121788,
+      "gaussian_contrast": 1.7715300990380287,
+      "directional_alignment": 0.5866084022294256,
+      "composite_recognisability": 0.5415509312207696,
+      "sigma_rel": 0.05,
+      "percentile": 20.0
+    },
+    "comsol_best_single_freq": {
+      "frequency_hz": 220.20540738456992,
+      "metrics": {
+        "enrichment_factor": 1.7203508105842067,
+        "coverage_recall": 0.5472138805472139,
+        "gaussian_contrast": 1.781861876727716,
+        "directional_alignment": 0.5883095531799327,
+        "composite_recognisability": 0.5555381745084654,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      }
+    },
+    "per_freq_metrics": {
+      "220.21": {
+        "enrichment_factor": 1.7203508105842067,
+        "coverage_recall": 0.5472138805472139,
+        "gaussian_contrast": 1.781861876727716,
+        "directional_alignment": 0.5883095531799327,
+        "composite_recognisability": 0.5555381745084654,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "318.53": {
+        "enrichment_factor": 1.238489501236703,
+        "coverage_recall": 0.2365699032365699,
+        "gaussian_contrast": 1.2528076455894899,
+        "directional_alignment": 0.43851946215101845,
+        "composite_recognisability": 0.24545734415841955,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "481.58": {
+        "enrichment_factor": 1.1292699267498614,
+        "coverage_recall": 0.11878545211878545,
+        "gaussian_contrast": 1.136309254294247,
+        "directional_alignment": 0.8663461127514916,
+        "composite_recognisability": 0.19645588629982008,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "714.53": {
+        "enrichment_factor": 1.4278688714645504,
+        "coverage_recall": 0.2739406072739406,
+        "gaussian_contrast": 1.4577592044109515,
+        "directional_alignment": 0.736968415616527,
+        "composite_recognisability": 0.373732329986446,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "837.70": {
+        "enrichment_factor": 0.8895908529539502,
+        "coverage_recall": 0.2002002002002002,
+        "gaussian_contrast": 0.8849087402573655,
+        "directional_alignment": 0.4358044799529499,
+        "composite_recognisability": 0.10364050805535505,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      },
+      "882.62": {
+        "enrichment_factor": 1.1072931967622353,
+        "coverage_recall": 0.2385719052385719,
+        "gaussian_contrast": 1.1130158653560176,
+        "directional_alignment": 0.6618849593376097,
+        "composite_recognisability": 0.19994212314729215,
+        "sigma_rel": 0.05,
+        "percentile": 20.0
+      }
+    }
+  }
+}

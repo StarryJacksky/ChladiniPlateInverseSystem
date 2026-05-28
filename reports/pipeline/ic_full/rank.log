@@ -1,0 +1,11 @@
+Primary metric: final_score_amplitude_valley / 主指标：final_score_amplitude_valley
+Target verdict: requires_topology (kind=open_stroke_pattern) / 目标判定：requires_topology（类别=open_stroke_pattern）
+Total candidates scored: 5 / 已评分候选数：5
+Top 10 (primary | nodal | amplitude): / 前 10 名 (主指标 | 节点线 | 振幅谷)：
+   1. w6_pipeline_ic_full_v1_sweep_f636p547                         primary=    0.1710  nodal=      n/a  amp=   0.1710
+   2. w4_pipeline_ic_full_sweep_f636p547                            primary=    0.1603  nodal=      n/a  amp=   0.1603
+   3. w4_pipeline_ic_full_sweep_f636p5                              primary=    0.1603  nodal=      n/a  amp=   0.1603
+   4. w6_pipeline_ic_full_v2_strong_sweep_f636p547                  primary=    0.1408  nodal=      n/a  amp=   0.1408
+   5. w3_pipeline_ic_full_sweep_f636p547                            primary=    0.1300  nodal=      n/a  amp=   0.1300
+CSV : candidates/ranked_candidates_unified.csv / 排行 CSV：candidates/ranked_candidates_unified.csv
+JSON: reports/leaderboard.json / 排行 JSON：reports/leaderboard.json

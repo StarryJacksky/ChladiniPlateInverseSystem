@@ -1,0 +1,8 @@
+{
+  "candidate_id": "mosaic_z_candidate_151_quad",
+  "source_candidate": "candidate_151_0005",
+  "method": "MOSAIC-Z modal subspace plus four-actuator physical projection",
+  "subspace_result": "reports/mosaic_z/top_full_refine/candidate_151_0005/subspace_loss.json",
+  "projection_result": "reports/mosaic_z/projection/candidate_151_0005_quad/actuator_projection.json",
+  "notes": "Research candidate for harmonic-response validation. Uses the source thickness field with MOSAIC-Z actuator and frequency contracts."
+}

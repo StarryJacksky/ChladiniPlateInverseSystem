@@ -1,0 +1,42 @@
+{
+  "verdict": "requires_topology",
+  "metrics": {
+    "image_size": 256,
+    "plate_size_mm": 150.0,
+    "grid_size": 15,
+    "cell_size_mm": 10.0,
+    "mm_per_pixel": 0.5859375,
+    "foreground_ratio": 0.0457305908203125,
+    "n_connected_components": 3,
+    "n_closed_loops": 0,
+    "n_skeleton_endpoints": 9,
+    "courant_min_mode_index": 3,
+    "stroke_min_gap_mm": 13.4765625,
+    "stroke_min_feature_mm": 1.6572815184059708,
+    "d4_symmetry_mismatch": 0.7626681547636884,
+    "estimated_min_frequency_hz": 212.1821849005727,
+    "near_clamp_ratio": 0.04537871204537871,
+    "target_kind": "open_stroke_pattern"
+  },
+  "thresholds": {
+    "infeasible_courant_min_mode_index": 60,
+    "infeasible_stroke_min_gap_mm": 6.0,
+    "requires_topology_courant_min_mode_index": 30,
+    "requires_topology_stroke_min_gap_mm": 7.0,
+    "requires_topology_d4_symmetry_mismatch": 0.55,
+    "borderline_courant_min_mode_index": 18,
+    "borderline_stroke_min_gap_mm": 10.0,
+    "borderline_d4_symmetry_mismatch": 0.35,
+    "filled_target_foreground_ratio": 0.18,
+    "thin_stroke_feature_mm": 8.0,
+    "clamp_buffer_mm": 4.0,
+    "max_endpoints_easy": 0
+  },
+  "diagnosis_notes": [
+    "D4 symmetry mismatch 0.76 exceeds 0.55; square plate natural modes resist this asymmetry. / D4 对称偏差 0.76 超过 0.55，方板自然模态会抵抗这种不对称。"
+  ],
+  "advisory": [
+    "Single passive plate at 15x15 likely insufficient. Document infeasibility for the user, then run W5 to report lambda_max under W2 amplitude-valley loss. / 单块 15x15 被动板很可能无法实现；向用户说明，并通过 W5 在 W2 振幅谷损失下报告 lambda_max。"
+  ],
+  "target_path": "data/processed_targets/target_binary.npy"
+}

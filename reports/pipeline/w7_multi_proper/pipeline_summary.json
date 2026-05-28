@@ -1,0 +1,83 @@
+{
+  "target_tag": "w7_multi_proper",
+  "target_path": "data/processed_targets/target_binary.npy",
+  "verdict_path": "/Users/apple/Documents/ChladiniPlateProject/reports/target_realizability_w7_multi_proper.json",
+  "drive_frequency_hz": 636.5465547017182,
+  "manifold_path": "reports/design_manifold_pca.npz",
+  "candidates": [
+    "w7_multifreq_ic_v2_diverse"
+  ],
+  "sweep_candidates": [
+    "w7_multifreq_ic_v2_diverse_sweep_f286p154",
+    "w7_multifreq_ic_v2_diverse_sweep_f387p72",
+    "w7_multifreq_ic_v2_diverse_sweep_f506p545",
+    "w7_multifreq_ic_v2_diverse_sweep_f606p611",
+    "w7_multifreq_ic_v2_diverse_sweep_f666p533",
+    "w7_multifreq_ic_v2_diverse_sweep_f815p659"
+  ],
+  "comsol_runs": [
+    {
+      "candidate_id": "w7_multifreq_ic_v2_diverse",
+      "name": "COMSOL_w7_multifreq_ic_v2_diverse",
+      "command": [
+        "/Users/apple/Documents/ChladiniPlateProject/.venv/bin/python",
+        "scripts/run_comsol_frequency_sweep.py",
+        "--config",
+        "config.yaml",
+        "--base-candidate-id",
+        "w7_multifreq_ic_v2_diverse",
+        "--frequencies",
+        "286.154,387.720,506.545,606.611,666.533,815.659",
+        "--run-name",
+        "pipeline_w7_multi_proper_w7_multifreq_ic_v2_diverse",
+        "--frequency-export-case",
+        "pipeline_w7_multi_proper_w7_multifreq_ic_v2_diverse",
+        "--skip-legacy-epsilon-score"
+      ],
+      "returncode": 0,
+      "elapsed_s": 120.88601493835449,
+      "log_path": "/Users/apple/Documents/ChladiniPlateProject/reports/pipeline/w7_multi_proper/comsol_w7_multifreq_ic_v2_diverse.log",
+      "status": "ok"
+    }
+  ],
+  "stages": [
+    {
+      "name": "W1",
+      "command": [
+        "/Users/apple/Documents/ChladiniPlateProject/.venv/bin/python",
+        "scripts/analyze_target_realizability.py",
+        "--config",
+        "config.yaml",
+        "--output",
+        "/Users/apple/Documents/ChladiniPlateProject/reports/target_realizability_w7_multi_proper.json"
+      ],
+      "returncode": 0,
+      "elapsed_s": 0.3179628849029541,
+      "log_path": "/Users/apple/Documents/ChladiniPlateProject/reports/pipeline/w7_multi_proper/w1.log",
+      "status": "ok"
+    },
+    {
+      "name": "COMSOL_w7_multifreq_ic_v2_diverse",
+      "command": [
+        "/Users/apple/Documents/ChladiniPlateProject/.venv/bin/python",
+        "scripts/run_comsol_frequency_sweep.py",
+        "--config",
+        "config.yaml",
+        "--base-candidate-id",
+        "w7_multifreq_ic_v2_diverse",
+        "--frequencies",
+        "286.154,387.720,506.545,606.611,666.533,815.659",
+        "--run-name",
+        "pipeline_w7_multi_proper_w7_multifreq_ic_v2_diverse",
+        "--frequency-export-case",
+        "pipeline_w7_multi_proper_w7_multifreq_ic_v2_diverse",
+        "--skip-legacy-epsilon-score"
+      ],
+      "returncode": 0,
+      "elapsed_s": 120.88601493835449,
+      "log_path": "/Users/apple/Documents/ChladiniPlateProject/reports/pipeline/w7_multi_proper/comsol_w7_multifreq_ic_v2_diverse.log",
+      "status": "ok"
+    }
+  ],
+  "rank_payload": null
+}

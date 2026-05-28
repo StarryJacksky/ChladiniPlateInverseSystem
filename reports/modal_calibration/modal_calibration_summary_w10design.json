@@ -1,0 +1,327 @@
+{
+  "setup": {
+    "H_mm": 2.0,
+    "theta_rad": 0.0,
+    "stiffness_ratio": 12.0,
+    "shear_ratio": 1.5,
+    "n_modes": 30,
+    "proxy_n": 25
+  },
+  "comsol_freqs_hz": [
+    39.256655581,
+    49.2773801853,
+    60.072283189,
+    85.80952523,
+    130.512442579,
+    209.873353562,
+    243.360469,
+    244.604618932,
+    286.634619434,
+    320.628773104,
+    395.793673832,
+    474.722682506,
+    497.650253243,
+    536.849490657,
+    646.276996188,
+    668.305245618,
+    690.52819362,
+    753.156704082,
+    860.183646574,
+    893.770696441,
+    945.183665056,
+    1020.49462061,
+    1059.11908655,
+    1067.76747204,
+    1185.49790607,
+    1259.28679525,
+    1305.27274845,
+    1345.70063323,
+    1442.72579912,
+    1498.52772031
+  ],
+  "surrogate_freqs_hz": [
+    127.11518886441118,
+    141.99618553076684,
+    159.77931581706952,
+    233.1092157037314,
+    283.9157457538862,
+    387.0295529857634,
+    451.6517184214682,
+    508.3887724954266,
+    535.6878193065065,
+    625.9076215926186,
+    685.0207301034809,
+    734.4668376813944,
+    830.4495398005859,
+    855.9618638723346,
+    908.7924750204963,
+    968.6586869207475,
+    1039.1302872635924,
+    1149.9257491834123,
+    1202.751373904771,
+    1232.948977490516,
+    1330.4585715150456,
+    1415.5811400442742,
+    1480.0199026438577,
+    1526.468416030382,
+    1587.1455556413744,
+    1638.02681684001,
+    1730.050356314975,
+    1753.0701250649224,
+    1882.6429518059801,
+    1904.0869885486509
+  ],
+  "matched_pairs": [
+    {
+      "comsol_mode": 1,
+      "comsol_freq_hz": 39.256655581,
+      "surrogate_mode": 2,
+      "surrogate_freq_hz": 141.99618553076684,
+      "mac": 0.7320244472132322,
+      "freq_ratio_comsol_over_surrogate": 0.27646274746228383
+    },
+    {
+      "comsol_mode": 2,
+      "comsol_freq_hz": 49.2773801853,
+      "surrogate_mode": 3,
+      "surrogate_freq_hz": 159.77931581706952,
+      "mac": 0.8175432928189817,
+      "freq_ratio_comsol_over_surrogate": 0.3084090073443386
+    },
+    {
+      "comsol_mode": 3,
+      "comsol_freq_hz": 60.072283189,
+      "surrogate_mode": 1,
+      "surrogate_freq_hz": 127.11518886441118,
+      "mac": 0.7882113790294545,
+      "freq_ratio_comsol_over_surrogate": 0.47258147295896136
+    },
+    {
+      "comsol_mode": 4,
+      "comsol_freq_hz": 85.80952523,
+      "surrogate_mode": 4,
+      "surrogate_freq_hz": 233.1092157037314,
+      "mac": 0.8941635647308865,
+      "freq_ratio_comsol_over_surrogate": 0.3681086780329571
+    },
+    {
+      "comsol_mode": 5,
+      "comsol_freq_hz": 130.512442579,
+      "surrogate_mode": 5,
+      "surrogate_freq_hz": 283.9157457538862,
+      "mac": 0.8980712420222318,
+      "freq_ratio_comsol_over_surrogate": 0.4596872295069375
+    },
+    {
+      "comsol_mode": 6,
+      "comsol_freq_hz": 209.873353562,
+      "surrogate_mode": 6,
+      "surrogate_freq_hz": 387.0295529857634,
+      "mac": 0.780056643914705,
+      "freq_ratio_comsol_over_surrogate": 0.5422669972949586
+    },
+    {
+      "comsol_mode": 7,
+      "comsol_freq_hz": 243.360469,
+      "surrogate_mode": 7,
+      "surrogate_freq_hz": 451.6517184214682,
+      "mac": 0.7484878585217118,
+      "freq_ratio_comsol_over_surrogate": 0.5388232991796195
+    },
+    {
+      "comsol_mode": 8,
+      "comsol_freq_hz": 244.604618932,
+      "surrogate_mode": 7,
+      "surrogate_freq_hz": 451.6517184214682,
+      "mac": 0.7974911603643433,
+      "freq_ratio_comsol_over_surrogate": 0.5415779658425701
+    },
+    {
+      "comsol_mode": 9,
+      "comsol_freq_hz": 286.634619434,
+      "surrogate_mode": 8,
+      "surrogate_freq_hz": 508.3887724954266,
+      "mac": 0.5853223982598595,
+      "freq_ratio_comsol_over_surrogate": 0.5638098930215429
+    },
+    {
+      "comsol_mode": 10,
+      "comsol_freq_hz": 320.628773104,
+      "surrogate_mode": 9,
+      "surrogate_freq_hz": 535.6878193065065,
+      "mac": 0.5275557113639037,
+      "freq_ratio_comsol_over_surrogate": 0.5985366132070751
+    },
+    {
+      "comsol_mode": 11,
+      "comsol_freq_hz": 395.793673832,
+      "surrogate_mode": 10,
+      "surrogate_freq_hz": 625.9076215926186,
+      "mac": 0.6124787055468883,
+      "freq_ratio_comsol_over_surrogate": 0.6323515806132942
+    },
+    {
+      "comsol_mode": 12,
+      "comsol_freq_hz": 474.722682506,
+      "surrogate_mode": 12,
+      "surrogate_freq_hz": 734.4668376813944,
+      "mac": 0.6488215537035263,
+      "freq_ratio_comsol_over_surrogate": 0.646350057144351
+    },
+    {
+      "comsol_mode": 13,
+      "comsol_freq_hz": 497.650253243,
+      "surrogate_mode": 11,
+      "surrogate_freq_hz": 685.0207301034809,
+      "mac": 0.6023690152246199,
+      "freq_ratio_comsol_over_surrogate": 0.7264747348125126
+    },
+    {
+      "comsol_mode": 14,
+      "comsol_freq_hz": 536.849490657,
+      "surrogate_mode": 14,
+      "surrogate_freq_hz": 855.9618638723346,
+      "mac": 0.4308420293181172,
+      "freq_ratio_comsol_over_surrogate": 0.627188562149622
+    },
+    {
+      "comsol_mode": 15,
+      "comsol_freq_hz": 646.276996188,
+      "surrogate_mode": 13,
+      "surrogate_freq_hz": 830.4495398005859,
+      "mac": 0.4723592151753563,
+      "freq_ratio_comsol_over_surrogate": 0.7782254853716809
+    },
+    {
+      "comsol_mode": 16,
+      "comsol_freq_hz": 668.305245618,
+      "surrogate_mode": 17,
+      "surrogate_freq_hz": 1039.1302872635924,
+      "mac": 0.24858358512568957,
+      "freq_ratio_comsol_over_surrogate": 0.6431390306001863
+    },
+    {
+      "comsol_mode": 17,
+      "comsol_freq_hz": 690.52819362,
+      "surrogate_mode": 16,
+      "surrogate_freq_hz": 968.6586869207475,
+      "mac": 0.3293730039972096,
+      "freq_ratio_comsol_over_surrogate": 0.7128704908589715
+    },
+    {
+      "comsol_mode": 18,
+      "comsol_freq_hz": 753.156704082,
+      "surrogate_mode": 16,
+      "surrogate_freq_hz": 968.6586869207475,
+      "mac": 0.26503621792706283,
+      "freq_ratio_comsol_over_surrogate": 0.7775253701344453
+    },
+    {
+      "comsol_mode": 19,
+      "comsol_freq_hz": 860.183646574,
+      "surrogate_mode": 20,
+      "surrogate_freq_hz": 1232.948977490516,
+      "mac": 0.19428396108844836,
+      "freq_ratio_comsol_over_surrogate": 0.6976636197264025
+    },
+    {
+      "comsol_mode": 20,
+      "comsol_freq_hz": 893.770696441,
+      "surrogate_mode": 20,
+      "surrogate_freq_hz": 1232.948977490516,
+      "mac": 0.24010781207107107,
+      "freq_ratio_comsol_over_surrogate": 0.7249048523160603
+    },
+    {
+      "comsol_mode": 21,
+      "comsol_freq_hz": 945.183665056,
+      "surrogate_mode": 20,
+      "surrogate_freq_hz": 1232.948977490516,
+      "mac": 0.20633188718963297,
+      "freq_ratio_comsol_over_surrogate": 0.7666040382139581
+    },
+    {
+      "comsol_mode": 22,
+      "comsol_freq_hz": 1020.49462061,
+      "surrogate_mode": 22,
+      "surrogate_freq_hz": 1415.5811400442742,
+      "mac": 0.33980116121466925,
+      "freq_ratio_comsol_over_surrogate": 0.7209015377091579
+    },
+    {
+      "comsol_mode": 23,
+      "comsol_freq_hz": 1059.11908655,
+      "surrogate_mode": 23,
+      "surrogate_freq_hz": 1480.0199026438577,
+      "mac": 0.29607201551189766,
+      "freq_ratio_comsol_over_surrogate": 0.7156113810753661
+    },
+    {
+      "comsol_mode": 24,
+      "comsol_freq_hz": 1067.76747204,
+      "surrogate_mode": 21,
+      "surrogate_freq_hz": 1330.4585715150456,
+      "mac": 0.5377652287567017,
+      "freq_ratio_comsol_over_surrogate": 0.802555971978963
+    },
+    {
+      "comsol_mode": 25,
+      "comsol_freq_hz": 1185.49790607,
+      "surrogate_mode": 25,
+      "surrogate_freq_hz": 1587.1455556413744,
+      "mac": 0.3825128497247744,
+      "freq_ratio_comsol_over_surrogate": 0.7469371047011083
+    },
+    {
+      "comsol_mode": 26,
+      "comsol_freq_hz": 1259.28679525,
+      "surrogate_mode": 24,
+      "surrogate_freq_hz": 1526.468416030382,
+      "mac": 0.21123398451128036,
+      "freq_ratio_comsol_over_surrogate": 0.8249674752687027
+    },
+    {
+      "comsol_mode": 27,
+      "comsol_freq_hz": 1305.27274845,
+      "surrogate_mode": 26,
+      "surrogate_freq_hz": 1638.02681684001,
+      "mac": 0.15410151140318373,
+      "freq_ratio_comsol_over_surrogate": 0.7968567639008862
+    },
+    {
+      "comsol_mode": 28,
+      "comsol_freq_hz": 1345.70063323,
+      "surrogate_mode": 28,
+      "surrogate_freq_hz": 1753.0701250649224,
+      "mac": 0.223894866380941,
+      "freq_ratio_comsol_over_surrogate": 0.7676251018082713
+    },
+    {
+      "comsol_mode": 29,
+      "comsol_freq_hz": 1442.72579912,
+      "surrogate_mode": 29,
+      "surrogate_freq_hz": 1882.6429518059801,
+      "mac": 0.1869486901082572,
+      "freq_ratio_comsol_over_surrogate": 0.766330013737349
+    },
+    {
+      "comsol_mode": 30,
+      "comsol_freq_hz": 1498.52772031,
+      "surrogate_mode": 28,
+      "surrogate_freq_hz": 1753.0701250649224,
+      "mac": 0.2053816003896751,
+      "freq_ratio_comsol_over_surrogate": 0.8548019265655469
+    }
+  ],
+  "frequency_fit": {
+    "alpha": 0.059113511743465685,
+    "beta": 1.3607003207937742,
+    "n_pairs_used": 19,
+    "interpretation": "f_comsol = alpha * f_surrogate ^ beta (over MAC>0.3 matched pairs)"
+  },
+  "modal_quality": {
+    "mean_mac_first20": 0.580659139870865,
+    "n_modes_with_mac_above_0.5_first20": 13
+  },
+  "decision": "YELLOW: modes partially align. Calibration possible but needs per-mode mapping (not single scalar). Sprint 2 §4 needs richer calibration table; risk medium."
+}

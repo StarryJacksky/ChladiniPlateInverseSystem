@@ -1,0 +1,5 @@
+W6 spectral start / 启动 W6 频谱聚簇: candidate=w6_pipeline_diagonal_v1_v2_strong, drive_hz=474.0, modes=20, manifold=on, steps=250
+steps=250  best_loss=0.874495@step248  first/last total=5.4118 / 0.8771  cluster=1.8668→0.3268  amp=1.6781→0.1972
+final eigenvalues (first 8): ['7.431e+05', '1.026e+06', '1.194e+06', '1.299e+06', '1.552e+06', '2.761e+06', '3.082e+06', '4.656e+06'], omega² = 8.870e+06 / 末步前 8 阶本征值与 ω²
+output dir: candidates/w6_pipeline_diagonal_v1_v2_strong / 输出：candidates/w6_pipeline_diagonal_v1_v2_strong
+summary json: candidates/w6_pipeline_diagonal_v1_v2_strong/w6_optimization_summary.json / 摘要：candidates/w6_pipeline_diagonal_v1_v2_strong/w6_optimization_summary.json

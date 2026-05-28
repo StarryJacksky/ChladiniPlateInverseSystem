@@ -1,0 +1,441 @@
+probe_orthotropic_api start
+mphstart_ok
+model_loaded=/Users/apple/Documents/ChladiniPlateProject/comsol_templates/Chladni_15x15_design_bound.mph
+existing_pg_tags=def,Enu,
+
+--- type=Orthotropic tag=probe_ortho_1 ---
+create=ok
+varName_error=未定义与 'com.comsol.clientapi.impl.MaterialModelClient' 类型的输入参数相对应的函数 'varName'。
+expr_error=未定义与 'com.comsol.clientapi.impl.MaterialModelClient' 类型的输入参数相对应的函数 'expr'。
+descr_error=没有为类 'com.comsol.clientapi.impl.MaterialModelClient' 找到具有匹配签名的方法 'descr'。
+identifier="probe_ortho_1",identifier_error=索引超过 Java 数组维度
+
+--- type=OrthotropicEnu_alpha tag=probe_ortho_2 ---
+create=ok
+varName_error=未定义与 'com.comsol.clientapi.impl.MaterialModelClient' 类型的输入参数相对应的函数 'varName'。
+expr_error=未定义与 'com.comsol.clientapi.impl.MaterialModelClient' 类型的输入参数相对应的函数 'expr'。
+descr_error=没有为类 'com.comsol.clientapi.impl.MaterialModelClient' 找到具有匹配签名的方法 'descr'。
+identifier="probe_ortho_2",identifier_error=索引超过 Java 数组维度
+
+--- type=OrthotropicEnu tag=probe_ortho_3 ---
+create=ok
+varName_error=未定义与 'com.comsol.clientapi.impl.MaterialModelClient' 类型的输入参数相对应的函数 'varName'。
+expr_error=未定义与 'com.comsol.clientapi.impl.MaterialModelClient' 类型的输入参数相对应的函数 'expr'。
+descr_error=没有为类 'com.comsol.clientapi.impl.MaterialModelClient' 找到具有匹配签名的方法 'descr'。
+identifier="probe_ortho_3",identifier_error=索引超过 Java 数组维度
+
+--- type=LinearElasticOrthotropic tag=probe_ortho_4 ---
+create=ok
+varName_error=未定义与 'com.comsol.clientapi.impl.MaterialModelClient' 类型的输入参数相对应的函数 'varName'。
+expr_error=未定义与 'com.comsol.clientapi.impl.MaterialModelClient' 类型的输入参数相对应的函数 'expr'。
+descr_error=没有为类 'com.comsol.clientapi.impl.MaterialModelClient' 找到具有匹配签名的方法 'descr'。
+identifier="probe_ortho_4",identifier_error=索引超过 Java 数组维度
+
+--- type=Orthotropic_Eortho tag=probe_ortho_5 ---
+create=ok
+varName_error=未定义与 'com.comsol.clientapi.impl.MaterialModelClient' 类型的输入参数相对应的函数 'varName'。
+expr_error=未定义与 'com.comsol.clientapi.impl.MaterialModelClient' 类型的输入参数相对应的函数 'expr'。
+descr_error=没有为类 'com.comsol.clientapi.impl.MaterialModelClient' 找到具有匹配签名的方法 'descr'。
+identifier="probe_ortho_5",identifier_error=索引超过 Java 数组维度
+
+--- type=OrthotropicElastic tag=probe_ortho_6 ---
+create=ok
+varName_error=未定义与 'com.comsol.clientapi.impl.MaterialModelClient' 类型的输入参数相对应的函数 'varName'。
+expr_error=未定义与 'com.comsol.clientapi.impl.MaterialModelClient' 类型的输入参数相对应的函数 'expr'。
+descr_error=没有为类 'com.comsol.clientapi.impl.MaterialModelClient' 找到具有匹配签名的方法 'descr'。
+identifier="probe_ortho_6",identifier_error=索引超过 Java 数组维度
+
+=== shell.emm1 probe ===
+current_SolidModel=Isotropic
+getString_MaterialModel_failed=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 未知参数 MaterialModel。
+Messages:
+	未知参数 MaterialModel。
+	- 特征: 壳 (shell)
+
+Stack trace:
+at com.comsol.model.dbmodel.ParameterEntityDb.getParamValue(SourceFile:190)
+	at com.comsol.model.dbmodel.ParameterEntityDb.getParamValue(SourceFile:1)
+	at com.comsol.model.method.ParameterEntityMethod.d(SourceFile:511)
+	at com.comsol.model.method.ParameterEntityMethod.getString(SourceFile:238)
+	at com.comsol.model.dbmodel.ParameterEntityDb.getString(SourceFile:333)
+	at jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source)
+	at java.lang.reflect.Method.invoke(Unknown Source)
+	at com.comsol.bridge.command.b.a(SourceFile:161)
+	at com.comsol.bridge.command.b.run(SourceFile:103)
+	at com.comsol.bridge.command.k.c(SourceFile:227)
+	at com.comsol.bridge.command.k$1.run(SourceFile:100)
+	at com.comsol.util.thread.SuspendableTasks$1.run(SourceFile:111)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.lang.Thread.run(Unknown Source)
+set_SolidModel_Isotropic=ok
+  properties_count=100
+  prop_1=SolidModel
+  prop_2=BendingFormulation
+  prop_3=SolveForOutOfPlaneStrain
+  prop_4=IsotropicOption
+  prop_5=E_mat
+  prop_6=E
+  prop_7=nu_mat
+  prop_8=nu
+  prop_9=K_mat
+  prop_10=K
+  prop_11=G_mat
+  prop_12=G
+  prop_13=lambLame_mat
+  prop_14=lambLame
+  prop_15=muLame_mat
+  prop_16=muLame
+  prop_17=cp_mat
+  prop_18=cp
+  prop_19=cs_mat
+  prop_20=cs
+  prop_21=OrthotropicOption
+  prop_22=TransverseIsotropic
+  prop_23=Evector_mat
+  prop_24=Evector
+  prop_25=nuvector_mat
+  prop_26=nuvector
+  prop_27=Gvector_mat
+  prop_28=Gvector
+  prop_29=GvectorVo_mat
+  prop_30=GvectorVo
+  prop_31=Evect_mat
+  prop_32=Evect
+  prop_33=nuvect_mat
+  prop_34=nuvect
+  prop_35=Gvect1_mat
+  prop_36=Gvect1
+  prop_37=AnisotropicMatrixOption
+  prop_38=AnisotropicOption
+  prop_39=D_mat
+  prop_40=D
+  prop_41=DVo_mat
+  prop_42=DVo
+  prop_43=Dinv_mat
+  prop_44=Dinv
+  prop_45=DinvVo_mat
+  prop_46=DinvVo
+  prop_47=CrystalSystem
+  prop_48=c3cub_mat
+  prop_49=c3cub
+  prop_50=c5hex_mat
+  prop_51=c5hex
+  prop_52=c6tri_mat
+  prop_53=c6tri
+  prop_54=c7tri_mat
+  prop_55=c7tri
+  prop_56=c6tet_mat
+  prop_57=c6tet
+  prop_58=c7tet_mat
+  prop_59=c7tet
+  prop_60=c9ort_mat
+  prop_61=c9ort
+  prop_62=rho_mat
+  prop_63=rho
+  prop_64=minput_strainreferencetemperature_src
+  prop_65=minput_strainreferencetemperature
+  prop_66=editModelInputs
+  prop_67=geometricNonlinearity
+  prop_68=strainDecomposition
+  prop_69=henckyApproximation
+  prop_70=storeDissipation
+  prop_71=minput_temperature_src
+  prop_72=minput_temperature
+  prop_73=minput_pressure_src
+  prop_74=minput_pressure
+  prop_75=minput_electricfield_src
+  prop_76=minput_electricfield
+  prop_77=minput_magneticfield_src
+  prop_78=minput_magneticfield
+  prop_79=minput_magneticfluxdensity_src
+  prop_80=minput_magneticfluxdensity
+  prop_81=minput_velocity_src
+  prop_82=minput_velocity
+  prop_83=minput_frequency_src
+  prop_84=minput_frequency
+  prop_85=minput_stress_src
+  prop_86=minput_stress
+  prop_87=minput_effectiveplasticstrain_src
+  prop_88=minput_effectiveplasticstrain
+  prop_89=minput_concentration_src
+  prop_90=minput_concentration
+  prop_91=minput_numberdensity_src
+  prop_92=minput_numberdensity
+  prop_93=minput_relativehumidity_src
+  prop_94=minput_relativehumidity
+  prop_95=minput_currentdensity_src
+  prop_96=minput_currentdensity
+  prop_97=minput_shiftedmagneticfield_src
+  prop_98=minput_shiftedmagneticfield
+  prop_99=StudyStep
+  prop_100=showPhysicsSymbols
+set_SolidModel_Orthotropic=ok
+  properties_count=100
+  prop_1=SolidModel
+  prop_2=BendingFormulation
+  prop_3=SolveForOutOfPlaneStrain
+  prop_4=IsotropicOption
+  prop_5=E_mat
+  prop_6=E
+  prop_7=nu_mat
+  prop_8=nu
+  prop_9=K_mat
+  prop_10=K
+  prop_11=G_mat
+  prop_12=G
+  prop_13=lambLame_mat
+  prop_14=lambLame
+  prop_15=muLame_mat
+  prop_16=muLame
+  prop_17=cp_mat
+  prop_18=cp
+  prop_19=cs_mat
+  prop_20=cs
+  prop_21=OrthotropicOption
+  prop_22=TransverseIsotropic
+  prop_23=Evector_mat
+  prop_24=Evector
+  prop_25=nuvector_mat
+  prop_26=nuvector
+  prop_27=Gvector_mat
+  prop_28=Gvector
+  prop_29=GvectorVo_mat
+  prop_30=GvectorVo
+  prop_31=Evect_mat
+  prop_32=Evect
+  prop_33=nuvect_mat
+  prop_34=nuvect
+  prop_35=Gvect1_mat
+  prop_36=Gvect1
+  prop_37=AnisotropicMatrixOption
+  prop_38=AnisotropicOption
+  prop_39=D_mat
+  prop_40=D
+  prop_41=DVo_mat
+  prop_42=DVo
+  prop_43=Dinv_mat
+  prop_44=Dinv
+  prop_45=DinvVo_mat
+  prop_46=DinvVo
+  prop_47=CrystalSystem
+  prop_48=c3cub_mat
+  prop_49=c3cub
+  prop_50=c5hex_mat
+  prop_51=c5hex
+  prop_52=c6tri_mat
+  prop_53=c6tri
+  prop_54=c7tri_mat
+  prop_55=c7tri
+  prop_56=c6tet_mat
+  prop_57=c6tet
+  prop_58=c7tet_mat
+  prop_59=c7tet
+  prop_60=c9ort_mat
+  prop_61=c9ort
+  prop_62=rho_mat
+  prop_63=rho
+  prop_64=minput_strainreferencetemperature_src
+  prop_65=minput_strainreferencetemperature
+  prop_66=editModelInputs
+  prop_67=geometricNonlinearity
+  prop_68=strainDecomposition
+  prop_69=henckyApproximation
+  prop_70=storeDissipation
+  prop_71=minput_temperature_src
+  prop_72=minput_temperature
+  prop_73=minput_pressure_src
+  prop_74=minput_pressure
+  prop_75=minput_electricfield_src
+  prop_76=minput_electricfield
+  prop_77=minput_magneticfield_src
+  prop_78=minput_magneticfield
+  prop_79=minput_magneticfluxdensity_src
+  prop_80=minput_magneticfluxdensity
+  prop_81=minput_velocity_src
+  prop_82=minput_velocity
+  prop_83=minput_frequency_src
+  prop_84=minput_frequency
+  prop_85=minput_stress_src
+  prop_86=minput_stress
+  prop_87=minput_effectiveplasticstrain_src
+  prop_88=minput_effectiveplasticstrain
+  prop_89=minput_concentration_src
+  prop_90=minput_concentration
+  prop_91=minput_numberdensity_src
+  prop_92=minput_numberdensity
+  prop_93=minput_relativehumidity_src
+  prop_94=minput_relativehumidity
+  prop_95=minput_currentdensity_src
+  prop_96=minput_currentdensity
+  prop_97=minput_shiftedmagneticfield_src
+  prop_98=minput_shiftedmagneticfield
+  prop_99=StudyStep
+  prop_100=showPhysicsSymbols
+set_SolidModel_Anisotropic=ok
+  properties_count=100
+  prop_1=SolidModel
+  prop_2=BendingFormulation
+  prop_3=SolveForOutOfPlaneStrain
+  prop_4=IsotropicOption
+  prop_5=E_mat
+  prop_6=E
+  prop_7=nu_mat
+  prop_8=nu
+  prop_9=K_mat
+  prop_10=K
+  prop_11=G_mat
+  prop_12=G
+  prop_13=lambLame_mat
+  prop_14=lambLame
+  prop_15=muLame_mat
+  prop_16=muLame
+  prop_17=cp_mat
+  prop_18=cp
+  prop_19=cs_mat
+  prop_20=cs
+  prop_21=OrthotropicOption
+  prop_22=TransverseIsotropic
+  prop_23=Evector_mat
+  prop_24=Evector
+  prop_25=nuvector_mat
+  prop_26=nuvector
+  prop_27=Gvector_mat
+  prop_28=Gvector
+  prop_29=GvectorVo_mat
+  prop_30=GvectorVo
+  prop_31=Evect_mat
+  prop_32=Evect
+  prop_33=nuvect_mat
+  prop_34=nuvect
+  prop_35=Gvect1_mat
+  prop_36=Gvect1
+  prop_37=AnisotropicMatrixOption
+  prop_38=AnisotropicOption
+  prop_39=D_mat
+  prop_40=D
+  prop_41=DVo_mat
+  prop_42=DVo
+  prop_43=Dinv_mat
+  prop_44=Dinv
+  prop_45=DinvVo_mat
+  prop_46=DinvVo
+  prop_47=CrystalSystem
+  prop_48=c3cub_mat
+  prop_49=c3cub
+  prop_50=c5hex_mat
+  prop_51=c5hex
+  prop_52=c6tri_mat
+  prop_53=c6tri
+  prop_54=c7tri_mat
+  prop_55=c7tri
+  prop_56=c6tet_mat
+  prop_57=c6tet
+  prop_58=c7tet_mat
+  prop_59=c7tet
+  prop_60=c9ort_mat
+  prop_61=c9ort
+  prop_62=rho_mat
+  prop_63=rho
+  prop_64=minput_strainreferencetemperature_src
+  prop_65=minput_strainreferencetemperature
+  prop_66=editModelInputs
+  prop_67=geometricNonlinearity
+  prop_68=strainDecomposition
+  prop_69=henckyApproximation
+  prop_70=storeDissipation
+  prop_71=minput_temperature_src
+  prop_72=minput_temperature
+  prop_73=minput_pressure_src
+  prop_74=minput_pressure
+  prop_75=minput_electricfield_src
+  prop_76=minput_electricfield
+  prop_77=minput_magneticfield_src
+  prop_78=minput_magneticfield
+  prop_79=minput_magneticfluxdensity_src
+  prop_80=minput_magneticfluxdensity
+  prop_81=minput_velocity_src
+  prop_82=minput_velocity
+  prop_83=minput_frequency_src
+  prop_84=minput_frequency
+  prop_85=minput_stress_src
+  prop_86=minput_stress
+  prop_87=minput_effectiveplasticstrain_src
+  prop_88=minput_effectiveplasticstrain
+  prop_89=minput_concentration_src
+  prop_90=minput_concentration
+  prop_91=minput_numberdensity_src
+  prop_92=minput_numberdensity
+  prop_93=minput_relativehumidity_src
+  prop_94=minput_relativehumidity
+  prop_95=minput_currentdensity_src
+  prop_96=minput_currentdensity
+  prop_97=minput_shiftedmagneticfield_src
+  prop_98=minput_shiftedmagneticfield
+  prop_99=StudyStep
+  prop_100=showPhysicsSymbols
+set_SolidModel_UserDefined_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 材料对称性 (SolidModel)
+	- 所有者: 线弹性材料 1
+	- : "Isotropic", "Orthotropic", "Anisotropic"
+	- 参数: 材料对称性 (SolidModel)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.method.ParamValueUtil.a(SourceFile:253)
+	at com.comsol.model.method.ParamValueUtil.a(SourceFile:225)
+	at com.comsol.model.method.ParamValueUtil.construct(SourceFile:350)
+	at com.comsol.model.method.ParamValueUtil.construct(SourceFile:450)
+	at com.comsol.model.data.primitive.ParamValuePrim.set(SourceFile:189)
+	at com.comsol.model.method.ParameterEntityMethod.set(SourceFile:320)
+	at com.comsol.model.dbmodel.ParameterEntityDb.set(SourceFile:394)
+	at jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source)
+	at java.lang.reflect.Method.invoke(Unknown Source)
+	at com.comsol.bridge.command.b.a(SourceFile:161)
+	at com.comsol.bridge.command.b.run(SourceFile:103)
+	at com.comsol.bridge.command.k.c(SourceFile:227)
+	at com.comsol.bridge.command.k$1.run(SourceFile:100)
+	at com.comsol.util.thread.SuspendableTasks$1.run(SourceFile:111)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.lang.Thread.run(Unknown Source)
+set_SolidModel_LinearElastic_FAILED=Java exception occurred: 
+Exception:
+	com.comsol.util.exceptions.FlException: 参数值无效。
+Messages:
+	参数值无效。
+	- 参数: 材料对称性 (SolidModel)
+	- 所有者: 线弹性材料 1
+	- : "Isotropic", "Orthotropic", "Anisotropic"
+	- 参数: 材料对称性 (SolidModel)
+	- 所有者: 线弹性材料 1
+
+Stack trace:
+at com.comsol.model.method.ParamValueUtil.a(SourceFile:253)
+	at com.comsol.model.method.ParamValueUtil.a(SourceFile:225)
+	at com.comsol.model.method.ParamValueUtil.construct(SourceFile:350)
+	at com.comsol.model.method.ParamValueUtil.construct(SourceFile:450)
+	at com.comsol.model.data.primitive.ParamValuePrim.set(SourceFile:189)
+	at com.comsol.model.method.ParameterEntityMethod.set(SourceFile:320)
+	at com.comsol.model.dbmodel.ParameterEntityDb.set(SourceFile:394)
+	at jdk.internal.reflect.DirectMethodHandleAccessor.invoke(Unknown Source)
+	at java.lang.reflect.Method.invoke(Unknown Source)
+	at com.comsol.bridge.command.b.a(SourceFile:161)
+	at com.comsol.bridge.command.b.run(SourceFile:103)
+	at com.comsol.bridge.command.k.c(SourceFile:227)
+	at com.comsol.bridge.command.k$1.run(SourceFile:100)
+	at com.comsol.util.thread.SuspendableTasks$1.run(SourceFile:111)
+	at java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)
+	at java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)
+	at java.lang.Thread.run(Unknown Source)
+
+=== material library probe (best-effort) ===
+propertyGroup_class=com.comsol.clientapi.impl.MaterialModelListClient
+
+probe_done

@@ -1,0 +1,329 @@
+{
+  "scoring": {
+    "broad": {
+      "sigma_rel": 0.05,
+      "percentile": 20.0
+    },
+    "tight": {
+      "sigma_rel": 0.012,
+      "percentile": 92.0
+    }
+  },
+  "per_freq": [
+    {
+      "f": 55.5857429568,
+      "mode": 3,
+      "w": 0.26298788431329456,
+      "broad": {
+        "enrich": 2.76358810865144,
+        "recall": 0.6212879546212879,
+        "contrast": 3.018714187248367,
+        "composite_recog": 0.8423167784884075
+      },
+      "tight": {
+        "enrich": 2.105764779000543,
+        "recall": 1.0,
+        "contrast": 2.223594153265974,
+        "composite_recog": 0.789696095602114
+      }
+    },
+    {
+      "f": 104.072806087,
+      "mode": 5,
+      "w": 0.18795568549118274,
+      "broad": {
+        "enrich": 2.9468566159970275,
+        "recall": 0.5922589255922589,
+        "contrast": 3.250080848448467,
+        "composite_recog": 0.9435744087408601
+      },
+      "tight": {
+        "enrich": 2.2106294153632593,
+        "recall": 1.0,
+        "contrast": 2.3467799073928077,
+        "composite_recog": 0.8806745432881019
+      }
+    },
+    {
+      "f": 204.181942724,
+      "mode": 8,
+      "w": 0.18620195740539483,
+      "broad": {
+        "enrich": 1.9415340244393169,
+        "recall": 0.3843843843843844,
+        "contrast": 2.033276008622194,
+        "composite_recog": 0.5521212016173882
+      },
+      "tight": {
+        "enrich": 1.7316673030581387,
+        "recall": 1.0,
+        "contrast": 1.794591081003377,
+        "composite_recog": 0.6536524056174312
+      }
+    },
+    {
+      "f": 181.189227737,
+      "mode": 6,
+      "w": 0.13330112077303666,
+      "broad": {
+        "enrich": 2.271106901327099,
+        "recall": 0.5131798465131798,
+        "contrast": 2.4184229700869224,
+        "composite_recog": 0.7573030093464107
+      },
+      "tight": {
+        "enrich": 2.561695676923268,
+        "recall": 1.0,
+        "contrast": 2.768920936325414,
+        "composite_recog": 0.9788399791569927
+      }
+    },
+    {
+      "f": 356.444064958,
+      "mode": 11,
+      "w": 0.1285526514463837,
+      "broad": {
+        "enrich": 1.52821061971839,
+        "recall": 0.2772772772772773,
+        "contrast": 1.5678987644812479,
+        "composite_recog": 0.41116714025730605
+      },
+      "tight": {
+        "enrich": 2.05014534982867,
+        "recall": 1.0,
+        "contrast": 2.1587865726862017,
+        "composite_recog": 0.8003837406733597
+      }
+    },
+    {
+      "f": 201.036362255,
+      "mode": 7,
+      "w": 0.1010007005707076,
+      "broad": {
+        "enrich": 1.5234122768276375,
+        "recall": 0.284617951284618,
+        "contrast": 1.5626071660838763,
+        "composite_recog": 0.36060289658696154
+      },
+      "tight": {
+        "enrich": 2.3597424118811987,
+        "recall": 1.0,
+        "contrast": 2.52422519415102,
+        "composite_recog": 0.8508253216339197
+      }
+    },
+    {
+      "f": 180.0,
+      "mode": "—",
+      "w": 0.0,
+      "broad": {
+        "enrich": 3.141681105560476,
+        "recall": 0.6496496496496497,
+        "contrast": 3.50100244516966,
+        "composite_recog": 1.0031711505947378
+      },
+      "tight": {
+        "enrich": 3.1611799103140235,
+        "recall": 1.0,
+        "contrast": 3.5264033756565487,
+        "composite_recog": 1.1122676856908555
+      }
+    }
+  ],
+  "composite_ranking": [
+    {
+      "name": "BEST_TIGHT_MAX_201-180",
+      "broad": {
+        "enrich": 3.7582559813473857,
+        "recall": 0.656322989656323,
+        "contrast": 4.330693028499846,
+        "composite_recog": 1.0232842927449275
+      },
+      "tight": {
+        "enrich": 4.334200024165461,
+        "recall": 1.0,
+        "contrast": 5.158422012979128,
+        "composite_recog": 1.2227375410625736
+      }
+    },
+    {
+      "name": "BEST_BROAD_RMS_104-204-181-180",
+      "broad": {
+        "enrich": 3.7116267627227058,
+        "recall": 0.9285952619285953,
+        "contrast": 4.265976912992671,
+        "composite_recog": 1.1875793336894347
+      },
+      "tight": {
+        "enrich": 1.2880369866485946,
+        "recall": 1.0,
+        "contrast": 1.3060649574887209,
+        "composite_recog": 0.5397222951688972
+      }
+    },
+    {
+      "name": "just_180+50+87_SUM",
+      "broad": {
+        "enrich": 3.62356363987284,
+        "recall": 0.7674341007674341,
+        "contrast": 4.144657591288766,
+        "composite_recog": 1.0503319561382978
+      },
+      "tight": {
+        "enrich": 2.6573388998676135,
+        "recall": 1.0,
+        "contrast": 2.8866017664633783,
+        "composite_recog": 0.9266290421701295
+      }
+    },
+    {
+      "name": "P1_uniform_RMS",
+      "broad": {
+        "enrich": 2.5721795391668323,
+        "recall": 0.8058058058058059,
+        "contrast": 2.781763456343949,
+        "composite_recog": 0.8261777572811002
+      },
+      "tight": {
+        "enrich": 1.42721964094674,
+        "recall": 1.0,
+        "contrast": 1.4570500772706374,
+        "composite_recog": 0.5182030269426309
+      }
+    },
+    {
+      "name": "P1_uniform_SUM",
+      "broad": {
+        "enrich": 2.5631876826963196,
+        "recall": 0.7967967967967968,
+        "contrast": 2.770747723110421,
+        "composite_recog": 0.8370379995208803
+      },
+      "tight": {
+        "enrich": 1.5266097582648963,
+        "recall": 1.0,
+        "contrast": 1.5661329398890063,
+        "composite_recog": 0.5677325969205578
+      }
+    },
+    {
+      "name": "P1_orig_RMS",
+      "broad": {
+        "enrich": 2.498978227930292,
+        "recall": 0.8218218218218218,
+        "contrast": 2.6923832770592573,
+        "composite_recog": 0.8254362121084468
+      },
+      "tight": {
+        "enrich": 1.3522973089048915,
+        "recall": 1.0,
+        "contrast": 1.375519845989714,
+        "composite_recog": 0.49494706472964733
+      }
+    },
+    {
+      "name": "P1_MAX",
+      "broad": {
+        "enrich": 2.420107281247737,
+        "recall": 0.8405071738405072,
+        "contrast": 2.5968334363971834,
+        "composite_recog": 0.8326144941556911
+      },
+      "tight": {
+        "enrich": 1.34689604893987,
+        "recall": 1.0,
+        "contrast": 1.3696652181244215,
+        "composite_recog": 0.4882177198006524
+      }
+    },
+    {
+      "name": "P1+180_MAX",
+      "broad": {
+        "enrich": 2.420107281247737,
+        "recall": 0.8405071738405072,
+        "contrast": 2.5968334363971834,
+        "composite_recog": 0.832614494155691
+      },
+      "tight": {
+        "enrich": 1.34689604893987,
+        "recall": 1.0,
+        "contrast": 1.3696652181244215,
+        "composite_recog": 0.4882177198006524
+      }
+    },
+    {
+      "name": "P1_enrW_RMS",
+      "broad": {
+        "enrich": 2.384164594539585,
+        "recall": 0.8338338338338338,
+        "contrast": 2.553546531764989,
+        "composite_recog": 0.7934042547103354
+      },
+      "tight": {
+        "enrich": 1.290498815133439,
+        "recall": 1.0,
+        "contrast": 1.308717765618997,
+        "composite_recog": 0.4634738338923446
+      }
+    },
+    {
+      "name": "just_180+62+87_MAX",
+      "broad": {
+        "enrich": 2.2506191035345786,
+        "recall": 0.8805472138805472,
+        "contrast": 2.39410311953215,
+        "composite_recog": 0.8347716636259274
+      },
+      "tight": {
+        "enrich": 1.287222594154669,
+        "recall": 1.0,
+        "contrast": 1.3051874907758145,
+        "composite_recog": 0.4548594253132119
+      }
+    }
+  ],
+  "best_subset_broad": {
+    "freqs": [
+      "104",
+      "204",
+      "181",
+      "180"
+    ],
+    "combo": "RMS",
+    "scores": {
+      "broad": {
+        "enrich": 3.7116267627227058,
+        "recall": 0.9285952619285953,
+        "contrast": 4.265976912992671,
+        "composite_recog": 1.1875793336894347
+      },
+      "tight": {
+        "enrich": 1.2880369866485946,
+        "recall": 1.0,
+        "contrast": 1.3060649574887209,
+        "composite_recog": 0.5397222951688972
+      }
+    }
+  },
+  "best_subset_tight": {
+    "freqs": [
+      "201",
+      "180"
+    ],
+    "combo": "MAX",
+    "scores": {
+      "broad": {
+        "enrich": 3.7582559813473857,
+        "recall": 0.656322989656323,
+        "contrast": 4.330693028499846,
+        "composite_recog": 1.0232842927449275
+      },
+      "tight": {
+        "enrich": 4.334200024165461,
+        "recall": 1.0,
+        "contrast": 5.158422012979128,
+        "composite_recog": 1.2227375410625736
+      }
+    }
+  }
+}

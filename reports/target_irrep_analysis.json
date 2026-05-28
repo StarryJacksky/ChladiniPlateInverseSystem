@@ -1,0 +1,144 @@
+{
+  "d4_character_table": {
+    "A1": {
+      "e": 1,
+      "r1": 1,
+      "r2": 1,
+      "r3": 1,
+      "s_x": 1,
+      "s_y": 1,
+      "s_d": 1,
+      "s_ad": 1
+    },
+    "A2": {
+      "e": 1,
+      "r1": 1,
+      "r2": 1,
+      "r3": 1,
+      "s_x": -1,
+      "s_y": -1,
+      "s_d": -1,
+      "s_ad": -1
+    },
+    "B1": {
+      "e": 1,
+      "r1": -1,
+      "r2": 1,
+      "r3": -1,
+      "s_x": 1,
+      "s_y": 1,
+      "s_d": -1,
+      "s_ad": -1
+    },
+    "B2": {
+      "e": 1,
+      "r1": -1,
+      "r2": 1,
+      "r3": -1,
+      "s_x": -1,
+      "s_y": -1,
+      "s_d": 1,
+      "s_ad": 1
+    },
+    "E": {
+      "e": 2,
+      "r1": 0,
+      "r2": -2,
+      "r3": 0,
+      "s_x": 0,
+      "s_y": 0,
+      "s_d": 0,
+      "s_ad": 0
+    }
+  },
+  "results": [
+    {
+      "name": "IC letters",
+      "target_path": "data/processed_targets/target_binary.npy",
+      "shape": [
+        256,
+        256
+      ],
+      "foreground_pixels": 2997,
+      "irrep_ratios": {
+        "A1": 0.41946112779446115,
+        "A2": 0.014222555889222556,
+        "B1": 0.2566316316316316,
+        "B2": 0.014556222889556223,
+        "E": 0.29512846179512847
+      },
+      "accessible_irreps": [
+        "A1"
+      ],
+      "accessible_energy_fraction": 0.41946112779446115,
+      "achievable_upper_bound_fraction": 0.41946112779446115,
+      "symmetry_type": "D4-incompatible"
+    },
+    {
+      "name": "Diagonal (top-left to bottom-right)",
+      "target_path": "data/processed_targets/target_diagonal.npy",
+      "shape": [
+        256,
+        256
+      ],
+      "foreground_pixels": 3232,
+      "irrep_ratios": {
+        "A1": 0.5173267326732673,
+        "A2": 0.0,
+        "B1": 0.0,
+        "B2": 0.48267326732673266,
+        "E": 0.0
+      },
+      "accessible_irreps": [
+        "A1"
+      ],
+      "accessible_energy_fraction": 0.5173267326732673,
+      "achievable_upper_bound_fraction": 0.5173267326732673,
+      "symmetry_type": "D4-incompatible"
+    },
+    {
+      "name": "X-form (both diagonals)",
+      "target_path": "data/processed_targets/target_xform.npy",
+      "shape": [
+        256,
+        256
+      ],
+      "foreground_pixels": 6352,
+      "irrep_ratios": {
+        "A1": 1.0,
+        "A2": 0.0,
+        "B1": 0.0,
+        "B2": 0.0,
+        "E": 0.0
+      },
+      "accessible_irreps": [
+        "A1"
+      ],
+      "accessible_energy_fraction": 1.0,
+      "achievable_upper_bound_fraction": 1.0,
+      "symmetry_type": "D4-friendly"
+    },
+    {
+      "name": "+ Cross (horizontal + vertical)",
+      "target_path": "data/processed_targets/target_cross.npy",
+      "shape": [
+        256,
+        256
+      ],
+      "foreground_pixels": 4631,
+      "irrep_ratios": {
+        "A1": 0.9557870870222415,
+        "A2": 0.0,
+        "B1": 0.0,
+        "B2": 5.398402072986396e-05,
+        "E": 0.04415892895702872
+      },
+      "accessible_irreps": [
+        "A1"
+      ],
+      "accessible_energy_fraction": 0.9557870870222415,
+      "achievable_upper_bound_fraction": 0.9557870870222415,
+      "symmetry_type": "D4-friendly"
+    }
+  ]
+}

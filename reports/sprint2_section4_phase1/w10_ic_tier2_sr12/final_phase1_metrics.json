@@ -1,0 +1,70 @@
+{
+  "deliverable_best": {
+    "name": "132Hz + 180Hz RMS composite",
+    "drive_freqs": [
+      132.0,
+      180.0
+    ],
+    "drive_weights": [
+      0.5,
+      0.5
+    ],
+    "broad_metric": {
+      "enrichment": 3.820831317011564,
+      "recall": 0.8902235568902236,
+      "contrast": 4.418066115146314,
+      "composite_recog": 1.1994888396439678
+    },
+    "tight_metric": {
+      "enrichment": 2.2213580157811332,
+      "recall": 1.0,
+      "contrast": 2.359457039442653,
+      "composite_recog": 0.8903671150559049
+    }
+  },
+  "deliverable_alt": {
+    "name": "4-freq MAX composite (246+51+87+180)",
+    "drive_freqs": [
+      246.1,
+      50.8,
+      87.3,
+      180.0
+    ],
+    "broad_metric": {
+      "enrichment": 2.746470615019735,
+      "recall": 0.667334000667334,
+      "contrast": 2.9973307589253873,
+      "composite_recog": 0.8473500304350378
+    },
+    "tight_metric": {
+      "enrichment": 3.3959859259552005,
+      "recall": 1.0,
+      "contrast": 3.8364945398398045,
+      "composite_recog": 1.0681501780967753
+    }
+  },
+  "old_baseline": {
+    "name": "OLD top-3 RMS (from 26-freq sweep)",
+    "drive_freqs": [
+      180.0,
+      1000.0,
+      840.0
+    ],
+    "weights": [
+      0.36150279292680504,
+      0.3285669573480828,
+      0.30993024972511213
+    ],
+    "broad_metric": {
+      "enrichment": 1.942195142754152,
+      "recall": 0.42742742742742745,
+      "contrast": 2.034035784264573,
+      "composite_recog": 0.6346733843898594
+    }
+  },
+  "improvement_ratios": {
+    "best_over_old_broad_enrich": 1.967274674363252,
+    "best_over_old_broad_recall": 2.0827478532396566
+  },
+  "honest_qualitative_note": "Phase 1 raises the recognisability METRIC from 1.94x (broad) to 3.82x (broad), with recall improving from 0.43 to 0.89. However the composite still appears as a centrally-concentrated blob with limited fine structure, not a sharp 'IC' rendering. Phase 2 (trust-region H+theta iteration) is needed if visually distinct 'IC' rendering is required."
+}

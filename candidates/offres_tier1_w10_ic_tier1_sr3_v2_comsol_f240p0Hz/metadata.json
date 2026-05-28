@@ -1,0 +1,15 @@
+{
+  "source_w10_candidate": "w10_ic_tier1_sr3_v2",
+  "baseline_candidate": "mosaic_z_candidate_151_calibrated_six_v1",
+  "drive_frequency_hz": 240.0,
+  "stiffness_ratio": 3.0,
+  "shear_ratio": 1.0,
+  "material_mode": "orthotropic_shell",
+  "use_orthotropic_runner": true,
+  "E_iso_pa": 2000000000.0,
+  "E_for_runner_pa": 2000000000.0,
+  "E1_pa": 3464101615.1377544,
+  "E2_pa": 1154700538.3792515,
+  "G12_pa": 740740740.7407407,
+  "G_iso_pa": 740740740.7407407
+}

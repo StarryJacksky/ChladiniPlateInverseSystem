@@ -1,0 +1,40 @@
+{
+  "best": {
+    "target_mean_amplitude": 0.16121810674667358,
+    "target_median_amplitude": 0.1780003309249878,
+    "side_mean_amplitude": 0.16761857271194458,
+    "side_median_amplitude": 0.16625267267227173,
+    "valley_contrast": 1.0397006644875704,
+    "median_valley_contrast": 0.9340020426272875,
+    "contrast_margin": 0.006400465965270996,
+    "median_contrast_margin": -0.011747658252716064,
+    "extra_valley_penalty": 0.10882035738668204,
+    "iou": 0.036176694592536175,
+    "dice": 0.06982726938625505,
+    "layout": 0.17338511064858914,
+    "chamfer": 0.5315577500857293,
+    "final_amplitude_valley_score": 0.09907700600292485,
+    "final_frequency_response_score": 0.09907700600292485,
+    "frequency_hz": 301.1
+  },
+  "rows": [
+    {
+      "target_mean_amplitude": 0.16121810674667358,
+      "target_median_amplitude": 0.1780003309249878,
+      "side_mean_amplitude": 0.16761857271194458,
+      "side_median_amplitude": 0.16625267267227173,
+      "valley_contrast": 1.0397006644875704,
+      "median_valley_contrast": 0.9340020426272875,
+      "contrast_margin": 0.006400465965270996,
+      "median_contrast_margin": -0.011747658252716064,
+      "extra_valley_penalty": 0.10882035738668204,
+      "iou": 0.036176694592536175,
+      "dice": 0.06982726938625505,
+      "layout": 0.17338511064858914,
+      "chamfer": 0.5315577500857293,
+      "final_amplitude_valley_score": 0.09907700600292485,
+      "final_frequency_response_score": 0.09907700600292485,
+      "frequency_hz": 301.1
+    }
+  ]
+}

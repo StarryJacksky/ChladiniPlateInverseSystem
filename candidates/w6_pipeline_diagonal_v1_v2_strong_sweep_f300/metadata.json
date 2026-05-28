@@ -1,0 +1,7 @@
+{
+  "candidate_id": "w6_pipeline_diagonal_v1_v2_strong_sweep_f300",
+  "source_candidate": "w6_pipeline_diagonal_v1_v2_strong",
+  "sweep_frequency_hz": 300.0,
+  "force_sigma_mm": 2.5,
+  "notes": "COMSOL-in-the-loop frequency sweep variant at 300.000 Hz. / COMSOL 闭环频率扫描变体，频率 300.000 Hz。"
+}

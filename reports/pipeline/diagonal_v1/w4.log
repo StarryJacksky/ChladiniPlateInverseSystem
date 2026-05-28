@@ -1,0 +1,5 @@
+W4 manifold optimisation start / 启动 W4 流形优化: candidate=w4_pipeline_diagonal_v1, drive_hz=474.0, components=79, steps=250
+steps=188  best_loss=0.228757@step147  first/last=1.6781 / 0.2347
+manifold dims=79  coeff_l2_norm=12.781  / 流形维度 79，系数 L2 范数 12.781
+output dir: candidates/w4_pipeline_diagonal_v1 / 输出目录：candidates/w4_pipeline_diagonal_v1
+summary json: candidates/w4_pipeline_diagonal_v1/w3_optimization_summary.json / 摘要 JSON: candidates/w4_pipeline_diagonal_v1/w3_optimization_summary.json

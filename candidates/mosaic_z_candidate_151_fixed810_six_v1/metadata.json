@@ -1,0 +1,15 @@
+{
+  "candidate_id": "mosaic_z_candidate_151_fixed810_six_v1",
+  "source_candidate": "candidate_151_0005",
+  "method": "MOSAIC-Z calibrated direct actuator optimisation with fixed 810 Hz drive frequency",
+  "actuator_count": 6,
+  "modal_scale_csv": "reports/mosaic_z/modal_calibration/real_comsol_v1/modal_participation_scale.csv",
+  "predicted_metrics": {
+    "iou": 0.23635235732009927,
+    "dice": 0.38233818364274963,
+    "layout": 0.6849529576458465,
+    "valley_area": 0.1116015625
+  },
+  "source_result": "reports/mosaic_z/direct_actuator/candidate_151_six_160_fixed810_v1/direct_forced_response_summary.json",
+  "notes": "Actuator layout re-optimised after real COMSOL frequency scanning identified 810 Hz as the current best drive frequency."
+}

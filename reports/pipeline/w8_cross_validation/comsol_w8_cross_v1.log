@@ -1,0 +1,25 @@
+Wrote frequency-domain validation outputs to reports/frequency_domain_validation/pipeline_w8_cross_validation_w8_cross_v1. / 已写出频域验证输出到 reports/frequency_domain_validation/pipeline_w8_cross_validation_w8_cross_v1。
+{
+  "best": {},
+  "rows": [],
+  "combined_frequency_export": "data/comsol_frequency_exports/pipeline_w8_cross_validation_w8_cross_v1/frequency_response.csv",
+  "frequency_domain_validation_report": "reports/frequency_domain_validation/pipeline_w8_cross_validation_w8_cross_v1/frequency_domain_validation_summary.md",
+  "amplitude_valley_best": {
+    "target_mean_amplitude": 0.013080782257020473,
+    "target_median_amplitude": 0.008304809220135212,
+    "side_mean_amplitude": 0.025327691808342934,
+    "side_median_amplitude": 0.01135787833482027,
+    "valley_contrast": 1.9362520765720663,
+    "median_valley_contrast": 1.3676266406316497,
+    "contrast_margin": 0.01224690955132246,
+    "median_contrast_margin": 0.0030530691146850586,
+    "extra_valley_penalty": 0.11588048934936523,
+    "iou": 0.04044132082139071,
+    "dice": 0.07773878259556964,
+    "layout": 0.33117202023335957,
+    "chamfer": 0.6031401246582523,
+    "final_amplitude_valley_score": 0.2120236694154089,
+    "final_frequency_response_score": 0.2120236694154089,
+    "frequency_hz": 765.03
+  }
+}

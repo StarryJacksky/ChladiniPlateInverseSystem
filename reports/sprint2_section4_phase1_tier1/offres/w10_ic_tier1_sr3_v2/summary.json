@@ -1,0 +1,71 @@
+{
+  "candidate": "w10_ic_tier1_sr3_v2",
+  "baseline_candidate": "mosaic_z_candidate_151_calibrated_six_v1",
+  "stiffness_ratio": 3.0,
+  "shear_ratio": 1.0,
+  "material_mode": "orthotropic_shell",
+  "material_summary": {
+    "E_iso_pa": 2000000000.0,
+    "E_for_runner_pa": 2000000000.0,
+    "E1_pa": 3464101615.1377544,
+    "E2_pa": 1154700538.3792515,
+    "G12_pa": 740740740.7407407,
+    "G_iso_pa": 740740740.7407407,
+    "stiffness_ratio": 3.0,
+    "shear_ratio": 1.0,
+    "material_mode": "orthotropic_shell"
+  },
+  "image_size": 256,
+  "frequencies_hz": [
+    140.0,
+    165.0,
+    240.0,
+    270.0
+  ],
+  "weights": [
+    4.884076700587621e-06,
+    4.884076700587621e-06,
+    4.884076700587621e-06,
+    4.884076700587621e-06
+  ],
+  "variants": [
+    {
+      "variant_id": "offres_tier1_w10_ic_tier1_sr3_v2_comsol_f140p0Hz",
+      "frequency_hz": 140.0,
+      "weight": 4.884076700587621e-06,
+      "response_csv": "data/comsol_exports/offres_tier1_w10_ic_tier1_sr3_v2_comsol_f140p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 1.54405489469e-06
+    },
+    {
+      "variant_id": "offres_tier1_w10_ic_tier1_sr3_v2_comsol_f165p0Hz",
+      "frequency_hz": 165.0,
+      "weight": 4.884076700587621e-06,
+      "response_csv": "data/comsol_exports/offres_tier1_w10_ic_tier1_sr3_v2_comsol_f165p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 1.42316904695e-06
+    },
+    {
+      "variant_id": "offres_tier1_w10_ic_tier1_sr3_v2_comsol_f240p0Hz",
+      "frequency_hz": 240.0,
+      "weight": 4.884076700587621e-06,
+      "response_csv": "data/comsol_exports/offres_tier1_w10_ic_tier1_sr3_v2_comsol_f240p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 5.67720972126e-06
+    },
+    {
+      "variant_id": "offres_tier1_w10_ic_tier1_sr3_v2_comsol_f270p0Hz",
+      "frequency_hz": 270.0,
+      "weight": 4.884076700587621e-06,
+      "response_csv": "data/comsol_exports/offres_tier1_w10_ic_tier1_sr3_v2_comsol_f270p0Hz/forced_response/forced_response.csv",
+      "field_max_abs": 7.45109371436e-07
+    }
+  ],
+  "metrics": {
+    "enrichment_factor": 1.2420222910149998,
+    "coverage_recall": 0.27627627627627627,
+    "gaussian_contrast": 1.2565965594812671,
+    "directional_alignment": 0.20831639391838355,
+    "composite_recognisability": 0.23609227929054566,
+    "powder_max": 1.0,
+    "powder_mean": 0.13413272740764903
+  },
+  "completed_at": "2026-05-28T00:45:30"
+}

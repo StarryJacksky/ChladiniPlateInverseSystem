@@ -1,0 +1,19 @@
+{
+  "response_csv": "data/comsol_exports/mosaic_z_operator_mass_pad_seed_v1/forced_response/forced_response.csv",
+  "image_size": 160,
+  "epsilon": 0.05,
+  "center_radius_px": 8,
+  "stats": {
+    "sample_count": 1027,
+    "max_abs": 2.16430616608e-09,
+    "mean_abs": 4.4783012552063356e-10,
+    "nonzero_count": 987
+  },
+  "metrics": {
+    "iou": 0.1843137254901961,
+    "dice": 0.31125827814569534,
+    "chamfer": 0.8073159992602719,
+    "layout": 0.5349646655506045,
+    "valley_area": 0.061640625
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "candidate_kind": "w10_tier2_sr12",
+  "label": "W10 tier2 (Continuous CF sr=12.0)",
+  "drive_frequency_hz": 398.58407648522774,
+  "stiffness_ratio_design": 12.0,
+  "shear_ratio_design": 0.55,
+  "actuator_pattern": "single_center_uniform",
+  "material_mode": "isotropic_baseline"
+}

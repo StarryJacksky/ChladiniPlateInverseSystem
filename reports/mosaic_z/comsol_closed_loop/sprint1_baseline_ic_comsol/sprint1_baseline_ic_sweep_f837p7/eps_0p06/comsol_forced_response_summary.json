@@ -1,0 +1,19 @@
+{
+  "response_csv": "data/comsol_exports/sprint1_baseline_ic_sweep_f837p7/forced_response/forced_response.csv",
+  "image_size": 160,
+  "epsilon": 0.06,
+  "center_radius_px": 8,
+  "stats": {
+    "sample_count": 1027,
+    "max_abs": 1.27183086716e-12,
+    "mean_abs": 1.3042191133007364e-13,
+    "nonzero_count": 1014
+  },
+  "metrics": {
+    "iou": 0.03791650708540789,
+    "dice": 0.07306273062730627,
+    "chamfer": 0.5734662791962576,
+    "layout": 0.21746347065386631,
+    "valley_area": 0.484765625
+  }
+}

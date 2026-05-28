@@ -1,0 +1,33 @@
+{
+  "candidate_id": "mosaic_z_operator_groove_seed_v1",
+  "source_candidate": "mosaic_z_candidate_151_calibrated_six_f810",
+  "materialized_topology_csv": "reports/mosaic_z/topology_seed_groove.csv",
+  "primitive_count": 4,
+  "primitive_application": [
+    {
+      "id": "1",
+      "type": "groove",
+      "changed_cells": 3,
+      "depth_or_height_mm": 0.5
+    },
+    {
+      "id": "2",
+      "type": "groove",
+      "changed_cells": 1,
+      "depth_or_height_mm": 0.5
+    },
+    {
+      "id": "3",
+      "type": "groove",
+      "changed_cells": 1,
+      "depth_or_height_mm": 0.5
+    },
+    {
+      "id": "4",
+      "type": "groove",
+      "changed_cells": 1,
+      "depth_or_height_mm": 0.5
+    }
+  ],
+  "operator_sculpting_mode": "rasterized_thickness_density_loss"
+}

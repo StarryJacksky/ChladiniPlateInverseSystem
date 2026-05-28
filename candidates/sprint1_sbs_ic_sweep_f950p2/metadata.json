@@ -1,0 +1,7 @@
+{
+  "candidate_id": "sprint1_sbs_ic_sweep_f950p2",
+  "source_candidate": "w8_ic_sprint1_sbs",
+  "sweep_frequency_hz": 950.2,
+  "force_sigma_mm": 2.5,
+  "notes": "COMSOL-in-the-loop frequency sweep variant at 950.200 Hz. / COMSOL 闭环频率扫描变体，频率 950.200 Hz。"
+}

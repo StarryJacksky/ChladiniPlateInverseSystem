@@ -1,0 +1,190 @@
+{
+  "best_loss": 1.328106103665956,
+  "best_step": 4,
+  "executed_steps": 5,
+  "drive_frequency_hz": 636.546555,
+  "damping_ratio": 0.02,
+  "proxy_grid_size": 25,
+  "num_modes_tracked": 8,
+  "cluster_weight": 0.5,
+  "amplitude_weight": 1.0,
+  "smoothness_weight": 2.0,
+  "smoothness_max_diff_mm": 1.0,
+  "h_min_mm": 0.6,
+  "h_max_mm": 2.0,
+  "final_max_row_neighbour_diff_mm": 0.9591376879939792,
+  "final_max_col_neighbour_diff_mm": 0.838715706586221,
+  "quantised_levels_mm": [
+    0.6,
+    0.8,
+    0.9,
+    1.0,
+    1.3,
+    1.4,
+    1.8,
+    2.0
+  ],
+  "search_mode": "manifold_pca",
+  "manifold": {
+    "num_components": 79,
+    "sample_count": 589
+  },
+  "trace": {
+    "total_loss": [
+      2.243575371350413,
+      1.8228142194704011,
+      1.5426270683360641,
+      1.4123832216419439,
+      1.328106103665956
+    ],
+    "cluster_loss": [
+      0.5470775040357756,
+      0.5430469597840893,
+      0.5496409979560647,
+      0.5579623940008326,
+      0.5660267425951947
+    ],
+    "amplitude_loss": [
+      1.9700366193325252,
+      1.5512507396322062,
+      1.2676835470340837,
+      1.131664548175302,
+      1.0394903105769449
+    ],
+    "smoothness_loss": [
+      0.0,
+      0.0,
+      0.0,
+      0.0007472916087070263,
+      0.002608257337419833
+    ],
+    "omega_squared": [
+      15996319.905329484,
+      15996319.905329484,
+      15996319.905329484,
+      15996319.905329484,
+      15996319.905329484
+    ],
+    "top1_mode_index": [
+      5,
+      5,
+      5,
+      5,
+      5
+    ],
+    "eigenvalues_history": [
+      [
+        1277542.6056103827,
+        1366471.410836329,
+        1414088.3280503624,
+        2067632.9511950766,
+        3359951.8096397645,
+        5869065.107586726,
+        5918003.552217074,
+        8458980.397175882
+      ],
+      [
+        1308731.0071203518,
+        1363083.0935529517,
+        1525648.2379506624,
+        2090643.053846337,
+        3457292.9842506447,
+        5837034.992507391,
+        6027948.220234485,
+        8484496.030579293
+      ],
+      [
+        1191077.10602073,
+        1352979.6687811245,
+        1601919.9969592993,
+        2074839.7393043202,
+        3409269.7238234733,
+        5576327.2964958735,
+        5963119.068416134,
+        8470934.065738156
+      ],
+      [
+        1121376.2455206662,
+        1326906.4002143855,
+        1653936.0173837251,
+        2074446.062344614,
+        3314232.6090711984,
+        5297985.228454083,
+        5862908.693332257,
+        8416876.399044158
+      ],
+      [
+        1081868.850669042,
+        1287165.5036402284,
+        1690956.2222672263,
+        2060666.5184646416,
+        3247223.329127546,
+        5102978.554949326,
+        5799632.197335127,
+        8142365.944850979
+      ]
+    ]
+  },
+  "final_eigenvalues_tracked": [
+    1277542.6056103827,
+    1366471.410836329,
+    1414088.3280503624,
+    2067632.9511950766,
+    3359951.8096397645,
+    5869065.107586726,
+    5918003.552217074,
+    8458980.397175882
+  ],
+  "final_residuals_omega2": [
+    14914451.054660443,
+    14709154.401689256,
+    14305363.68306226,
+    13935653.386864843,
+    12749096.576201938,
+    10893341.350380158,
+    10196687.707994357,
+    7853953.960478505
+  ],
+  "verdict_used": {
+    "verdict": "requires_topology",
+    "metrics": {
+      "image_size": 256,
+      "plate_size_mm": 150.0,
+      "grid_size": 15,
+      "cell_size_mm": 10.0,
+      "mm_per_pixel": 0.5859375,
+      "foreground_ratio": 0.0457305908203125,
+      "n_connected_components": 3,
+      "n_closed_loops": 0,
+      "n_skeleton_endpoints": 9,
+      "courant_min_mode_index": 3,
+      "stroke_min_gap_mm": 13.4765625,
+      "stroke_min_feature_mm": 1.6572815184059708,
+      "d4_symmetry_mismatch": 0.7626681547636884,
+      "estimated_min_frequency_hz": 212.1821849005727,
+      "near_clamp_ratio": 0.04537871204537871,
+      "target_kind": "open_stroke_pattern"
+    },
+    "thresholds": {
+      "infeasible_courant_min_mode_index": 60,
+      "infeasible_stroke_min_gap_mm": 6.0,
+      "requires_topology_courant_min_mode_index": 30,
+      "requires_topology_stroke_min_gap_mm": 7.0,
+      "requires_topology_d4_symmetry_mismatch": 0.55,
+      "borderline_courant_min_mode_index": 18,
+      "borderline_stroke_min_gap_mm": 10.0,
+      "borderline_d4_symmetry_mismatch": 0.35,
+      "filled_target_foreground_ratio": 0.18,
+      "thin_stroke_feature_mm": 8.0,
+      "clamp_buffer_mm": 4.0,
+      "max_endpoints_easy": 0
+    },
+    "diagnosis_notes": [
+      "D4 symmetry mismatch 0.76 exceeds 0.55; square plate natural modes resist this asymmetry. / D4 对称偏差 0.76 超过 0.55，方板自然模态会抵抗这种不对称。"
+    ],
+    "advisory": [
+      "Single passive plate at 15x15 likely insufficient. Document infeasibility for the user, then run W5 to report lambda_max under W2 amplitude-valley loss. / 单块 15x15 被动板很可能无法实现；向用户说明，并通过 W5 在 W2 振幅谷损失下报告 lambda_max。"
+    ],
+    "target_path": "data/processed_targets/target_binary.npy"
+  }
+}

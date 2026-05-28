@@ -1,0 +1,15 @@
+Verdict: requires_topology / 判定：requires_topology
+Target kind: open_stroke_pattern / 目标类别：open_stroke_pattern
+Foreground ratio: 0.046 / 前景占比：0.046
+Connected components: 3 / 连通分量：3
+Closed loops: 0 / 闭合环数：0
+Skeleton endpoints: 9 / 骨架端点：9
+Courant min mode index: 3 / Courant 下界 mode：3
+Stroke min feature: 1.66 mm / 最小笔画宽度：1.66 mm
+Stroke min gap: 13.48 mm / 最小笔画间隙：13.48 mm
+D4 mismatch: 0.763 / D4 对称偏差：0.763
+Near-clamp ratio: 0.045 / 贴夹持区比例：0.045
+Estimated min frequency: 212.2 Hz / 估算所需最低频率：212.2 Hz
+D4 symmetry mismatch 0.76 exceeds 0.55; square plate natural modes resist this asymmetry. / D4 对称偏差 0.76 超过 0.55，方板自然模态会抵抗这种不对称。
+Single passive plate at 15x15 likely insufficient. Document infeasibility for the user, then run W5 to report lambda_max under W2 amplitude-valley loss. / 单块 15x15 被动板很可能无法实现；向用户说明，并通过 W5 在 W2 振幅谷损失下报告 lambda_max。
+Report: /Users/apple/Documents/ChladiniPlateProject/reports/target_realizability_w8_ic_validation.json / 报告：/Users/apple/Documents/ChladiniPlateProject/reports/target_realizability_w8_ic_validation.json

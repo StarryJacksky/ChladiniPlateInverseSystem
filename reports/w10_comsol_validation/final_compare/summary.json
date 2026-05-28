@@ -1,0 +1,135 @@
+{
+  "completed_at": "2026-05-27T21:08:01",
+  "image_size": 256,
+  "material_mode": "isotropic_baseline (E=2e9 Pa)",
+  "actuator_pattern": "single_center_uniform (wide Gaussian)",
+  "note": "orthotropic_shell_attempt_logged_in_comsol_templates/apply_orthotropic_shell.m; full Shell-physics orthotropic is Sprint 2 §3.",
+  "results": {
+    "baseline_w8": {
+      "label": "W8 baseline (isotropic optim, calibrated 6-actuator)",
+      "frequencies_hz": [
+        796.96
+      ],
+      "weights": [
+        1.0
+      ],
+      "stiffness_ratio_design": 1.0,
+      "shear_ratio_design": 1.0,
+      "per_freq": [
+        {
+          "variant_id": "final_compare_baseline_w8_f797p0Hz",
+          "frequency_hz": 796.96,
+          "weight": 1.0,
+          "field_max_abs": 1.2253139108e-07,
+          "response_csv": "data/comsol_exports/final_compare_baseline_w8_f797p0Hz/forced_response/forced_response.csv"
+        }
+      ],
+      "metrics": {
+        "enrichment_factor": 1.7465602931058855,
+        "coverage_recall": 0.3780447113780447,
+        "gaussian_contrast": 1.8113650034255304,
+        "directional_alignment": 0.7374890578332043,
+        "composite_recognisability": 0.5290377832817943,
+        "powder_max": 1.0,
+        "powder_mean": 0.12511593897869783,
+        "target_pixels": 2997
+      }
+    },
+    "w10_tier1_sr3": {
+      "label": "W10 tier1 (CF-PETG sr=3.0)",
+      "frequencies_hz": [
+        351.0731521672577,
+        495.2724806571861,
+        643.7706049096515
+      ],
+      "weights": [
+        0.1749848393598548,
+        0.4837264802803969,
+        0.34094418050148856
+      ],
+      "stiffness_ratio_design": 3.0,
+      "shear_ratio_design": 0.85,
+      "per_freq": [
+        {
+          "variant_id": "final_compare_w10_tier1_sr3_f351p1Hz",
+          "frequency_hz": 351.0731521672577,
+          "weight": 0.1749848393598548,
+          "field_max_abs": 2.86430052913e-07,
+          "response_csv": "data/comsol_exports/final_compare_w10_tier1_sr3_f351p1Hz/forced_response/forced_response.csv"
+        },
+        {
+          "variant_id": "final_compare_w10_tier1_sr3_f495p3Hz",
+          "frequency_hz": 495.2724806571861,
+          "weight": 0.4837264802803969,
+          "field_max_abs": 9.35087532609e-07,
+          "response_csv": "data/comsol_exports/final_compare_w10_tier1_sr3_f495p3Hz/forced_response/forced_response.csv"
+        },
+        {
+          "variant_id": "final_compare_w10_tier1_sr3_f643p8Hz",
+          "frequency_hz": 643.7706049096515,
+          "weight": 0.34094418050148856,
+          "field_max_abs": 1.63377983171e-07,
+          "response_csv": "data/comsol_exports/final_compare_w10_tier1_sr3_f643p8Hz/forced_response/forced_response.csv"
+        }
+      ],
+      "metrics": {
+        "enrichment_factor": 0.7173883037753757,
+        "coverage_recall": 0.08541875208541876,
+        "gaussian_contrast": 0.7078022773868786,
+        "directional_alignment": 0.632381464126879,
+        "composite_recognisability": 0.08886377203831353,
+        "powder_max": 1.0,
+        "powder_mean": 0.04438415628825239,
+        "target_pixels": 2997
+      }
+    },
+    "w10_tier2_sr12": {
+      "label": "W10 tier2 (Continuous CF sr=12.0)",
+      "frequencies_hz": [
+        398.58407648522774,
+        573.5349956693959,
+        759.7024489217872
+      ],
+      "weights": [
+        0.9987651778417916,
+        0.0005611709322268933,
+        0.00041540029127504457
+      ],
+      "stiffness_ratio_design": 12.0,
+      "shear_ratio_design": 0.55,
+      "per_freq": [
+        {
+          "variant_id": "final_compare_w10_tier2_sr12_f398p6Hz",
+          "frequency_hz": 398.58407648522774,
+          "weight": 0.9987651778417916,
+          "field_max_abs": 1.81544036936e-07,
+          "response_csv": "data/comsol_exports/final_compare_w10_tier2_sr12_f398p6Hz/forced_response/forced_response.csv"
+        },
+        {
+          "variant_id": "final_compare_w10_tier2_sr12_f573p5Hz",
+          "frequency_hz": 573.5349956693959,
+          "weight": 0.0005611709322268933,
+          "field_max_abs": 2.12698954078e-07,
+          "response_csv": "data/comsol_exports/final_compare_w10_tier2_sr12_f573p5Hz/forced_response/forced_response.csv"
+        },
+        {
+          "variant_id": "final_compare_w10_tier2_sr12_f759p7Hz",
+          "frequency_hz": 759.7024489217872,
+          "weight": 0.00041540029127504457,
+          "field_max_abs": 3.62272194287e-08,
+          "response_csv": "data/comsol_exports/final_compare_w10_tier2_sr12_f759p7Hz/forced_response/forced_response.csv"
+        }
+      ],
+      "metrics": {
+        "enrichment_factor": 2.41109026314646,
+        "coverage_recall": 0.2702702702702703,
+        "gaussian_contrast": 2.5859589783528905,
+        "directional_alignment": 0.9475022838615378,
+        "composite_recognisability": 0.7178822075380983,
+        "powder_max": 1.0,
+        "powder_mean": 0.05461970513630299,
+        "target_pixels": 2997
+      }
+    }
+  }
+}
