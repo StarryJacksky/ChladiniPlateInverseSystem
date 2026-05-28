@@ -43,6 +43,10 @@ end
 
 model = mphload(model_path);
 
+if ~exist(export_dir, 'dir')
+    mkdir(export_dir);
+end
+
 parameter_file = fullfile(candidate_dir, 'comsol_parameters.csv');
 parameters = readtable(parameter_file, 'TextType', 'string', 'VariableNamingRule', 'preserve');
 parameter_names = string(parameters{:, 1});
@@ -90,6 +94,57 @@ if exist(design_variable_file, 'file')
     end
 end
 
+operator_log_path = fullfile(export_dir, 'operator_contract_summary.txt');
+operator_log = fopen(operator_log_path, 'w');
+fprintf(operator_log, 'MOSAIC-Z operator contract summary\n');
+
+support_file = fullfile(candidate_dir, 'support_parameters.csv');
+if exist(support_file, 'file')
+    support_parameters = readtable(support_file, 'TextType', 'string', 'VariableNamingRule', 'preserve');
+    if height(support_parameters) >= 1
+        model.param.set('support_center_x', sprintf('%.12g[mm]', support_parameters.center_x_mm(1)));
+        model.param.set('support_center_y', sprintf('%.12g[mm]', support_parameters.center_y_mm(1)));
+        model.param.set('support_clamp_radius', sprintf('%.12g[mm]', support_parameters.clamp_radius_mm(1)));
+        fprintf(operator_log, 'support_center_x_mm=%.12g\n', support_parameters.center_x_mm(1));
+        fprintf(operator_log, 'support_center_y_mm=%.12g\n', support_parameters.center_y_mm(1));
+        fprintf(operator_log, 'support_clamp_radius_mm=%.12g\n', support_parameters.clamp_radius_mm(1));
+    end
+end
+
+frequency_file = fullfile(candidate_dir, 'frequency_parameters.csv');
+if exist(frequency_file, 'file')
+    frequency_parameters = readtable(frequency_file, 'TextType', 'string', 'VariableNamingRule', 'preserve');
+    if height(frequency_parameters) >= 1
+        model.param.set('drive_frequency_hz', sprintf('%.12g[Hz]', frequency_parameters.drive_frequency_hz(1)));
+        model.param.set('modal_damping_ratio', sprintf('%.12g', frequency_parameters.damping_ratio(1)));
+        fprintf(operator_log, 'drive_frequency_hz=%.12g\n', frequency_parameters.drive_frequency_hz(1));
+        fprintf(operator_log, 'modal_damping_ratio=%.12g\n', frequency_parameters.damping_ratio(1));
+    end
+end
+
+actuator_file = fullfile(candidate_dir, 'actuator_parameters.csv');
+if exist(actuator_file, 'file')
+    actuator_parameters = readtable(actuator_file, 'TextType', 'string', 'VariableNamingRule', 'preserve');
+    fprintf(operator_log, 'actuator_count=%d\n', height(actuator_parameters));
+    for row = 1:height(actuator_parameters)
+        actuator_id = actuator_parameters.id(row);
+        model.param.set(sprintf('act%d_x', actuator_id), sprintf('%.12g[mm]', actuator_parameters.x_mm(row)));
+        model.param.set(sprintf('act%d_y', actuator_id), sprintf('%.12g[mm]', actuator_parameters.y_mm(row)));
+        model.param.set(sprintf('act%d_amplitude', actuator_id), sprintf('%.12g', actuator_parameters.amplitude(row)));
+        model.param.set(sprintf('act%d_phase_deg', actuator_id), sprintf('%.12g[deg]', actuator_parameters.phase_deg(row)));
+        fprintf(operator_log, 'actuator_%d=%.12g,%.12g,%.12g,%.12g\n', actuator_id, actuator_parameters.x_mm(row), actuator_parameters.y_mm(row), actuator_parameters.amplitude(row), actuator_parameters.phase_deg(row));
+    end
+end
+
+topology_file = fullfile(candidate_dir, 'topology_primitives.csv');
+if exist(topology_file, 'file')
+    topology_primitives = readtable(topology_file, 'TextType', 'string', 'VariableNamingRule', 'preserve');
+    model.param.set('topology_primitive_count', sprintf('%d', height(topology_primitives)));
+    fprintf(operator_log, 'topology_primitive_count=%d\n', height(topology_primitives));
+end
+
+fclose(operator_log);
+
 try
     model.study('std1').feature('eig').set('neigs', num2str(num_modes));
 catch err
@@ -97,10 +152,6 @@ catch err
 end
 
 model.study('std1').run;
-
-if ~exist(export_dir, 'dir')
-    mkdir(export_dir);
-end
 
 dataset_tag = 'dset1';
 

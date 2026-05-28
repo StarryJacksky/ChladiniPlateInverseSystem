@@ -2,6 +2,8 @@
 
 [语言](./remaining_work_plan.md): [双语](./remaining_work_plan.md) | 中文 | [English](./remaining_work_plan.en.md)
 
+> 算法主线规划见 [`algorithm_breakthrough_plan.zh-CN.md`](./algorithm_breakthrough_plan.zh-CN.md)。本文聚焦"维护性 / 等待外部输入"两类任务，不再包含算法突破工作流。
+
 本文把 Codex 现在还能继续做的任务，与需要真实材料、COMSOL 或实体测试数据后才能做的任务分开。
 
 ## A. 现在可以独立继续做

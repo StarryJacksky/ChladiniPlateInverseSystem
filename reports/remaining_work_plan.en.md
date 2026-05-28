@@ -2,6 +2,8 @@
 
 [Language](./remaining_work_plan.md): [Bilingual](./remaining_work_plan.md) | [中文](./remaining_work_plan.zh-CN.md) | English
 
+> Algorithm-breakthrough roadmap lives in [`algorithm_breakthrough_plan.en.md`](./algorithm_breakthrough_plan.en.md). This document covers only maintenance work and tasks waiting for external inputs.
+
 This document separates tasks Codex can continue now from tasks blocked by real material, COMSOL, or physical-test data.
 
 ## A. Can Continue Independently

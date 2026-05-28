@@ -34,6 +34,8 @@ MATERIAL_LIMITS = {  # 定义前端材料参数范围 / Define frontend material
     "thermal_conductivity_w_mk": (1.0e-4, 5000.0),  # 导热系数范围 / Thermal-conductivity range
     "heat_capacity_j_kgk": (1.0, 10000.0),  # 热容范围 / Heat-capacity range
     "thermal_expansion_1_k": (0.0, 1.0e-3),  # 热膨胀范围 / Thermal-expansion range
+    "stiffness_ratio": (1.0, 4.0),  # 各向异性比 E_||/E_⊥ 范围 / Stiffness anisotropy ratio range
+    "shear_ratio": (0.3, 3.0),  # 剪切模量相对比范围 / Shear modulus ratio range
 }  # 结束材料参数范围 / End material parameter ranges
 SCORING_LIMITS = {  # 定义评分参数范围 / Define scoring parameter ranges
     "roughness_weight": (0.0, 10.0),  # 粗糙度权重范围 / Roughness-weight range
@@ -138,6 +140,186 @@ def run_workflow_thread(config: dict, payload: dict) -> None:  # 后台运行自
         update_and_persist_workflow_state(config, event={"stage": "error", "message": str(exc)}, running=False, cancel_requested=False, stage="error", message=str(exc), error=str(exc))  # 写入错误状态 / Store error state
 
 
+def discover_candidate_mph_files(candidate_id: str) -> list[dict]:  # 收集候选对应的 .mph 文件 / Collect .mph files for a candidate
+    """Find every .mph file related to a given candidate id under data/comsol_exports/."""
+    root = project_root() / "data" / "comsol_exports"  # COMSOL exports root / 导出根目录
+    if not root.exists():  # 不存在直接空 / Empty if missing
+        return []  # / Empty
+    if not candidate_id or any(ch in candidate_id for ch in "/\\:*?<>|\""):  # 防注入 / Sanitize
+        raise ValueError("Invalid candidate id. / 候选编号非法。")  # / Reject
+    candidates: list[dict] = []  # 结果列表 / Result list
+    # Direct match (candidate_id is itself an export dir): / 候选本身是导出目录
+    direct_dir = root / candidate_id  # / Direct dir
+    if direct_dir.is_dir():  # / If dir
+        for mph in sorted(direct_dir.rglob("*.mph")):  # 递归 .mph / Recurse for .mph
+            if mph.name.startswith("debug_") or "/recovery/" in str(mph):  # 跳过 debug / recovery / Skip debug & recovery
+                continue  # / Skip
+            kind = "eigenfrequency" if "eigenfrequency" in mph.parent.name else ("forced_response" if "forced_response" in mph.parent.name else "other")  # 类型 / Kind
+            candidates.append({  # 加入 / Append
+                "path": str(mph),  # 绝对路径 / Absolute path
+                "relative_path": str(mph.relative_to(project_root())),  # 相对项目根 / Relative to project root
+                "kind": kind,  # 模型类型 / Model kind
+                "label": f"{candidate_id} — {kind}",  # 展示名 / Display label
+                "variant_dir": direct_dir.name,  # / Variant dir name
+                "size_mb": round(mph.stat().st_size / 1024.0 / 1024.0, 2),  # 大小 MB / Size MB
+            })
+    # Sibling variant dirs that start with the candidate id or contain it: / 同候选派生的 variant
+    for variant_dir in sorted(root.iterdir()):  # 遍历同级 / Iterate siblings
+        if not variant_dir.is_dir():  # / Skip files
+            continue  # / Skip
+        if variant_dir.name == candidate_id:  # 已处理 / Already handled
+            continue  # / Skip
+        if candidate_id not in variant_dir.name:  # 不相关 / Unrelated
+            continue  # / Skip
+        for mph in sorted(variant_dir.rglob("*.mph")):  # 递归 / Recurse
+            if mph.name.startswith("debug_") or "/recovery/" in str(mph):  # / Skip
+                continue  # / Skip
+            kind = "eigenfrequency" if "eigenfrequency" in mph.parent.name else ("forced_response" if "forced_response" in mph.parent.name else "other")  # / Kind
+            # Extract a friendly suffix like "f165Hz" or "eig30" from variant dir name: / 友好后缀
+            suffix = variant_dir.name.replace(candidate_id, "").strip("_- ")  # / Suffix
+            candidates.append({  # / Append
+                "path": str(mph),  # / Path
+                "relative_path": str(mph.relative_to(project_root())),  # / Relative
+                "kind": kind,  # / Kind
+                "label": f"{kind} — {suffix or variant_dir.name}",  # / Display label
+                "variant_dir": variant_dir.name,  # / Variant dir
+                "size_mb": round(mph.stat().st_size / 1024.0 / 1024.0, 2),  # / Size
+            })
+    return candidates  # 返回列表 / Return list
+
+
+def open_mph_in_comsol(config: dict, mph_path: str) -> dict:  # 用 COMSOL 打开 .mph / Launch COMSOL with .mph
+    """Spawn COMSOL Multiphysics to open a saved .mph; returns spawn metadata."""
+    project = project_root()  # 项目根 / Project root
+    resolved = (project / mph_path).resolve() if not Path(mph_path).is_absolute() else Path(mph_path).resolve()  # 解析路径 / Resolve path
+    if not resolved.exists():  # 文件不存在 / Missing file
+        raise FileNotFoundError(f"MPH file not found: {resolved} / 未找到 MPH 文件：{resolved}")  # / Missing
+    if resolved.suffix.lower() != ".mph":  # 后缀检查 / Suffix check
+        raise ValueError("Only .mph files can be opened. / 仅支持打开 .mph 文件。")  # / Bad suffix
+    try:  # 安全检查：限制只能打开项目目录下的 mph / Confine to project dir
+        resolved.relative_to(project)  # / Confined
+    except ValueError:  # / Outside
+        raise ValueError("Refusing to open files outside the project directory. / 拒绝打开项目目录之外的文件。")  # / Refuse
+    import subprocess  # 子进程 / Subprocess
+    import platform  # 平台 / Platform
+    system = platform.system()  # 平台名 / Platform name
+    comsol_command = str(config.get("comsol", {}).get("comsol_command_path", "")).strip()  # 命令行入口 / CLI entry
+    # 统一用 `comsol -open <file>`：根据 `comsol --help` 这是把 mph 加载进 Desktop GUI 的官方写法 / Per `comsol --help` this is the official desktop-open flag
+    # 之前 `open -a "COMSOL Multiphysics.app" file` 只会启动空 GUI，COMSOL.app 不接受 LSItemContentTypes 文档参数 / `open -a` route doesn't pass docs to COMSOL.app
+    if not comsol_command:  # macOS 上兜底找 /Applications/COMSOL*/Multiphysics/bin/comsol / macOS fallback search
+        if system == "Darwin":  # / macOS
+            for candidate in [
+                Path("/Applications/COMSOL64/Multiphysics/bin/comsol"),
+                Path("/Applications/COMSOL63/Multiphysics/bin/comsol"),
+                Path("/Applications/COMSOL62/Multiphysics/bin/comsol"),
+            ]:  # / Candidates
+                if candidate.exists():  # / Exists
+                    comsol_command = str(candidate)  # / Adopt
+                    break  # / Stop
+    if not comsol_command:  # 仍无 / Still missing
+        raise RuntimeError("comsol.comsol_command_path is empty and no COMSOL was auto-detected. / 未配置 comsol_command_path 且无法自动发现 COMSOL。")  # / Bail
+    if not Path(comsol_command).exists():  # 路径无效 / Bad path
+        raise FileNotFoundError(f"COMSOL command not found: {comsol_command} / 未找到 COMSOL 命令：{comsol_command}")  # / Bail
+    # 每次 spawn 用一份独立的 prefsdir/configuration，强制 COMSOL 当新实例处理；
+    # 否则同一份 prefs 下后续启动会复用已开窗口（替换当前模型），用户已开的实例会丢失上下文。
+    # Each spawn gets isolated prefsdir/configuration to force COMSOL to start as a fresh GUI instance;
+    # otherwise sharing prefs makes a later launch hijack the existing window and replace its model.
+    instances_root = project / "data" / "comsol_exports" / ".runtime_instances"  # 隔离根 / Isolation root
+    instance_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")  # 唯一 id / Unique id
+    instance_dir = instances_root / instance_id  # 当前实例 dir / Current instance dir
+    prefs_dir = instance_dir / "prefs"  # / Prefs
+    config_dir = instance_dir / "configuration"  # / Config
+    tmp_dir = instance_dir / "tmp"  # / Tmp
+    recovery_dir = instance_dir / "recovery"  # / Recovery
+    for d in [prefs_dir, config_dir, tmp_dir, recovery_dir]:  # 建目录 / Mkdir
+        d.mkdir(parents=True, exist_ok=True)  # / Mkdir
+    cmd: list[str]  # 命令 / Command
+    if system == "Windows":  # Windows / Windows
+        cmd = [comsol_command, "-open", str(resolved),
+               "-prefsdir", str(prefs_dir), "-configuration", str(config_dir),
+               "-tmpdir", str(tmp_dir), "-recoverydir", str(recovery_dir)]  # / Cmd
+    else:  # macOS / Linux / macOS & Linux
+        cmd = [comsol_command, "-open", str(resolved),
+               "-prefsdir", str(prefs_dir), "-configuration", str(config_dir),
+               "-tmpdir", str(tmp_dir), "-recoverydir", str(recovery_dir)]  # / Cmd
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)  # 后台启动 / Background spawn
+    return {  # 返回元数据 / Metadata
+        "pid": proc.pid,  # 进程 PID / Spawned pid
+        "command": cmd,  # 实际命令 / Actual command
+        "mph_path": str(resolved),  # 实际路径 / Actual path
+        "started_at": datetime.now().isoformat(timespec="seconds"),  # 启动时间 / Start time
+    }
+
+
+def validate_production_payload(payload: dict, config: dict) -> dict:  # 校验生产 pipeline 载荷 / Validate production pipeline payload
+    stiffness_ratio = float(payload.get("stiffness_ratio", config.get("material", {}).get("stiffness_ratio", 3.0)))  # 各向异性比 / Stiffness ratio
+    if stiffness_ratio < 1.0 or stiffness_ratio > 20.0:  # 检查范围 / Check range
+        raise ValueError("stiffness_ratio must be between 1.0 and 20.0. / 各向异性比必须在 1.0 到 20.0 之间。")  # 范围错误 / Range error
+    shear_ratio = float(payload.get("shear_ratio", config.get("material", {}).get("shear_ratio", 1.0)))  # 剪切比 / Shear ratio
+    if shear_ratio < 0.3 or shear_ratio > 3.0:  # 检查范围 / Check range
+        raise ValueError("shear_ratio must be between 0.3 and 3.0. / 剪切比必须在 0.3 到 3.0 之间。")  # 范围错误 / Range error
+    w10_num_steps = int(payload.get("w10_num_steps", 300))  # W10 步数 / W10 steps
+    if w10_num_steps < 30 or w10_num_steps > 2000:  # 检查范围 / Check range
+        raise ValueError("w10_num_steps must be between 30 and 2000. / W10 步数必须在 30 到 2000 之间。")  # 范围错误 / Range error
+    phase2_max_iters = int(payload.get("phase2_max_iters", 1))  # Phase 2 迭代数 / Phase 2 iters
+    if phase2_max_iters < 0 or phase2_max_iters > 10:  # 检查范围 / Check range
+        raise ValueError("phase2_max_iters must be between 0 and 10. / Phase 2 迭代数必须在 0 到 10 之间。")  # 范围错误 / Range error
+    magic_str = str(payload.get("magic_off_resonance_hz", "165.0")).strip()  # 魔法频率 / Magic freqs
+    try:
+        magic_freqs = tuple(float(x.strip()) for x in magic_str.split(",") if x.strip())  # 解析逗号分隔 / Parse comma-separated
+    except ValueError:
+        raise ValueError("magic_off_resonance_hz must be comma-separated numbers. / 魔法频率必须是逗号分隔的数字。")  # 解析错误 / Parse error
+    if not magic_freqs:  # 至少一个 / At least one
+        magic_freqs = (165.0,)  # 默认 / Default
+    candidate_id = str(payload.get("candidate_id", "production_design")).strip()  # 候选编号 / Candidate id
+    if not candidate_id or any(ch in candidate_id for ch in "/\\:*?<>|\""):  # 合法字符 / Legal chars
+        raise ValueError("candidate_id contains invalid characters. / 候选编号含非法字符。")  # 非法字符 / Bad chars
+    return {  # 规范载荷 / Normalised payload
+        "candidate_id": candidate_id,  # 候选 / Candidate
+        "stiffness_ratio": stiffness_ratio,  # 各向异性 / Stiffness
+        "shear_ratio": shear_ratio,  # 剪切 / Shear
+        "w10_num_steps": w10_num_steps,  # 步数 / Steps
+        "phase2_max_iters": phase2_max_iters,  # Phase 2 / Phase 2
+        "magic_off_resonance_hz": magic_freqs,  # 魔法频率 / Magic freqs
+        "skip_comsol": bool(payload.get("skip_comsol", False)),  # 跳过 COMSOL / Skip COMSOL
+        "skip_phase2": bool(payload.get("skip_phase2", False)),  # 跳过 Phase 2 / Skip Phase 2
+    }
+
+
+def run_production_pipeline_thread(config: dict, payload: dict) -> None:  # 后台运行生产 pipeline / Run production pipeline in background
+    from src.optimisation.production_pipeline import build_default_pipeline_config, run_production_pipeline  # 延迟导入 / Lazy import
+    from src.optimisation.workflow import WorkflowCancelled  # 复用取消异常 / Reuse cancellation exception
+    try:  # 捕获异常 / Catch exceptions
+        cfg = build_default_pipeline_config(  # 用 config.yaml production: 区段 + payload 覆盖构建 / Build from production: section + payload overrides
+            "config.yaml",
+            overrides={
+                "default_candidate_id": payload["candidate_id"],  # 候选 / Candidate
+                "stiffness_ratio": payload["stiffness_ratio"],  # 各向异性 / Stiffness
+                "shear_ratio": payload["shear_ratio"],  # 剪切 / Shear
+                "w10_num_steps": payload["w10_num_steps"],  # 步数 / Steps
+                "magic_off_resonance_hz": payload["magic_off_resonance_hz"],  # 魔法频率 / Magic freqs
+                "phase2_max_iters": payload["phase2_max_iters"],  # Phase 2 / Phase 2
+                "skip_comsol": payload["skip_comsol"],  # 跳过 COMSOL / Skip COMSOL
+                "skip_phase2": payload["skip_phase2"],  # 跳过 Phase 2 / Skip Phase 2
+            },
+        )
+        cfg.candidate_id = payload["candidate_id"]  # 强制覆盖候选编号 / Force candidate id
+        def cancel_check() -> bool:  # 取消检查 / Cancellation check
+            return WORKFLOW_CANCEL_EVENT.is_set()  # / Event state
+        def progress(event: dict) -> None:  # 进度回调 / Progress callback
+            if cancel_check():  # / Check cancel
+                raise WorkflowCancelled("Pipeline cancelled by user. / 用户已取消流水线。")  # / Cancel
+            update_and_persist_workflow_state(config, event=event, stage=event.get("stage", ""), message=event.get("message", ""), result=event if event.get("stage") == "done" else workflow_snapshot().get("result"))  # / Update state
+        result = run_production_pipeline(cfg, progress=progress)  # 运行 pipeline / Run pipeline
+        update_and_persist_workflow_state(config, running=False, cancel_requested=False, stage="done", message="Pipeline complete. / 流水线完成。", result=result, error="", current_candidate="", current_index=0, total=0)  # / Done
+    except WorkflowCancelled as exc:  # 处理取消 / Handle cancel
+        WORKFLOW_CANCEL_EVENT.clear()  # / Clear
+        update_and_persist_workflow_state(config, event={"stage": "cancelled", "message": str(exc)}, running=False, cancel_requested=False, stage="cancelled", message=str(exc), error="", current_candidate="", current_index=0, total=0)  # / Cancelled
+    except Exception as exc:  # 处理异常 / Handle exception
+        WORKFLOW_CANCEL_EVENT.clear()  # / Clear
+        update_and_persist_workflow_state(config, event={"stage": "error", "message": str(exc)}, running=False, cancel_requested=False, stage="error", message=str(exc), error=str(exc))  # / Error
+
+
 def request_workflow_cancel(config: dict) -> dict:  # 请求取消工作流 / Request workflow cancellation
     state = workflow_snapshot()  # 读取当前状态 / Read current state
     if not state.get("running"):  # 检查是否没有运行中工作流 / Check no running workflow
@@ -159,11 +341,20 @@ def designer_html_path() -> Path:  # 获取绘图页面路径 / Get designer pag
     return project_root() / "frontend" / "target_designer.html"  # 返回单页 HTML 路径 / Return single-page HTML path
 
 
+MATERIAL_OPTIONAL_DEFAULTS = {  # 新增字段的向后兼容默认值（旧客户端不发这些字段时使用） / Optional defaults for backwards compatibility
+    "stiffness_ratio": 1.05,  # SLA grey resin near-isotropic / SLA grey resin near-isotropic
+    "shear_ratio": 1.0,  # isotropic shear / isotropic shear
+}  # 结束默认值 / End defaults
+
+
 def validate_material_payload(payload: dict) -> dict[str, float]:  # 校验材料参数输入 / Validate material parameter input
     material = {}  # 创建材料字典 / Create material dictionary
     for key, (minimum, maximum) in MATERIAL_LIMITS.items():  # 遍历参数范围 / Iterate parameter ranges
-        if key not in payload:  # 检查必需字段 / Check required field
-            raise ValueError(f"Missing material field: {key}")  # 抛出缺失字段错误 / Raise missing field error
+        if key not in payload:  # 缺失字段处理 / Missing field handling
+            if key in MATERIAL_OPTIONAL_DEFAULTS:  # 可选字段，用默认 / Optional, use default
+                material[key] = float(MATERIAL_OPTIONAL_DEFAULTS[key])  # 默认值 / Default value
+                continue  # 下一个 / Next
+            raise ValueError(f"Missing material field: {key}")  # 必需字段缺失 / Required field missing
         value = float(payload[key])  # 转换为浮点数 / Convert to float
         if value < minimum or value > maximum:  # 检查范围 / Check range
             raise ValueError(f"Material field out of range: {key}")  # 抛出范围错误 / Raise range error
@@ -252,6 +443,8 @@ def write_material_to_config(material: dict[str, float], path: Path | None = Non
         "thermal_conductivity_w_mk": f"  thermal_conductivity_w_mk: {format_config_number(material['thermal_conductivity_w_mk'])} # 导热系数 / Thermal conductivity",  # 导热系数行 / Thermal-conductivity line
         "heat_capacity_j_kgk": f"  heat_capacity_j_kgk: {format_config_number(material['heat_capacity_j_kgk'])} # 定压热容 / Heat capacity",  # 热容行 / Heat-capacity line
         "thermal_expansion_1_k": f"  thermal_expansion_1_k: {format_config_number(material['thermal_expansion_1_k'])} # 热膨胀系数 / Thermal expansion coefficient",  # 热膨胀行 / Thermal-expansion line
+        "stiffness_ratio": f"  stiffness_ratio: {format_config_number(material.get('stiffness_ratio', 1.05))} # E_||/E_⊥（沿主刚度方向 vs 垂直），1.0 = 各向同性 / E_||/E_perp, 1.0 = isotropic",  # 各向异性比 / Stiffness ratio line
+        "shear_ratio": f"  shear_ratio: {format_config_number(material.get('shear_ratio', 1.0))} # G_pp / G_iso 剪切模量相对各向同性比 / Shear modulus ratio vs isotropic",  # 剪切比 / Shear ratio line
     }  # 结束替换行定义 / End replacement lines
     output = []  # 创建输出行 / Create output lines
     in_material = False  # 标记材料区 / Track material section
@@ -1121,6 +1314,14 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 except Exception as exc:  # 处理异常 / Handle exception
                     self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
                 return  # 结束请求 / Finish request
+            if route == "/api/candidate-mph":  # 列出候选关联的 .mph / List candidate-related .mph files
+                try:  # 捕获错误 / Catch errors
+                    candidate_id = query.get("id", [""])[0]  # 读取候选编号 / Read candidate id
+                    files = discover_candidate_mph_files(candidate_id)  # 收集文件 / Collect files
+                    self.send_json({"candidate_id": candidate_id, "count": len(files), "files": files})  # 返回 / Return
+                except Exception as exc:  # 处理异常 / Handle exception
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 错误 / Error
+                return  # 结束 / Finish
             if route == "/api/run-report":  # 判断是否请求整次运行报告 / Check full-run report request
                 self.send_bytes(build_run_report_html(config).encode("utf-8"), "text/html; charset=utf-8")  # 返回 HTML 报告 / Return HTML report
                 return  # 结束请求 / Finish request
@@ -1231,6 +1432,30 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 except Exception as exc:  # 处理取消异常 / Handle cancellation exception
                     self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
                 return  # 结束请求 / Finish request
+            if route == "/api/open-in-comsol":  # 用本机 COMSOL 打开 .mph / Launch local COMSOL with selected .mph
+                try:  # 捕获错误 / Catch errors
+                    length = int(self.headers.get("Content-Length", "0"))  # 请求体长度 / Body length
+                    payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 解析 JSON / Parse JSON
+                    mph_path = str(payload.get("path", "")).strip()  # 读取路径 / Read path
+                    if not mph_path:  # 缺失 / Missing
+                        candidate_id = str(payload.get("candidate_id", "")).strip()  # 候选编号 / Candidate id
+                        if not candidate_id:  # 完全无线索 / No clue
+                            raise ValueError("Provide either 'path' or 'candidate_id'. / 必须提供 path 或 candidate_id。")  # / Reject
+                        files = discover_candidate_mph_files(candidate_id)  # 自动发现 / Auto-discover
+                        if not files:  # 无文件 / None
+                            raise FileNotFoundError(f"No .mph saved for candidate {candidate_id}. Re-run with COMSOL enabled to generate one. / 候选 {candidate_id} 没有保存的 .mph 文件，请在启用 COMSOL 的情况下重新运行以生成。")  # / Helpful error
+                        if len(files) > 1:  # 多个 / Multiple
+                            raise ValueError(f"Multiple .mph files exist for {candidate_id}; specify 'path'. / 候选 {candidate_id} 有多个 .mph 文件，请通过 path 指定具体文件。")  # / Need disambiguation
+                        mph_path = files[0]["path"]  # 用唯一文件 / Use single match
+                    result = open_mph_in_comsol(config, mph_path)  # 启动 / Launch
+                    self.send_json(result)  # 返回元数据 / Return metadata
+                except FileNotFoundError as exc:  # 文件不存在 / Missing file
+                    self.send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)  # 404 / 404
+                except ValueError as exc:  # 参数错误 / Bad params
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                except Exception as exc:  # 其他异常 / Other
+                    self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束 / Finish
             if route == "/api/run-workflow":  # 检查自动工作流路由 / Check automatic workflow route
                 try:  # 捕获启动错误 / Catch startup errors
                     if workflow_snapshot().get("running"):  # 检查是否已有工作流运行 / Check existing workflow
@@ -1242,6 +1467,22 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                     payload = validate_workflow_payload(raw_payload, config)  # 校验工作流载荷 / Validate workflow payload
                     update_and_persist_workflow_state(config, event={"stage": "queued", "message": "Workflow queued. / 工作流已排队。"}, running=True, cancel_requested=False, stage="queued", message="Workflow queued. / 工作流已排队。", result=None, error="", current_candidate="", current_index=0, total=0, events=[])  # 设置排队状态 / Set queued state
                     thread = threading.Thread(target=run_workflow_thread, args=(config, payload), daemon=True)  # 创建后台线程 / Create background thread
+                    thread.start()  # 启动后台线程 / Start background thread
+                    self.send_json(workflow_snapshot())  # 返回初始状态 / Return initial status
+                except Exception as exc:  # 处理启动异常 / Handle startup exception
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
+                return  # 结束请求 / Finish request
+            if route == "/api/run-production-pipeline":  # 检查 W10+Phase pipeline 路由 / Check W10+Phase production pipeline route
+                try:  # 捕获启动错误 / Catch startup errors
+                    if workflow_snapshot().get("running"):  # 检查是否已有任务运行 / Check existing task
+                        self.send_json({"error": "Workflow is already running. / 工作流已在运行。"}, HTTPStatus.CONFLICT)  # 返回冲突错误 / Return conflict error
+                        return  # 结束请求 / Finish request
+                    WORKFLOW_CANCEL_EVENT.clear()  # 清除旧取消事件 / Clear stale cancellation event
+                    length = int(self.headers.get("Content-Length", "0"))  # 读取请求体长度 / Read request body length
+                    raw_payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 读取并解析 JSON / Read and parse JSON
+                    payload = validate_production_payload(raw_payload, config)  # 校验 pipeline 载荷 / Validate pipeline payload
+                    update_and_persist_workflow_state(config, event={"stage": "queued", "message": "Production pipeline queued. / 生产流水线已排队。"}, running=True, cancel_requested=False, stage="queued", message="Production pipeline queued. / 生产流水线已排队。", result=None, error="", current_candidate="", current_index=0, total=0, events=[])  # 设置排队状态 / Set queued state
+                    thread = threading.Thread(target=run_production_pipeline_thread, args=(config, payload), daemon=True)  # 创建后台线程 / Create background thread
                     thread.start()  # 启动后台线程 / Start background thread
                     self.send_json(workflow_snapshot())  # 返回初始状态 / Return initial status
                 except Exception as exc:  # 处理启动异常 / Handle startup exception

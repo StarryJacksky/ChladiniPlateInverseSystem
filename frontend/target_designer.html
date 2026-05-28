@@ -252,10 +252,42 @@
 
     .workspace { /* 样式设置 / Style setting */
       display: grid; /* 样式设置 / Style setting */
-      grid-template-columns: minmax(560px, 1fr) minmax(360px, 430px); /* 样式设置 / Style setting */
-      gap: 22px; /* 样式设置 / Style setting */
+      grid-template-columns: minmax(420px, 1fr) 6px clamp(280px, var(--side-width, 410px), 720px); /* 样式设置 / Style setting */
+      gap: 16px; /* 样式设置 / Style setting */
       padding: 24px; /* 样式设置 / Style setting */
       min-height: 0; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .workspace-splitter { /* 样式设置 / Style setting */
+      position: relative; /* 样式设置 / Style setting */
+      width: 6px; /* 样式设置 / Style setting */
+      cursor: col-resize; /* 样式设置 / Style setting */
+      align-self: stretch; /* 样式设置 / Style setting */
+      background: transparent; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .workspace-splitter::after { /* 样式设置 / Style setting */
+      content: ''; /* 样式设置 / Style setting */
+      position: absolute; /* 样式设置 / Style setting */
+      left: 2px; /* 样式设置 / Style setting */
+      right: 2px; /* 样式设置 / Style setting */
+      top: 50%; /* 样式设置 / Style setting */
+      transform: translateY(-50%); /* 样式设置 / Style setting */
+      height: 44px; /* 样式设置 / Style setting */
+      border-radius: 3px; /* 样式设置 / Style setting */
+      background: rgba(16, 23, 22, 0.14); /* 样式设置 / Style setting */
+      transition: background 0.15s ease; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .workspace-splitter:hover::after, /* 样式设置 / Style setting */
+    .workspace-splitter.dragging::after { /* 样式设置 / Style setting */
+      background: var(--accent); /* 样式设置 / Style setting */
+      height: 64px; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    body.is-resizing-side { /* 样式设置 / Style setting */
+      cursor: col-resize !important; /* 样式设置 / Style setting */
+      user-select: none; /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
     .stage-wrap { /* 样式设置 / Style setting */
@@ -385,18 +417,35 @@
 
     .stage { /* 样式设置 / Style setting */
       position: relative; /* 样式设置 / Style setting */
-      width: clamp(320px, min(512px, calc(100vw - 520px), calc(100vh - 300px)), 512px); /* 样式设置 / Style setting */
-      min-width: clamp(320px, min(512px, calc(100vw - 520px), calc(100vh - 300px)), 512px); /* 样式设置 / Style setting */
+      width: clamp(320px, min(720px, calc(100vw - 480px), calc(100vh - 300px)), 720px); /* 样式设置 / Style setting */
+      min-width: clamp(320px, min(720px, calc(100vw - 480px), calc(100vh - 300px)), 720px); /* 样式设置 / Style setting */
       aspect-ratio: 1; /* 样式设置 / Style setting */
       border: 1px solid #101716; /* 样式设置 / Style setting */
       box-shadow: 0 0 0 10px #f0ede7, 0 0 0 11px rgba(16, 23, 22, 0.14), 0 18px 42px rgba(16, 23, 22, 0.20); /* 样式设置 / Style setting */
       background: #ffffff; /* 样式设置 / Style setting */
       touch-action: none; /* 样式设置 / Style setting */
+      overflow: hidden; /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
     .stage.drag-over { /* 样式设置 / Style setting */
       outline: 3px solid rgba(23, 107, 97, 0.45); /* 样式设置 / Style setting */
       outline-offset: 4px; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .stage.panning { /* 样式设置 / Style setting */
+      cursor: grabbing; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .stage.space-pan { /* 样式设置 / Style setting */
+      cursor: grab; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .stage-content { /* 样式设置 / Style setting */
+      position: absolute; /* 样式设置 / Style setting */
+      inset: 0; /* 样式设置 / Style setting */
+      transform-origin: 0 0; /* 样式设置 / Style setting */
+      transform: translate(var(--pan-x, 0px), var(--pan-y, 0px)) scale(var(--zoom, 1)); /* 样式设置 / Style setting */
+      will-change: transform; /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
     canvas { /* 样式设置 / Style setting */
@@ -408,6 +457,62 @@
     } /* 样式设置 / Style setting */
 
     #overlayCanvas { /* 样式设置 / Style setting */
+      pointer-events: none; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .stage-zoom { /* 样式设置 / Style setting */
+      position: absolute; /* 样式设置 / Style setting */
+      bottom: 10px; /* 样式设置 / Style setting */
+      right: 10px; /* 样式设置 / Style setting */
+      display: inline-flex; /* 样式设置 / Style setting */
+      align-items: center; /* 样式设置 / Style setting */
+      gap: 2px; /* 样式设置 / Style setting */
+      padding: 4px; /* 样式设置 / Style setting */
+      background: rgba(255, 255, 255, 0.94); /* 样式设置 / Style setting */
+      border: 1px solid rgba(16, 23, 22, 0.16); /* 样式设置 / Style setting */
+      border-radius: 8px; /* 样式设置 / Style setting */
+      box-shadow: 0 4px 12px rgba(16, 23, 22, 0.14); /* 样式设置 / Style setting */
+      z-index: 4; /* 样式设置 / Style setting */
+      pointer-events: auto; /* 样式设置 / Style setting */
+      font-size: 12px; /* 样式设置 / Style setting */
+      backdrop-filter: blur(4px); /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .stage-zoom button { /* 样式设置 / Style setting */
+      border: none; /* 样式设置 / Style setting */
+      background: transparent; /* 样式设置 / Style setting */
+      padding: 4px 8px; /* 样式设置 / Style setting */
+      font: inherit; /* 样式设置 / Style setting */
+      font-weight: 600; /* 样式设置 / Style setting */
+      color: var(--text, #101716); /* 样式设置 / Style setting */
+      cursor: pointer; /* 样式设置 / Style setting */
+      border-radius: 6px; /* 样式设置 / Style setting */
+      min-width: 28px; /* 样式设置 / Style setting */
+      line-height: 1; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .stage-zoom button:hover { /* 样式设置 / Style setting */
+      background: rgba(23, 107, 97, 0.12); /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .stage-zoom button:active { /* 样式设置 / Style setting */
+      background: rgba(23, 107, 97, 0.22); /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .stage-zoom #zoomResetButton { /* 样式设置 / Style setting */
+      min-width: 48px; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .stage-pan-hint { /* 样式设置 / Style setting */
+      position: absolute; /* 样式设置 / Style setting */
+      bottom: 10px; /* 样式设置 / Style setting */
+      left: 10px; /* 样式设置 / Style setting */
+      padding: 5px 9px; /* 样式设置 / Style setting */
+      background: rgba(16, 23, 22, 0.78); /* 样式设置 / Style setting */
+      color: #f7f3eb; /* 样式设置 / Style setting */
+      border-radius: 6px; /* 样式设置 / Style setting */
+      font-size: 11px; /* 样式设置 / Style setting */
+      z-index: 4; /* 样式设置 / Style setting */
       pointer-events: none; /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
@@ -640,7 +745,17 @@
     .rank-compare-row strong { /* 样式设置 / Style setting */
       color: var(--ink); /* 样式设置 / Style setting */
       font-size: 12px; /* 样式设置 / Style setting */
-      overflow-wrap: anywhere; /* 样式设置 / Style setting */
+      display: block; /* 样式设置 / Style setting */
+      min-width: 0; /* 样式设置 / Style setting */
+      overflow: hidden; /* 样式设置 / Style setting */
+      text-overflow: ellipsis; /* 样式设置 / Style setting */
+      white-space: nowrap; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .rank-compare-row > span:last-child { /* 样式设置 / Style setting */
+      white-space: nowrap; /* 样式设置 / Style setting */
+      font-size: 11px; /* 样式设置 / Style setting */
+      color: var(--muted); /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
     .metric-grid { /* 样式设置 / Style setting */
@@ -777,7 +892,7 @@
 
     .result-summary { /* 样式设置 / Style setting */
       display: block; /* 样式设置 / Style setting */
-      margin-bottom: 8px; /* 样式设置 / Style setting */
+      margin: 4px 0 10px; /* 样式设置 / Style setting */
       color: var(--muted); /* 样式设置 / Style setting */
       font-size: 11px; /* 样式设置 / Style setting */
       line-height: 1.35; /* 样式设置 / Style setting */
@@ -864,7 +979,7 @@
 
     .result-row { /* 样式设置 / Style setting */
       display: grid; /* 样式设置 / Style setting */
-      grid-template-columns: 1fr auto; /* 样式设置 / Style setting */
+      grid-template-columns: minmax(0, 1fr) auto; /* 样式设置 / Style setting */
       gap: 8px; /* 样式设置 / Style setting */
       padding: 9px; /* 样式设置 / Style setting */
       border: 1px solid rgba(16, 23, 22, 0.08); /* 样式设置 / Style setting */
@@ -874,6 +989,7 @@
       text-align: left; /* 样式设置 / Style setting */
       border-radius: 8px; /* 样式设置 / Style setting */
       background: #ffffff; /* 样式设置 / Style setting */
+      align-items: start; /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
     .result-row:last-child { /* 样式设置 / Style setting */
@@ -889,6 +1005,44 @@
     .result-row strong { /* 样式设置 / Style setting */
       color: var(--text); /* 样式设置 / Style setting */
       font-weight: 700; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .result-row > div { /* 样式设置 / Style setting */
+      min-width: 0; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .result-row .result-row-main { /* 样式设置 / Style setting */
+      min-width: 0; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .result-row .result-row-title { /* 样式设置 / Style setting */
+      display: block; /* 样式设置 / Style setting */
+      overflow: hidden; /* 样式设置 / Style setting */
+      text-overflow: ellipsis; /* 样式设置 / Style setting */
+      white-space: nowrap; /* 样式设置 / Style setting */
+      max-width: 100%; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .result-row .result-row-meta { /* 样式设置 / Style setting */
+      display: block; /* 样式设置 / Style setting */
+      margin-top: 2px; /* 样式设置 / Style setting */
+      font-size: 11px; /* 样式设置 / Style setting */
+      color: var(--muted); /* 样式设置 / Style setting */
+      white-space: normal; /* 样式设置 / Style setting */
+      word-break: break-word; /* 样式设置 / Style setting */
+      line-height: 1.4; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .result-row .result-row-side { /* 样式设置 / Style setting */
+      text-align: right; /* 样式设置 / Style setting */
+      white-space: nowrap; /* 样式设置 / Style setting */
+      font-size: 11px; /* 样式设置 / Style setting */
+      color: var(--muted); /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .result-row .result-row-side strong { /* 样式设置 / Style setting */
+      display: block; /* 样式设置 / Style setting */
+      font-size: 13px; /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
     .history-row { /* 样式设置 / Style setting */
@@ -1693,10 +1847,20 @@
           <div class="studio-stat dark"><span>Run</span><strong id="studioRunStat">Ready</strong></div> <!-- 页面结构 / Page structure -->
         </div> <!-- 页面结构 / Page structure -->
         <div class="stage" id="stage"> <!-- 页面结构 / Page structure -->
-          <canvas id="drawCanvas" width="512" height="512" aria-label="drawing canvas"></canvas> <!-- 页面结构 / Page structure -->
-          <canvas id="overlayCanvas" width="512" height="512" aria-hidden="true"></canvas> <!-- 页面结构 / Page structure -->
+          <div class="stage-content" id="stageContent"> <!-- 页面结构 / Page structure -->
+            <canvas id="drawCanvas" width="512" height="512" aria-label="drawing canvas"></canvas> <!-- 页面结构 / Page structure -->
+            <canvas id="overlayCanvas" width="512" height="512" aria-hidden="true"></canvas> <!-- 页面结构 / Page structure -->
+          </div> <!-- 页面结构 / Page structure -->
+          <div class="stage-zoom" role="group" aria-label="zoom controls"> <!-- 页面结构 / Page structure -->
+            <button id="zoomOutButton" type="button" title="Zoom out (wheel down)" aria-label="zoom out">&minus;</button> <!-- 页面结构 / Page structure -->
+            <button id="zoomResetButton" type="button" title="Reset zoom (double-click)" aria-label="reset zoom"><span id="zoomLevelLabel">100%</span></button> <!-- 页面结构 / Page structure -->
+            <button id="zoomInButton" type="button" title="Zoom in (wheel up)" aria-label="zoom in">+</button> <!-- 页面结构 / Page structure -->
+          </div> <!-- 页面结构 / Page structure -->
+          <div class="stage-pan-hint" id="stagePanHint" hidden>Drag with middle-mouse or hold Space to pan · scroll to zoom · double-click 100% to reset</div> <!-- 页面结构 / Page structure -->
         </div> <!-- 页面结构 / Page structure -->
       </div> <!-- 页面结构 / Page structure -->
+
+      <div class="workspace-splitter" id="workspaceSplitter" role="separator" aria-orientation="vertical" aria-label="resize side panel" title="Drag left/right to resize"></div> <!-- 页面结构 / Page structure -->
 
       <aside class="side" aria-label="target controls"> <!-- 页面结构 / Page structure -->
         <nav class="side-tabs" aria-label="workspace tabs"> <!-- 页面结构 / Page structure -->
@@ -1738,16 +1902,36 @@
         <section class="panel"> <!-- 页面结构 / Page structure -->
           <h2>Material</h2> <!-- 页面结构 / Page structure -->
           <div class="field-grid"> <!-- 页面结构 / Page structure -->
-            <label class="field"><span>Preset</span><select id="materialPresetSelect"><option value="">Custom</option><option value="grey_resin">Grey resin</option><option value="stiffer_resin">Stiffer resin</option><option value="lightweight_plastic">Lightweight plastic</option></select></label> <!-- 页面结构 / Page structure -->
+            <label class="field"><span>Preset</span><select id="materialPresetSelect">
+              <option value="">Custom</option>
+              <optgroup label="SLA Resin (≈ isotropic)">
+                <option value="grey_resin">Grey resin (Formlabs Grey V5)</option>
+                <option value="tough_2000">Tough 2000 (SLA)</option>
+                <option value="rigid_4000">Rigid 4000 (SLA glass-filled)</option>
+              </optgroup>
+              <optgroup label="FDM Standard (moderate anisotropy)">
+                <option value="pla_fdm">PLA — FDM layered (sr 1.45)</option>
+                <option value="abs_fdm">ABS — FDM layered (sr 1.60)</option>
+                <option value="petg_fdm">PETG — FDM layered (sr 1.67)</option>
+              </optgroup>
+              <optgroup label="Carbon-fibre composites (high anisotropy)">
+                <option value="onyx_chopped">Markforged Onyx (chopped CF, sr 1.71)</option>
+                <option value="cf_petg_t1">CF-PETG (Tier 1, sr 2.80)</option>
+                <option value="onyx_continuous_cf_t2">Onyx + Continuous CF (Tier 2, sr 12.0)</option>
+              </optgroup>
+            </select></label> <!-- 页面结构 / Page structure -->
             <label class="field"><span>Density kg/m^3</span><input id="densityInput" type="number" step="1"></label> <!-- 页面结构 / Page structure -->
             <label class="field"><span>Young's modulus Pa</span><input id="youngInput" type="number" step="1000000"></label> <!-- 页面结构 / Page structure -->
             <label class="field"><span>Poisson ratio</span><input id="poissonInput" type="number" step="0.01"></label> <!-- 页面结构 / Page structure -->
             <label class="field"><span>Thermal k W/mK</span><input id="thermalConductivityInput" type="number" step="0.01"></label> <!-- 页面结构 / Page structure -->
             <label class="field"><span>Heat capacity J/kgK</span><input id="heatCapacityInput" type="number" step="1"></label> <!-- 页面结构 / Page structure -->
             <label class="field"><span>Thermal expansion 1/K</span><input id="thermalExpansionInput" type="number" step="0.000001"></label> <!-- 页面结构 / Page structure -->
+            <label class="field" title="E_parallel / E_perp. SLA grey resin ≈ 1.05 (近各向同性). FDM PLA ≈ 1.3-2.0. 碳纤增强 ≈ 2.0-4.0."><span>Stiffness ratio E∥/E⊥</span><input id="stiffnessRatioInput" type="number" min="1.0" max="4.0" step="0.01" value="1.05"></label> <!-- 页面结构 / Anisotropy ratio input -->
+            <label class="field" title="G_pp / G_iso. 默认 1.0 (各向同性剪切)."><span>Shear ratio G/G_iso</span><input id="shearRatioInput" type="number" min="0.3" max="3.0" step="0.01" value="1.0"></label> <!-- 页面结构 / Shear ratio input -->
           </div> <!-- 页面结构 / Page structure -->
           <div class="panel-actions"> <!-- 页面结构 / Page structure -->
             <button id="saveMaterialButton" type="button" class="primary">Apply</button> <!-- 页面结构 / Page structure -->
+            <span class="field-hint" style="font-size:0.85em;opacity:0.7;margin-left:0.6em">Stiffness ratio: SLA grey resin ≈ 1.05, FDM PLA ≈ 1.5, carbon-fibre ≈ 2.5. 实测值请询打印厂或材料商。</span> <!-- 提示 / Hint -->
           </div> <!-- 页面结构 / Page structure -->
         </section> <!-- 页面结构 / Page structure -->
         <section class="panel"> <!-- 页面结构 / Page structure -->
@@ -1804,23 +1988,28 @@
           <div id="runOverview" class="run-overview">Not checked</div> <!-- 页面结构 / Page structure -->
         </section> <!-- 页面结构 / Page structure -->
         <section class="panel"> <!-- 页面结构 / Page structure -->
-          <h2>Automation</h2> <!-- 页面结构 / Page structure -->
+          <h2>Run / 运行</h2> <!-- 页面结构 / Page structure -->
           <div class="preset-grid" role="group" aria-label="run presets"> <!-- 页面结构 / Page structure -->
-            <button type="button" data-run-preset="smoke">Smoke</button> <!-- 页面结构 / Page structure -->
-            <button type="button" data-run-preset="review">Review</button> <!-- 页面结构 / Page structure -->
-            <button type="button" data-run-preset="full">Full</button> <!-- 页面结构 / Page structure -->
+            <button type="button" data-run-preset="quick">Quick preview (~30s)</button> <!-- 页面结构 / Page structure -->
+            <button type="button" data-run-preset="standard">Standard (~2h)</button> <!-- 页面结构 / Page structure -->
+            <button type="button" data-run-preset="deep">Deep (~3h)</button> <!-- 页面结构 / Page structure -->
           </div> <!-- 页面结构 / Page structure -->
           <div class="field-grid"> <!-- 页面结构 / Page structure -->
-            <label class="field"><span>Candidates</span><input id="candidateCountInput" type="number" min="1" max="100" step="1" value="2"></label> <!-- 页面结构 / Page structure -->
-            <label class="field"><span>Modes</span><input id="modeCountInput" type="number" min="1" max="60" step="1" value="20"></label> <!-- 页面结构 / Page structure -->
-            <label class="field"><span>Iterations</span><input id="iterationCountInput" type="number" min="1" max="50" step="1" value="2"></label> <!-- 页面结构 / Page structure -->
-            <label class="toggle">Run COMSOL <input id="simulateToggle" type="checkbox" checked></label> <!-- 页面结构 / Page structure -->
+            <label class="field"><span>Candidate ID</span><input id="prodCandidateIdInput" type="text" value="production_design"></label> <!-- 页面结构 / Page structure -->
+            <label class="field"><span>Stiffness ratio E∥/E⊥</span><input id="prodStiffnessRatioInput" type="number" min="1" max="20" step="0.1" value="3.0"></label> <!-- 页面结构 / Page structure -->
+            <label class="field"><span>Shear ratio G/G_iso</span><input id="prodShearRatioInput" type="number" min="0.3" max="3" step="0.1" value="1.0"></label> <!-- 页面结构 / Page structure -->
+            <label class="field"><span>W10 steps</span><input id="prodW10StepsInput" type="number" min="30" max="2000" step="10" value="300"></label> <!-- 页面结构 / Page structure -->
+            <label class="field"><span>Magic off-resonance Hz</span><input id="prodMagicFreqsInput" type="text" value="165.0"></label> <!-- 页面结构 / Page structure -->
+            <label class="field"><span>Phase 2 iters</span><input id="prodPhase2ItersInput" type="number" min="0" max="10" step="1" value="1"></label> <!-- 页面结构 / Page structure -->
+            <label class="toggle">Skip COMSOL (surrogate only) <input id="prodSkipComsolToggle" type="checkbox"></label> <!-- 页面结构 / Page structure -->
+            <label class="toggle">Skip Phase 2 <input id="prodSkipPhase2Toggle" type="checkbox"></label> <!-- 页面结构 / Page structure -->
           </div> <!-- 页面结构 / Page structure -->
           <div class="panel-actions"> <!-- 页面结构 / Page structure -->
             <button id="runWorkflowButton" type="button" class="primary">Run</button> <!-- 页面结构 / Page structure -->
             <button id="cancelWorkflowButton" type="button" disabled>Stop</button> <!-- 页面结构 / Page structure -->
           </div> <!-- 页面结构 / Page structure -->
           <div id="workflowStatus" class="status">Idle</div> <!-- 页面结构 / Page structure -->
+          <div id="productionResult" class="status" hidden></div> <!-- 页面结构 / Page structure -->
           <div id="workflowProgress" class="workflow-progress" hidden> <!-- 页面结构 / Page structure -->
             <div class="workflow-bar"><div id="workflowFill" class="workflow-fill"></div></div> <!-- 页面结构 / Page structure -->
             <div id="workflowProgressText">Waiting</div> <!-- 页面结构 / Page structure -->
@@ -1902,6 +2091,18 @@
     // 前端逻辑 / Frontend logic
     const stage = document.getElementById("stage");
     // 前端逻辑 / Frontend logic
+    const stageContent = document.getElementById("stageContent");
+    // 前端逻辑 / Frontend logic
+    const zoomInButton = document.getElementById("zoomInButton");
+    // 前端逻辑 / Frontend logic
+    const zoomOutButton = document.getElementById("zoomOutButton");
+    // 前端逻辑 / Frontend logic
+    const zoomResetButton = document.getElementById("zoomResetButton");
+    // 前端逻辑 / Frontend logic
+    const zoomLevelLabel = document.getElementById("zoomLevelLabel");
+    // 前端逻辑 / Frontend logic
+    const workspaceSplitter = document.getElementById("workspaceSplitter");
+    // 前端逻辑 / Frontend logic
     const brushTool = document.getElementById("brushTool");
     // 前端逻辑 / Frontend logic
     const eraserTool = document.getElementById("eraserTool");
@@ -1968,6 +2169,10 @@
     // 前端逻辑 / Frontend logic
     const thermalExpansionInput = document.getElementById("thermalExpansionInput");
     // 前端逻辑 / Frontend logic
+    const stiffnessRatioInput = document.getElementById("stiffnessRatioInput");
+    // 前端逻辑 / Frontend logic
+    const shearRatioInput = document.getElementById("shearRatioInput");
+    // 前端逻辑 / Frontend logic
     const saveMaterialButton = document.getElementById("saveMaterialButton");
     // 前端逻辑 / Frontend logic
     const scoringPresetSelect = document.getElementById("scoringPresetSelect");
@@ -2007,14 +2212,6 @@
     const historyList = document.getElementById("historyList");
     // 前端逻辑 / Frontend logic
     const candidateDetail = document.getElementById("candidateDetail");
-    // 前端逻辑 / Frontend logic
-    const candidateCountInput = document.getElementById("candidateCountInput");
-    // 前端逻辑 / Frontend logic
-    const modeCountInput = document.getElementById("modeCountInput");
-    // 前端逻辑 / Frontend logic
-    const iterationCountInput = document.getElementById("iterationCountInput");
-    // 前端逻辑 / Frontend logic
-    const simulateToggle = document.getElementById("simulateToggle");
     // 前端逻辑 / Frontend logic
     const runWorkflowButton = document.getElementById("runWorkflowButton");
     // 前端逻辑 / Frontend logic
@@ -2140,13 +2337,20 @@
     };
 
     // 前端逻辑 / Frontend logic
+    // 材料预设（杨氏模量取沿 / 跨向几何平均；密度、泊松、各向异性比参考 Formlabs/Markforged TDS 与 Letcher 2014、Tymrak 2014、Yao 2020） / Material presets (Young's = geometric mean of along/cross modulus; refs in tooltips)
     const materialPresets = {
-      // 前端逻辑 / Frontend logic
-      grey_resin: { density_kg_m3: 1200, youngs_modulus_pa: 2000000000, poisson_ratio: 0.35, thermal_conductivity_w_mk: 0.18, heat_capacity_j_kgk: 1200, thermal_expansion_1_k: 0.00008 },
-      // 前端逻辑 / Frontend logic
-      stiffer_resin: { density_kg_m3: 1250, youngs_modulus_pa: 3200000000, poisson_ratio: 0.34, thermal_conductivity_w_mk: 0.2, heat_capacity_j_kgk: 1150, thermal_expansion_1_k: 0.00007 },
-      // 前端逻辑 / Frontend logic
-      lightweight_plastic: { density_kg_m3: 950, youngs_modulus_pa: 1500000000, poisson_ratio: 0.38, thermal_conductivity_w_mk: 0.16, heat_capacity_j_kgk: 1600, thermal_expansion_1_k: 0.0001 }
+      // SLA 树脂 — 近各向同性 / SLA resins ≈ isotropic (Formlabs 2018, Sci. Reports 2025)
+      grey_resin: { density_kg_m3: 1180, youngs_modulus_pa: 2685000000, poisson_ratio: 0.40, thermal_conductivity_w_mk: 0.18, heat_capacity_j_kgk: 1200, thermal_expansion_1_k: 0.00008, stiffness_ratio: 1.05, shear_ratio: 1.0 },
+      tough_2000: { density_kg_m3: 1180, youngs_modulus_pa: 2150000000, poisson_ratio: 0.42, thermal_conductivity_w_mk: 0.17, heat_capacity_j_kgk: 1250, thermal_expansion_1_k: 0.00009, stiffness_ratio: 1.05, shear_ratio: 1.0 },
+      rigid_4000: { density_kg_m3: 1620, youngs_modulus_pa: 4000000000, poisson_ratio: 0.30, thermal_conductivity_w_mk: 0.20, heat_capacity_j_kgk: 1100, thermal_expansion_1_k: 0.00006, stiffness_ratio: 1.05, shear_ratio: 1.0 },
+      // FDM 标准丝 — 中等各向异性 / FDM standard filaments — moderate anisotropy (Letcher 2014, Tymrak 2014)
+      pla_fdm: { density_kg_m3: 1240, youngs_modulus_pa: 2900000000, poisson_ratio: 0.36, thermal_conductivity_w_mk: 0.13, heat_capacity_j_kgk: 1800, thermal_expansion_1_k: 0.00007, stiffness_ratio: 1.45, shear_ratio: 0.85 },
+      abs_fdm: { density_kg_m3: 1040, youngs_modulus_pa: 1900000000, poisson_ratio: 0.38, thermal_conductivity_w_mk: 0.17, heat_capacity_j_kgk: 1300, thermal_expansion_1_k: 0.00009, stiffness_ratio: 1.60, shear_ratio: 0.85 },
+      petg_fdm: { density_kg_m3: 1270, youngs_modulus_pa: 1550000000, poisson_ratio: 0.40, thermal_conductivity_w_mk: 0.20, heat_capacity_j_kgk: 1400, thermal_expansion_1_k: 0.00007, stiffness_ratio: 1.67, shear_ratio: 0.85 },
+      // 碳纤复合 — 高各向异性 / Carbon-fibre composites — high anisotropy (Yao 2020, Markforged TDS)
+      onyx_chopped: { density_kg_m3: 1200, youngs_modulus_pa: 1830000000, poisson_ratio: 0.40, thermal_conductivity_w_mk: 0.20, heat_capacity_j_kgk: 1500, thermal_expansion_1_k: 0.00005, stiffness_ratio: 1.71, shear_ratio: 0.80 },
+      cf_petg_t1: { density_kg_m3: 1300, youngs_modulus_pa: 3700000000, poisson_ratio: 0.38, thermal_conductivity_w_mk: 0.25, heat_capacity_j_kgk: 1400, thermal_expansion_1_k: 0.00005, stiffness_ratio: 2.80, shear_ratio: 0.75 },
+      onyx_continuous_cf_t2: { density_kg_m3: 1400, youngs_modulus_pa: 17320000000, poisson_ratio: 0.32, thermal_conductivity_w_mk: 0.80, heat_capacity_j_kgk: 1200, thermal_expansion_1_k: 0.000002, stiffness_ratio: 12.0, shear_ratio: 0.55 }
     // 前端逻辑 / Frontend logic
     };
 
@@ -2166,11 +2370,11 @@
     // 前端逻辑 / Frontend logic
     const runPresets = {
       // 前端逻辑 / Frontend logic
-      smoke: { candidates: 1, modes: 3, iterations: 1, simulate: true },
+      quick: { w10_num_steps: 100, phase2_max_iters: 0, skip_comsol: true, skip_phase2: true },
       // 前端逻辑 / Frontend logic
-      review: { candidates: 8, modes: 24, iterations: 4, simulate: true },
+      standard: { w10_num_steps: 300, phase2_max_iters: 1, skip_comsol: false, skip_phase2: false },
       // 前端逻辑 / Frontend logic
-      full: { candidates: 24, modes: 40, iterations: 8, simulate: true }
+      deep: { w10_num_steps: 500, phase2_max_iters: 2, skip_comsol: false, skip_phase2: false }
     // 前端逻辑 / Frontend logic
     };
 
@@ -2498,6 +2702,10 @@
       heatCapacityInput.value = formatMaterialValue(material.heat_capacity_j_kgk ?? 1200);
       // 前端逻辑 / Frontend logic
       thermalExpansionInput.value = formatMaterialValue(material.thermal_expansion_1_k ?? 0.00008);
+      // 前端逻辑 / Frontend logic
+      stiffnessRatioInput.value = formatMaterialValue(material.stiffness_ratio ?? 1.05);
+      // 前端逻辑 / Frontend logic
+      shearRatioInput.value = formatMaterialValue(material.shear_ratio ?? 1.0);
     // 前端逻辑 / Frontend logic
     }
 
@@ -2640,6 +2848,7 @@
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${compactNumber(material.youngs_modulus_pa / 1000000000)} GPa</strong><span>Young</span></div>
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${compactNumber(material.density_kg_m3)}</strong><span>kg/m3</span></div>
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${compactNumber(material.poisson_ratio)}</strong><span>Poisson</span></div>
+          <!-- 模板内容 / Template content --><div class="metric-card" title="Anisotropy E_||/E_⊥; 1.0=isotropic"><strong>${compactNumber(material.stiffness_ratio ?? 1.05)}×</strong><span>E∥/E⊥</span></div>
         <!-- 模板内容 / Template content --></div>
         <!-- 模板内容 / Template content --><div class="tune-band">
           <!-- 模板内容 / Template content --><div class="metric-card"><strong>${compactNumber(scoring.frequency_min_hz)}-${compactNumber(scoring.frequency_max_hz)} Hz</strong><span>Frequency</span></div>
@@ -2664,7 +2873,9 @@
       // 前端逻辑 / Frontend logic
       renderTuneOverview();
       // 前端逻辑 / Frontend logic
-      setStatus("Material preset loaded; press Apply to save.", "good");
+      const sr = (materialPresets[name].stiffness_ratio ?? 1.0).toFixed(2);
+      // 前端逻辑 / Frontend logic
+      setStatus(`Preset "${name}" loaded (E∥/E⊥ = ${sr}×); press Apply to save.`, "good");
     // 前端逻辑 / Frontend logic
     }
 
@@ -2705,13 +2916,13 @@
       // 前端逻辑 / Frontend logic
       }
       // 前端逻辑 / Frontend logic
-      candidateCountInput.value = String(preset.candidates);
+      prodW10StepsInput.value = String(preset.w10_num_steps);
       // 前端逻辑 / Frontend logic
-      modeCountInput.value = String(preset.modes);
+      prodPhase2ItersInput.value = String(preset.phase2_max_iters);
       // 前端逻辑 / Frontend logic
-      iterationCountInput.value = String(preset.iterations);
+      prodSkipComsolToggle.checked = Boolean(preset.skip_comsol);
       // 前端逻辑 / Frontend logic
-      simulateToggle.checked = Boolean(preset.simulate);
+      prodSkipPhase2Toggle.checked = Boolean(preset.skip_phase2);
       // 前端逻辑 / Frontend logic
       syncRunPresetButtons(name);
       // 前端逻辑 / Frontend logic
@@ -2741,7 +2952,11 @@
         // 前端逻辑 / Frontend logic
         heat_capacity_j_kgk: Number(heatCapacityInput.value),
         // 前端逻辑 / Frontend logic
-        thermal_expansion_1_k: Number(thermalExpansionInput.value)
+        thermal_expansion_1_k: Number(thermalExpansionInput.value),
+        // 前端逻辑 / Frontend logic
+        stiffness_ratio: Number(stiffnessRatioInput.value),
+        // 前端逻辑 / Frontend logic
+        shear_ratio: Number(shearRatioInput.value)
       // 前端逻辑 / Frontend logic
       };
     // 前端逻辑 / Frontend logic
@@ -3135,9 +3350,12 @@
       <!-- 模板内容 / Template content -->`;
       // 前端逻辑 / Frontend logic
       resultsList.innerHTML = rows.slice(0, 10).map((row, index) => `
-        <!-- 模板内容 / Template content --><button class="result-row" type="button" data-candidate-id="${escapeText(row.candidate_id)}">
-          <!-- 模板内容 / Template content --><div><strong>${index + 1}. ${escapeText(row.candidate_id)}</strong><br>mode ${escapeText(row.best_mode)} · IoU ${formatScore(row.best_iou)} · Dice ${formatScore(row.best_dice)} · Cov ${formatScore(row.best_recall)} · Shape ${formatScore(row.best_projection_similarity)} · Ext ${formatScore(row.best_extent_similarity)}</div>
-          <!-- 模板内容 / Template content --><div>${formatFrequency(row.frequency_hz)} Hz<br>${formatScore(row.final_score)}</div>
+        <!-- 模板内容 / Template content --><button class="result-row" type="button" data-candidate-id="${escapeText(row.candidate_id)}" title="${escapeText(row.candidate_id)}">
+          <!-- 模板内容 / Template content --><div class="result-row-main">
+            <!-- 模板内容 / Template content --><strong class="result-row-title">${index + 1}. ${escapeText(row.candidate_id)}</strong>
+            <!-- 模板内容 / Template content --><span class="result-row-meta">mode ${escapeText(row.best_mode)} · IoU ${formatScore(row.best_iou)} · Dice ${formatScore(row.best_dice)} · Cov ${formatScore(row.best_recall)} · Shape ${formatScore(row.best_projection_similarity)} · Ext ${formatScore(row.best_extent_similarity)}</span>
+          <!-- 模板内容 / Template content --></div>
+          <!-- 模板内容 / Template content --><div class="result-row-side"><strong>${formatScore(row.final_score)}</strong>${formatFrequency(row.frequency_hz)} Hz</div>
         <!-- 模板内容 / Template content --></button>
       <!-- 模板内容 / Template content -->`).join("");
       // 前端逻辑 / Frontend logic
@@ -3196,7 +3414,7 @@
       return `
         <!-- 模板内容 / Template content --><div class="rank-compare">
           <!-- 模板内容 / Template content -->${topRows.map((row, index) => `
-            <!-- 模板内容 / Template content --><button class="rank-compare-row" type="button" data-candidate-id="${escapeText(row.candidate_id)}">
+            <!-- 模板内容 / Template content --><button class="rank-compare-row" type="button" data-candidate-id="${escapeText(row.candidate_id)}" title="${escapeText(row.candidate_id)}">
               <!-- 模板内容 / Template content --><span>#${index + 1}</span>
               <!-- 模板内容 / Template content --><strong>${escapeText(row.candidate_id)}</strong>
               <!-- 模板内容 / Template content --><span>IoU ${formatScore(row.best_iou)} · Dice ${formatScore(row.best_dice)} · ${formatScore(row.final_score)}</span>
@@ -3525,7 +3743,9 @@
             <!-- 模板内容 / Template content --><div class="candidate-actions">
               <!-- 模板内容 / Template content --><a class="download-link" href="/api/candidate-report?id=${encodeURIComponent(detail.candidate_id)}" target="_blank" rel="noreferrer">Report</a>
               <!-- 模板内容 / Template content --><a class="download-link" href="/api/candidate-package?id=${encodeURIComponent(detail.candidate_id)}">Package</a>
+              <!-- 模板内容 / Template content --><button class="download-link" type="button" data-action="open-in-comsol" data-candidate-id="${encodeURIComponent(detail.candidate_id)}">Open in COMSOL</button>
             <!-- 模板内容 / Template content --></div>
+            <!-- 模板内容 / Template content --><div id="comsolOpenStatus" class="status" hidden></div>
           <!-- 模板内容 / Template content --></div>
           <!-- 模板内容 / Template content --><div class="candidate-review">
             <!-- 模板内容 / Template content --><div id="activeModeSummary" class="detail-grid">
@@ -3819,6 +4039,8 @@
         // 前端逻辑 / Frontend logic
         }
         // 前端逻辑 / Frontend logic
+        renderProductionResult(state);
+        // 前端逻辑 / Frontend logic
         await loadRanking();
         // 前端逻辑 / Frontend logic
         await loadHistory();
@@ -3850,51 +4072,35 @@
       // 前端逻辑 / Frontend logic
       const issues = [];
       // 前端逻辑 / Frontend logic
-      const limit = Number(candidateCountInput.value);
+      const sr = Number(prodStiffnessRatioInput.value);
       // 前端逻辑 / Frontend logic
-      const modes = Number(modeCountInput.value);
+      const shear = Number(prodShearRatioInput.value);
       // 前端逻辑 / Frontend logic
-      const iterations = Number(iterationCountInput.value);
+      const steps = Number(prodW10StepsInput.value);
       // 前端逻辑 / Frontend logic
-      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+      const iters = Number(prodPhase2ItersInput.value);
+      // 前端逻辑 / Frontend logic
+      if (!(sr >= 1 && sr <= 20)) { issues.push("Stiffness ratio must be between 1 and 20."); }
+      // 前端逻辑 / Frontend logic
+      if (!(shear >= 0.3 && shear <= 3)) { issues.push("Shear ratio must be between 0.3 and 3."); }
+      // 前端逻辑 / Frontend logic
+      if (!Number.isInteger(steps) || steps < 30 || steps > 2000) { issues.push("W10 steps must be an integer from 30 to 2000."); }
+      // 前端逻辑 / Frontend logic
+      if (!Number.isInteger(iters) || iters < 0 || iters > 10) { issues.push("Phase 2 iters must be an integer from 0 to 10."); }
+      // 前端逻辑 / Frontend logic
+      if (!(prodCandidateIdInput.value || "").trim()) { issues.push("Candidate ID cannot be empty."); }
+      // 前端逻辑 / Frontend logic
+      if (!Object.keys(latestTargetAnalysis).length) { await loadTargetAnalysis(); }
+      // 前端逻辑 / Frontend logic
+      if (!Object.keys(latestTargetAnalysis).length) { issues.push("Save the target once so preprocessing and target-quality metrics exist."); }
+      // 前端逻辑 / Frontend logic
+      const needComsol = !prodSkipComsolToggle.checked;
+      // 前端逻辑 / Frontend logic
+      if (needComsol && !latestDiagnostics.ready_for_auto_run) { await loadDiagnostics(); }
+      // 前端逻辑 / Frontend logic
+      if (needComsol && !latestDiagnostics.ready_for_auto_run) {
         // 前端逻辑 / Frontend logic
-        issues.push("Candidates must be an integer from 1 to 100.");
-      // 前端逻辑 / Frontend logic
-      }
-      // 前端逻辑 / Frontend logic
-      if (!Number.isInteger(modes) || modes < 1 || modes > 60) {
-        // 前端逻辑 / Frontend logic
-        issues.push("Modes must be an integer from 1 to 60.");
-      // 前端逻辑 / Frontend logic
-      }
-      // 前端逻辑 / Frontend logic
-      if (!Number.isInteger(iterations) || iterations < 1 || iterations > 50) {
-        // 前端逻辑 / Frontend logic
-        issues.push("Iterations must be an integer from 1 to 50.");
-      // 前端逻辑 / Frontend logic
-      }
-      // 前端逻辑 / Frontend logic
-      if (!Object.keys(latestTargetAnalysis).length) {
-        // 前端逻辑 / Frontend logic
-        await loadTargetAnalysis();
-      // 前端逻辑 / Frontend logic
-      }
-      // 前端逻辑 / Frontend logic
-      if (!Object.keys(latestTargetAnalysis).length) {
-        // 前端逻辑 / Frontend logic
-        issues.push("Save the target once so preprocessing and target-quality metrics exist.");
-      // 前端逻辑 / Frontend logic
-      }
-      // 前端逻辑 / Frontend logic
-      if (simulateToggle.checked && !latestDiagnostics.ready_for_auto_run) {
-        // 前端逻辑 / Frontend logic
-        await loadDiagnostics();
-      // 前端逻辑 / Frontend logic
-      }
-      // 前端逻辑 / Frontend logic
-      if (simulateToggle.checked && !latestDiagnostics.ready_for_auto_run) {
-        // 前端逻辑 / Frontend logic
-        issues.push("Run COMSOL is enabled, but diagnostics are not ready. Refresh diagnostics or turn Run COMSOL off for a Python-only smoke run.");
+        issues.push("COMSOL is required by this run but diagnostics are not ready. Enable 'Skip COMSOL' for a surrogate-only preview or refresh diagnostics.");
       // 前端逻辑 / Frontend logic
       }
       // 前端逻辑 / Frontend logic
@@ -3923,11 +4129,11 @@
       // 前端逻辑 / Frontend logic
       cancelWorkflowButton.disabled = false;
       // 前端逻辑 / Frontend logic
-      workflowStatus.textContent = "Starting...";
+      workflowStatus.textContent = "Starting production pipeline...";
       // 前端逻辑 / Frontend logic
       workflowProgress.hidden = true;
       // 前端逻辑 / Frontend logic
-      workflowTimeline.textContent = "Queueing workflow...";
+      workflowTimeline.textContent = "Queueing pipeline...";
       // 前端逻辑 / Frontend logic
       workflowHint.hidden = true;
       // 前端逻辑 / Frontend logic
@@ -3935,7 +4141,7 @@
       // 前端逻辑 / Frontend logic
       try {
         // 前端逻辑 / Frontend logic
-        const response = await fetch("/api/run-workflow", {
+        const response = await fetch("/api/run-production-pipeline", {
           // 前端逻辑 / Frontend logic
           method: "POST",
           // 前端逻辑 / Frontend logic
@@ -3943,13 +4149,21 @@
           // 前端逻辑 / Frontend logic
           body: JSON.stringify({
             // 前端逻辑 / Frontend logic
-            limit: Number(candidateCountInput.value),
+            candidate_id: prodCandidateIdInput.value || "production_design",
             // 前端逻辑 / Frontend logic
-            num_modes: Number(modeCountInput.value),
+            stiffness_ratio: Number(prodStiffnessRatioInput.value),
             // 前端逻辑 / Frontend logic
-            iterations: Number(iterationCountInput.value),
+            shear_ratio: Number(prodShearRatioInput.value),
             // 前端逻辑 / Frontend logic
-            simulate: simulateToggle.checked
+            w10_num_steps: Number(prodW10StepsInput.value),
+            // 前端逻辑 / Frontend logic
+            magic_off_resonance_hz: prodMagicFreqsInput.value || "165.0",
+            // 前端逻辑 / Frontend logic
+            phase2_max_iters: Number(prodPhase2ItersInput.value),
+            // 前端逻辑 / Frontend logic
+            skip_comsol: prodSkipComsolToggle.checked,
+            // 前端逻辑 / Frontend logic
+            skip_phase2: prodSkipPhase2Toggle.checked
           // 前端逻辑 / Frontend logic
           })
         // 前端逻辑 / Frontend logic
@@ -4962,7 +5176,7 @@
     // 前端逻辑 / Frontend logic
     scoringPresetSelect.addEventListener("change", () => applyScoringPreset(scoringPresetSelect.value));
     // 前端逻辑 / Frontend logic
-    [densityInput, youngInput, poissonInput, thermalConductivityInput, heatCapacityInput, thermalExpansionInput, roughnessWeightInput, massWeightInput, frequencyWeightInput, frequencyMinInput, frequencyMaxInput].forEach((input) => input.addEventListener("input", renderTuneOverview));
+    [densityInput, youngInput, poissonInput, thermalConductivityInput, heatCapacityInput, thermalExpansionInput, stiffnessRatioInput, shearRatioInput, roughnessWeightInput, massWeightInput, frequencyWeightInput, frequencyMinInput, frequencyMaxInput].forEach((input) => input.addEventListener("input", renderTuneOverview));
     // 前端逻辑 / Frontend logic
     saveButton.addEventListener("click", saveTarget);
     // 前端逻辑 / Frontend logic
@@ -4971,14 +5185,93 @@
     saveScoringButton.addEventListener("click", saveScoring);
     // 前端逻辑 / Frontend logic
     runWorkflowButton.addEventListener("click", runWorkflow);
+    const prodCandidateIdInput = document.getElementById("prodCandidateIdInput");
+    const prodStiffnessRatioInput = document.getElementById("prodStiffnessRatioInput");
+    const prodShearRatioInput = document.getElementById("prodShearRatioInput");
+    const prodW10StepsInput = document.getElementById("prodW10StepsInput");
+    const prodMagicFreqsInput = document.getElementById("prodMagicFreqsInput");
+    const prodPhase2ItersInput = document.getElementById("prodPhase2ItersInput");
+    const prodSkipComsolToggle = document.getElementById("prodSkipComsolToggle");
+    const prodSkipPhase2Toggle = document.getElementById("prodSkipPhase2Toggle");
+    const productionResult = document.getElementById("productionResult");
+
+    function renderProductionResult(state) {
+      if (!productionResult) return;
+      const r = (state && state.result) || {};
+      if (!r.stage_reached) { productionResult.hidden = true; productionResult.textContent = ""; return; }
+      const lines = ["Stage reached: " + r.stage_reached];
+      if (r.surrogate_metrics) {
+        lines.push("Surrogate enrichment: " + Number(r.surrogate_metrics.enrichment || 0).toFixed(2) + "×");
+      }
+      if (r.phase1 && r.phase1.best_composite) {
+        const bc = r.phase1.best_composite;
+        lines.push("Phase 1 best: " + bc.method + "(" + (bc.subset || []).join("+") + ") broad enr=" +
+          Number(bc.broad.enrich).toFixed(2) + "× rec=" + Number(bc.broad.recall).toFixed(2) +
+          " | tight enr=" + Number(bc.tight.enrich).toFixed(2) + "× rec=" + Number(bc.tight.recall).toFixed(2));
+      }
+      if (r.phase2) {
+        lines.push("Phase 2: best iter " + r.phase2.best_iter + " → " +
+          Number(r.phase2.best_enrichment).toFixed(2) + "× (" +
+          (r.phase2.improvement_pct >= 0 ? "+" : "") + Number(r.phase2.improvement_pct).toFixed(1) + "%)");
+      }
+      if (r.output_dir) { lines.push("Output: " + r.output_dir); }
+      productionResult.textContent = lines.join("\n");
+      productionResult.hidden = false;
+    }
+
+    async function openCandidateInComsol(candidateId) {
+      const statusEl = document.getElementById("comsolOpenStatus");
+      if (statusEl) { statusEl.hidden = false; statusEl.textContent = "Locating COMSOL model files..."; }
+      try {
+        const listRes = await fetch(`/api/candidate-mph?id=${encodeURIComponent(candidateId)}&t=${Date.now()}`);
+        const list = await listRes.json();
+        if (!listRes.ok) { throw new Error(list.error || "Failed to list COMSOL models"); }
+        if (!list.files || list.files.length === 0) {
+          if (statusEl) statusEl.textContent = `No COMSOL .mph saved for "${candidateId}". Re-run with COMSOL enabled (Production Pipeline without "Skip COMSOL"). / 该候选没有保存的 .mph 文件；请启用 COMSOL 重新运行。`;
+          return;
+        }
+        let chosenPath;
+        if (list.files.length === 1) {
+          chosenPath = list.files[0].path;
+        } else {
+          const labels = list.files.map((f, i) => `${i + 1}. ${f.label} (${f.size_mb} MB)`).join("\n");
+          const choice = window.prompt(`Multiple COMSOL models found for "${candidateId}". Enter number to open:\n\n${labels}`, "1");
+          if (!choice) { if (statusEl) statusEl.textContent = "Cancelled."; return; }
+          const idx = parseInt(choice, 10) - 1;
+          if (Number.isNaN(idx) || idx < 0 || idx >= list.files.length) {
+            if (statusEl) statusEl.textContent = "Invalid selection.";
+            return;
+          }
+          chosenPath = list.files[idx].path;
+        }
+        if (statusEl) statusEl.textContent = "Launching COMSOL...";
+        const openRes = await fetch("/api/open-in-comsol", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: chosenPath })
+        });
+        const openJson = await openRes.json();
+        if (!openRes.ok) { throw new Error(openJson.error || "Failed to launch COMSOL"); }
+        if (statusEl) statusEl.textContent = `COMSOL launched (pid ${openJson.pid}). Opening: ${openJson.mph_path}`;
+      } catch (err) {
+        if (statusEl) statusEl.textContent = "Error: " + err.message;
+      }
+    }
+
+    candidateDetail.addEventListener("click", (event) => {
+      const btn = event.target.closest('[data-action="open-in-comsol"]');
+      if (!btn) return;
+      event.preventDefault();
+      openCandidateInComsol(decodeURIComponent(btn.dataset.candidateId));
+    });
     // 前端逻辑 / Frontend logic
     cancelWorkflowButton.addEventListener("click", cancelWorkflow);
     // 前端逻辑 / Frontend logic
     runPresetButtons.forEach((button) => button.addEventListener("click", () => applyRunPreset(button.dataset.runPreset)));
     // 前端逻辑 / Frontend logic
-    [candidateCountInput, modeCountInput, iterationCountInput, simulateToggle].forEach((control) => control.addEventListener("input", markCustomRunPreset));
+    [prodStiffnessRatioInput, prodShearRatioInput, prodW10StepsInput, prodMagicFreqsInput, prodPhase2ItersInput, prodSkipComsolToggle, prodSkipPhase2Toggle].forEach((control) => control.addEventListener("input", markCustomRunPreset));
     // 前端逻辑 / Frontend logic
-    [candidateCountInput, modeCountInput, iterationCountInput, simulateToggle].forEach((control) => control.addEventListener("change", markCustomRunPreset));
+    [prodStiffnessRatioInput, prodShearRatioInput, prodW10StepsInput, prodMagicFreqsInput, prodPhase2ItersInput, prodSkipComsolToggle, prodSkipPhase2Toggle].forEach((control) => control.addEventListener("change", markCustomRunPreset));
     // 前端逻辑 / Frontend logic
     showTimelineLogsToggle.addEventListener("change", () => renderWorkflowTimeline(latestWorkflowEvents));
     // 前端逻辑 / Frontend logic
@@ -5151,6 +5444,194 @@
       handleImageFile(event.dataTransfer.files[0]);
     // 前端逻辑 / Frontend logic
     });
+
+    // ============================================================
+    // Stage zoom + pan + side panel splitter
+    // 画板缩放、平移与右侧栏分隔条
+    // ============================================================
+    const ZOOM_MIN = 0.25;
+    const ZOOM_MAX = 8;
+    const ZOOM_STEP = 1.2;
+    const SIDE_WIDTH_KEY = "chladni:sideWidth";
+    const ZOOM_STATE_KEY = "chladni:stageZoom";
+    const zoomState = { z: 1, dx: 0, dy: 0 };
+
+    function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+    function applyStageTransform() {
+      stageContent.style.setProperty("--zoom", String(zoomState.z));
+      stageContent.style.setProperty("--pan-x", `${zoomState.dx}px`);
+      stageContent.style.setProperty("--pan-y", `${zoomState.dy}px`);
+      if (zoomLevelLabel) {
+        zoomLevelLabel.textContent = `${Math.round(zoomState.z * 100)}%`;
+      }
+      try { localStorage.setItem(ZOOM_STATE_KEY, JSON.stringify(zoomState)); } catch (e) {}
+    }
+
+    function clampPan() {
+      const rect = stage.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      const sw = w * zoomState.z;
+      const sh = h * zoomState.z;
+      const maxOverhang = 0.4;
+      const minDx = Math.min(0, w - sw - w * maxOverhang);
+      const maxDx = w * maxOverhang;
+      const minDy = Math.min(0, h - sh - h * maxOverhang);
+      const maxDy = h * maxOverhang;
+      zoomState.dx = clamp(zoomState.dx, minDx, maxDx);
+      zoomState.dy = clamp(zoomState.dy, minDy, maxDy);
+    }
+
+    function zoomAt(newZoom, anchorX, anchorY) {
+      const oldZoom = zoomState.z;
+      const clamped = clamp(newZoom, ZOOM_MIN, ZOOM_MAX);
+      if (Math.abs(clamped - oldZoom) < 1e-6) { return; }
+      const wx = (anchorX - zoomState.dx) / oldZoom;
+      const wy = (anchorY - zoomState.dy) / oldZoom;
+      zoomState.z = clamped;
+      zoomState.dx = anchorX - wx * clamped;
+      zoomState.dy = anchorY - wy * clamped;
+      clampPan();
+      applyStageTransform();
+    }
+
+    function resetZoom() {
+      zoomState.z = 1;
+      zoomState.dx = 0;
+      zoomState.dy = 0;
+      applyStageTransform();
+    }
+
+    try {
+      const saved = JSON.parse(localStorage.getItem(ZOOM_STATE_KEY) || "null");
+      if (saved && typeof saved.z === "number") {
+        zoomState.z = clamp(Number(saved.z) || 1, ZOOM_MIN, ZOOM_MAX);
+        zoomState.dx = Number(saved.dx) || 0;
+        zoomState.dy = Number(saved.dy) || 0;
+      }
+    } catch (e) {}
+    applyStageTransform();
+
+    if (zoomInButton) {
+      zoomInButton.addEventListener("click", () => {
+        const rect = stage.getBoundingClientRect();
+        zoomAt(zoomState.z * ZOOM_STEP, rect.width / 2, rect.height / 2);
+      });
+    }
+    if (zoomOutButton) {
+      zoomOutButton.addEventListener("click", () => {
+        const rect = stage.getBoundingClientRect();
+        zoomAt(zoomState.z / ZOOM_STEP, rect.width / 2, rect.height / 2);
+      });
+    }
+    if (zoomResetButton) {
+      zoomResetButton.addEventListener("click", resetZoom);
+      zoomResetButton.addEventListener("dblclick", resetZoom);
+    }
+
+    stage.addEventListener("wheel", (event) => {
+      const onZoomControl = event.target && event.target.closest && event.target.closest(".stage-zoom");
+      if (onZoomControl) { return; }
+      event.preventDefault();
+      const rect = stage.getBoundingClientRect();
+      const anchorX = event.clientX - rect.left;
+      const anchorY = event.clientY - rect.top;
+      const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+      zoomAt(zoomState.z * factor, anchorX, anchorY);
+    }, { passive: false });
+
+    let spaceHeld = false;
+    document.addEventListener("keydown", (event) => {
+      if (event.code === "Space" && !spaceHeld) {
+        const tag = (event.target && event.target.tagName) || "";
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (event.target && event.target.isContentEditable)) { return; }
+        spaceHeld = true;
+        stage.classList.add("space-pan");
+        event.preventDefault();
+      }
+    });
+    document.addEventListener("keyup", (event) => {
+      if (event.code === "Space") {
+        spaceHeld = false;
+        stage.classList.remove("space-pan");
+      }
+    });
+
+    let panState = null;
+    stage.addEventListener("pointerdown", (event) => {
+      const onZoomControl = event.target && event.target.closest && event.target.closest(".stage-zoom");
+      if (onZoomControl) { return; }
+      const isPanGesture = event.button === 1 || (event.button === 0 && spaceHeld);
+      if (!isPanGesture) { return; }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      panState = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        baseDx: zoomState.dx,
+        baseDy: zoomState.dy
+      };
+      stage.classList.add("panning");
+      try { stage.setPointerCapture(event.pointerId); } catch (e) {}
+    }, true);
+    stage.addEventListener("pointermove", (event) => {
+      if (!panState || event.pointerId !== panState.pointerId) { return; }
+      zoomState.dx = panState.baseDx + (event.clientX - panState.startX);
+      zoomState.dy = panState.baseDy + (event.clientY - panState.startY);
+      clampPan();
+      applyStageTransform();
+    }, true);
+    function endPan(event) {
+      if (!panState) { return; }
+      if (event && event.pointerId !== panState.pointerId) { return; }
+      try { stage.releasePointerCapture(panState.pointerId); } catch (e) {}
+      panState = null;
+      stage.classList.remove("panning");
+    }
+    stage.addEventListener("pointerup", endPan, true);
+    stage.addEventListener("pointercancel", endPan, true);
+
+    function setSideWidth(px) {
+      const clamped = clamp(Math.round(px), 280, 720);
+      document.documentElement.style.setProperty("--side-width", `${clamped}px`);
+      try { localStorage.setItem(SIDE_WIDTH_KEY, String(clamped)); } catch (e) {}
+    }
+    try {
+      const savedSide = parseInt(localStorage.getItem(SIDE_WIDTH_KEY) || "", 10);
+      if (Number.isFinite(savedSide)) { setSideWidth(savedSide); }
+    } catch (e) {}
+    let splitterState = null;
+    if (workspaceSplitter) {
+      workspaceSplitter.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        const sideEl = document.querySelector(".side");
+        const currentWidth = sideEl ? sideEl.getBoundingClientRect().width : 410;
+        splitterState = { pointerId: event.pointerId, startX: event.clientX, startWidth: currentWidth };
+        workspaceSplitter.classList.add("dragging");
+        document.body.classList.add("is-resizing-side");
+        try { workspaceSplitter.setPointerCapture(event.pointerId); } catch (e) {}
+      });
+      workspaceSplitter.addEventListener("pointermove", (event) => {
+        if (!splitterState || event.pointerId !== splitterState.pointerId) { return; }
+        setSideWidth(splitterState.startWidth - (event.clientX - splitterState.startX));
+      });
+      const endSplitter = (event) => {
+        if (!splitterState) { return; }
+        if (event && event.pointerId !== splitterState.pointerId) { return; }
+        try { workspaceSplitter.releasePointerCapture(splitterState.pointerId); } catch (e) {}
+        splitterState = null;
+        workspaceSplitter.classList.remove("dragging");
+        document.body.classList.remove("is-resizing-side");
+      };
+      workspaceSplitter.addEventListener("pointerup", endSplitter);
+      workspaceSplitter.addEventListener("pointercancel", endSplitter);
+      workspaceSplitter.addEventListener("dblclick", () => {
+        document.documentElement.style.removeProperty("--side-width");
+        try { localStorage.removeItem(SIDE_WIDTH_KEY); } catch (e) {}
+      });
+    }
     // 前端逻辑 / Frontend logic
     canvas.addEventListener("pointerdown", (event) => {
       // 前端逻辑 / Frontend logic

@@ -43,7 +43,10 @@ def score_available_candidates(config: dict, target_binary, candidate_id: str | 
         export_path = exports_dir / candidate_path.name  # 构造 COMSOL 导出路径 / Build COMSOL export path
         if not export_path.exists():  # 检查导出目录是否存在 / Check whether export directory exists
             continue  # 跳过未仿真的候选 / Skip unsimulated candidate
-        result = score_candidate(candidate_path, export_path, target_binary, config)  # 计算候选分数 / Score candidate
+        try:  # 尝试评分 / Try scoring
+            result = score_candidate(candidate_path, export_path, target_binary, config)  # 计算候选分数 / Score candidate
+        except Exception:  # 兼容无模态文件的候选 / Tolerate candidates without mode files
+            continue  # 跳过失败候选 / Skip failed candidates
         rows.append({"candidate_id": candidate_path.name, "best_mode": result["best_mode"], "best_iou": result["best_iou"], "best_dice": result["best_dice"], "best_distance_similarity": result.get("best_distance_similarity", ""), "best_overlap_balance": result.get("best_overlap_balance", ""), "best_layout_similarity": result.get("best_layout_similarity", ""), "best_area_similarity": result.get("best_area_similarity", ""), "best_precision": result.get("best_precision", ""), "best_recall": result.get("best_recall", ""), "best_projection_similarity": result.get("best_projection_similarity", ""), "best_extent_similarity": result.get("best_extent_similarity", ""), "best_complexity_similarity": result.get("best_complexity_similarity", ""), "best_component_similarity": result.get("best_component_similarity", ""), "best_centerline_penalty": result.get("best_centerline_penalty", ""), "frequency_hz": result["frequency_hz"], "final_score": result["final_score"]})  # 添加排行行 / Add ranking row
     ranking = sorted(rows, key=lambda item: item["final_score"], reverse=True)  # 按最终分数排序 / Sort by final score
     with (candidates_dir / "ranked_candidates.csv").open("w", encoding="utf-8", newline="") as file_obj:  # 打开排行文件 / Open ranking file
@@ -53,4 +56,9 @@ def score_available_candidates(config: dict, target_binary, candidate_id: str | 
     from src.scoring.feasibility import save_feasibility_report  # 延迟导入可行性报告 / Lazily import feasibility report
     report_path = candidates_dir.parent / "reports" / "feasibility_report.json"  # 构造随候选根目录移动的报告路径 / Build report path that follows candidate root
     save_feasibility_report(config, report_path)  # 保存最新可行性诊断 / Save latest feasibility diagnosis
+    try:  # 尝试同时输出 W2 统一排行 / Also emit W2 unified ranking when possible
+        from src.scoring.unified_ranker import rank_candidates_unified  # 延迟导入统一排序 / Lazily import unified ranker
+        rank_candidates_unified(config, target_binary, candidate_filter=[candidate_id] if candidate_id else None)  # 写双列排行 / Write dual-column ranking
+    except Exception:  # 兼容缺少振幅响应或目标判定文件 / Tolerate missing forced-response or verdict file
+        pass  # 静默跳过 / Silently skip
     return ranking  # 返回排行列表 / Return ranking list

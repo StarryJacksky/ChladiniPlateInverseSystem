@@ -5,6 +5,7 @@ from pathlib import Path  # 导入路径工具 / Import path utilities
 
 SOURCE_SUFFIXES = {".py", ".m", ".html"}  # 定义需要检查的源码后缀 / Define source suffixes to check
 EXCLUDED_PATHS = {Path("reports/chladni_baseline_export.m")}  # 排除自动导出的巨大参考文件 / Exclude huge generated reference file
+EXCLUDED_DIR_NAMES = {".venv", "venv", ".git", "__pycache__", "node_modules", ".tox", "build", "dist", ".mypy_cache", ".pytest_cache"}  # 排除虚拟环境与缓存目录 / Exclude virtual envs and cache dirs
 
 
 def has_bilingual_marker(line: str) -> bool:  # 判断一行是否含中英注释标记 / Decide whether a line has bilingual comment marker
@@ -40,6 +41,8 @@ def check_file(path: Path) -> list[str]:  # 检查单个文件 / Check one file
 def iter_source_files(root: Path) -> list[Path]:  # 枚举源码文件 / Enumerate source files
     files = []  # 创建文件列表 / Create file list
     for path in root.rglob("*"):  # 遍历项目文件 / Iterate project files
+        if any(part in EXCLUDED_DIR_NAMES for part in path.parts):  # 跳过排除目录 / Skip excluded directories
+            continue  # 继续下一项 / Continue to next item
         if path.is_file() and path.suffix in SOURCE_SUFFIXES and path not in EXCLUDED_PATHS:  # 筛选源码文件 / Filter source files
             files.append(path)  # 添加源码路径 / Add source path
     return sorted(files)  # 返回排序后的文件 / Return sorted files

@@ -4,6 +4,8 @@ from pathlib import Path  # 导入路径工具 / Import path utilities
 
 import numpy as np  # 导入数值计算库 / Import numerical library
 
+from src.topology_grammar.primitives import write_operator_contract_csvs  # 导入算子塑形合同写入函数 / Import operator-contract writer
+
 
 MATERIAL_PARAMETER_SPECS = {  # 定义材料参数导出合同 / Define material parameter export contract
     "density_kg_m3": ("mat_density", "kg/m^3"),  # 密度参数 / Density parameter
@@ -84,11 +86,12 @@ def export_design_variable_parameter_csv(candidate_path: Path, path: str | Path)
     return output_path  # 返回输出路径 / Return output path
 
 
-def export_candidate_for_comsol(candidate_dir: str | Path, material: dict | None = None) -> Path:  # 导出候选 COMSOL 参数 / Export candidate COMSOL parameters
+def export_candidate_for_comsol(candidate_dir: str | Path, material: dict | None = None, config: dict | None = None) -> Path:  # 导出候选 COMSOL 参数 / Export candidate COMSOL parameters
     path = Path(candidate_dir)  # 转换为路径对象 / Convert to path object
     H = np.loadtxt(path / "H.csv", delimiter=",")  # 读取厚度矩阵 / Load thickness matrix
     output_path = path / "comsol_parameters.csv"  # 设置输出路径 / Set output path
     export_parameter_csv(H, output_path)  # 导出参数表 / Export parameter table
     export_material_parameter_csv(material, path / "material_parameters.csv")  # 导出材料参数表 / Export material parameter table
     export_design_variable_parameter_csv(path, path / "design_variable_parameters.csv")  # 导出扩展设计变量表 / Export expanded design-variable table
+    write_operator_contract_csvs(path, config or {})  # 导出默认算子塑形合同 / Export default operator-sculpting contract
     return output_path  # 返回输出路径 / Return output path

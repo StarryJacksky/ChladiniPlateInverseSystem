@@ -4,10 +4,13 @@ import os
 import secrets
 import string
 from dataclasses import dataclass
+from pathlib import Path
 
 
 _GENERATED_USER = ""
 _GENERATED_PASSWORD = ""
+
+_CRED_STATE_PATH = Path("data/.comsol_credentials.state")
 
 
 @dataclass(frozen=True)
@@ -31,6 +34,44 @@ def set_comsol_credentials(username: str, password: str) -> ComsolCredentials:
     return ComsolCredentials(clean_username, str(password or ""), False)
 
 
+def _load_persisted_credentials() -> tuple[str, str]:
+    try:
+        if _CRED_STATE_PATH.exists():
+            lines = _CRED_STATE_PATH.read_text(encoding="utf-8").splitlines()
+            data = {}
+            for line in lines:
+                if "=" in line:
+                    k, v = line.split("=", 1)
+                    data[k.strip()] = v.strip()
+            return data.get("COMSOL_SERVER_USER", ""), data.get("COMSOL_SERVER_PASSWORD", "")
+    except OSError:
+        pass
+    return "", ""
+
+
+def _persist_credentials(user: str, password: str) -> None:
+    try:
+        _CRED_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _CRED_STATE_PATH.write_text(
+            f"COMSOL_SERVER_USER={user}\nCOMSOL_SERVER_PASSWORD={password}\n",
+            encoding="utf-8",
+        )
+        try:
+            os.chmod(_CRED_STATE_PATH, 0o600)
+        except OSError:
+            pass
+    except OSError:
+        pass
+
+
+def clear_persisted_credentials() -> None:
+    try:
+        if _CRED_STATE_PATH.exists():
+            _CRED_STATE_PATH.unlink()
+    except OSError:
+        pass
+
+
 def ensure_comsol_credentials(config: dict | None = None) -> ComsolCredentials:
     global _GENERATED_USER, _GENERATED_PASSWORD
     comsol_config = (config or {}).get("comsol", {})
@@ -44,11 +85,17 @@ def ensure_comsol_credentials(config: dict | None = None) -> ComsolCredentials:
         os.environ["COMSOL_SERVER_USER"] = configured_user
         os.environ["COMSOL_SERVER_PASSWORD"] = configured_password
         return ComsolCredentials(configured_user, configured_password, False)
+    persisted_user, persisted_password = _load_persisted_credentials()
+    if persisted_user:
+        os.environ["COMSOL_SERVER_USER"] = persisted_user
+        os.environ["COMSOL_SERVER_PASSWORD"] = persisted_password
+        return ComsolCredentials(persisted_user, persisted_password, True)
     if not _GENERATED_USER:
         _GENERATED_USER = "codex_" + _random_token(8)
         _GENERATED_PASSWORD = _random_token(24)
     os.environ["COMSOL_SERVER_USER"] = _GENERATED_USER
     os.environ["COMSOL_SERVER_PASSWORD"] = _GENERATED_PASSWORD
+    _persist_credentials(_GENERATED_USER, _GENERATED_PASSWORD)
     return ComsolCredentials(_GENERATED_USER, _GENERATED_PASSWORD, True)
 
 

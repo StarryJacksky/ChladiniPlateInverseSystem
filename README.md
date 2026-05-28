@@ -8,11 +8,33 @@ Chladni Studio 是一个用于 Chladni 板的本地逆向设计工具。用户�
 
 ## Start Here / 从这里开始
 
+- **[★ Final Results & Production Pipeline / 最终成果与生产流水线](./docs/final_results.zh-CN.md)** — read first / 推荐先读
+- [Reports Index / 报告索引](./reports/INDEX.md) · [Candidates Index / 候选索引](./candidates/INDEX.md) · [Scripts Index / 脚本索引](./scripts/INDEX.md)
 - [Deployment Guide / 三系统部署教程](./docs/deployment_guide.md) ([中文](./docs/deployment_guide.zh-CN.md) | [English](./docs/deployment_guide.en.md))
 - [User Manual / 软件使用说明书](./docs/user_manual.md) ([中文](./docs/user_manual.zh-CN.md) | [English](./docs/user_manual.en.md))
 - [Code Structure and Logic / 项目代码结构与逻辑说明](./docs/code_structure.md) ([中文](./docs/code_structure.zh-CN.md) | [English](./docs/code_structure.en.md))
 - [Documentation Index / 文档索引](./docs/README.md) ([中文](./docs/README.zh-CN.md) | [English](./docs/README.en.md))
+- [Algorithm Breakthrough Plan / 算法突破规划](./reports/algorithm_breakthrough_plan.zh-CN.md) ([中文](./reports/algorithm_breakthrough_plan.zh-CN.md) | [English](./reports/algorithm_breakthrough_plan.en.md))
+- [Algorithm Trial History (350+ experiments) / 算法 350+ 次试错全史](./reports/algorithm_trial_full_history.zh-CN.md)
 - [Remaining Work Plan / 后续任务规划](./reports/remaining_work_plan.md) ([中文](./reports/remaining_work_plan.zh-CN.md) | [English](./reports/remaining_work_plan.en.md))
+
+## Production Pipeline (Recommended Path) / 生产流水线（推荐入口）
+
+After 350+ experiments, the validated end-to-end inverse-design path is **W10 surrogate → COMSOL eigfreq → Phase 1 IC-likeness → Phase 2 trust-region**. It achieves **4.85× broad enrichment / 3.94× tight enrichment** on the IC target with tier1 CF-PETG (`stiffness_ratio ≈ 3`) in full COMSOL forced-response validation.
+
+经过 350+ 次实验，最终验证有效的逆向设计路径为 **W10 surrogate → COMSOL eigfreq → Phase 1 IC-likeness → Phase 2 trust-region**。在 tier1 CF-PETG 上 IC 目标的 COMSOL 强迫响应验证达到 **4.85× 宽富集 / 3.94× 紧富集**。
+
+```powershell
+# CLI (full pipeline ≈ 2 h with COMSOL LiveLink):
+python scripts/run_production_pipeline.py --candidate-id my_run
+
+# CLI (surrogate-only preview ≈ 30 s):
+python scripts/run_production_pipeline.py --candidate-id preview --skip-comsol
+
+# UI: open Run tab → "Production Pipeline" panel → click "Run Production Pipeline"
+```
+
+See [final_results.zh-CN.md](./docs/final_results.zh-CN.md) for full discussion of algorithm state, physical limits, and customer usage.
 
 ## What It Does / 它能做什么
 

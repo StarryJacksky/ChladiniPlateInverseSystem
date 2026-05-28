@@ -2,6 +2,9 @@
 
 [Language / 语言](./remaining_work_plan.md): Bilingual | [中文](./remaining_work_plan.zh-CN.md) | [English](./remaining_work_plan.en.md)
 
+> Algorithm-breakthrough roadmap is tracked in [`algorithm_breakthrough_plan.md`](./algorithm_breakthrough_plan.en.md) ([中文](./algorithm_breakthrough_plan.zh-CN.md)). This document covers only maintenance work and tasks waiting for external inputs.
+> 算法突破主线见 [`algorithm_breakthrough_plan.zh-CN.md`](./algorithm_breakthrough_plan.zh-CN.md)。本文只覆盖维护性工作与等待外部输入的任务。
+
 This document separates tasks Codex can continue now from tasks blocked by real material, COMSOL, or physical-test data.
 本文把 Codex 现在还能继续做的任务，与需要真实材料、COMSOL 或实体测试数据后才能做的任务分开。
 

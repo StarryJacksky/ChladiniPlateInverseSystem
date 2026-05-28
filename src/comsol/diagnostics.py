@@ -12,6 +12,7 @@ from src.comsol.discovery import discover_runtime_environment  # 导入运行环
 from src.comsol.discovery import config_with_runtime_discovery  # 导入运行时配置补全 / Import runtime config completion
 from src.comsol.design_contract import expected_design_parameter_names  # 导入扩展设计参数名 / Import expanded design parameter names
 from src.comsol.export_parameters import export_candidate_for_comsol  # 导入参数导出函数 / Import parameter export helper
+from src.comsol.run_livelink import build_forced_matlab_batch  # 导入强迫响应 batch 构造函数 / Import forced-response batch builder
 from src.comsol.run_livelink import build_matlab_batch  # 导入 MATLAB batch 构造函数 / Import MATLAB batch builder
 from src.comsol.server import is_server_reachable  # 导入 server 端口检查 / Import server port check
 
@@ -188,6 +189,17 @@ def check_runner_contract(runner_path: Path) -> dict:  # 检查 LiveLink runner 
     return self_test_item("LiveLink runner contract", ok, message, str(runner_path))  # 返回检查结果 / Return check result
 
 
+def check_forced_runner_contract(runner_path: Path) -> dict:  # 检查强迫响应 runner 合同 / Check forced-response runner contract
+    if not runner_path.exists():  # 检查 runner 是否存在 / Check whether runner exists
+        return self_test_item("Forced-response runner contract", False, "Forced-response runner file is missing. / 强迫响应 runner 文件不存在。", str(runner_path))  # 返回缺失结果 / Return missing result
+    text = runner_path.read_text(encoding="utf-8", errors="ignore")  # 读取 runner 文本 / Read runner text
+    required_tokens = ["function run_chladni_forced_response", "frequency_parameters.csv", "actuator_parameters.csv", "forced_response.csv", "std_mosaic_forced"]  # 定义强迫响应合同片段 / Define forced-response contract tokens
+    missing = [token for token in required_tokens if token not in text]  # 查找缺失片段 / Find missing tokens
+    ok = not missing  # 判断是否通过 / Decide whether passed
+    message = "Forced-response runner contract looks complete. / 强迫响应 runner 合同看起来完整。" if ok else f"Missing tokens: {', '.join(missing)}"  # 生成检查消息 / Build check message
+    return self_test_item("Forced-response runner contract", ok, message, str(runner_path))  # 返回检查结果 / Return check result
+
+
 def check_design_contract_runner(script_path: Path) -> dict:  # 检查设计变量合同脚本 / Check design-variable contract script
     if not script_path.exists():  # 检查脚本是否存在 / Check whether script exists
         return self_test_item("Design contract runner", False, "Design contract script is missing. / 设计变量合同脚本不存在。", str(script_path))  # 返回缺失结果 / Return missing result
@@ -304,11 +316,22 @@ def check_matlab_batch(config: dict) -> dict:  # 检查 MATLAB batch 表达式 /
     return self_test_item("MATLAB batch dry run", ok, message)  # 返回检查结果 / Return check result
 
 
+def check_forced_matlab_batch(config: dict) -> dict:  # 检查强迫响应 MATLAB batch 表达式 / Check forced-response MATLAB batch expression
+    comsol_config = config.get("comsol", {})  # 读取 COMSOL 配置 / Read COMSOL config
+    model = resolve_project_path(comsol_config.get("model_path", ""))  # 解析模型路径 / Resolve model path
+    runner = resolve_project_path(comsol_config.get("forced_response_runner_path", "comsol_templates/run_chladni_forced_response.m"))  # 解析强迫响应 runner 路径 / Resolve forced-response runner path
+    batch = build_forced_matlab_batch(model, Path("candidate_000_0000"), Path("data/comsol_exports/candidate_000_0000/forced_response"), runner)  # 构造测试 batch / Build test batch
+    ok = "run_chladni_forced_response" in batch and str(model.resolve()) in batch  # 检查表达式关键内容 / Check expression key content
+    message = "Forced-response MATLAB batch expression can be built. / 强迫响应 MATLAB batch 表达式可构造。" if ok else "Forced-response MATLAB batch expression is incomplete. / 强迫响应 MATLAB batch 表达式不完整。"  # 生成检查消息 / Build check message
+    return self_test_item("Forced-response MATLAB batch dry run", ok, message)  # 返回检查结果 / Return check result
+
+
 def run_deployment_self_test(config: dict) -> dict:  # 运行部署自检 / Run deployment self-test
     diagnostics = diagnose_comsol_environment(config)  # 运行基础诊断 / Run base diagnostics
     comsol_config = config.get("comsol", {})  # 读取 COMSOL 配置 / Read COMSOL config
     paths_config = config.get("paths", {})  # 读取路径配置 / Read path config
     runner_path = resolve_project_path(comsol_config.get("runner_path", ""))  # 解析 runner 路径 / Resolve runner path
+    forced_runner_path = resolve_project_path(comsol_config.get("forced_response_runner_path", "comsol_templates/run_chladni_forced_response.m"))  # 解析强迫响应 runner 路径 / Resolve forced-response runner path
     design_runner_path = resolve_project_path(comsol_config.get("design_contract_runner_path", ""))  # 解析设计合同脚本路径 / Resolve design-contract script path
     export_dir = resolve_project_path(paths_config.get("comsol_exports_dir", "data/comsol_exports"))  # 解析导出目录 / Resolve export directory
     grid_size = int(config["project"]["grid_size"])  # 读取网格尺寸 / Read grid size
@@ -316,11 +339,13 @@ def run_deployment_self_test(config: dict) -> dict:  # 运行部署自检 / Run 
         self_test_item("Diagnostics readiness", bool(diagnostics["ready_for_auto_run"]), "Base diagnostics are ready. / 基础诊断已就绪。" if diagnostics["ready_for_auto_run"] else "Base diagnostics are not ready. / 基础诊断尚未就绪。"),  # 添加基础诊断结果 / Add base diagnostics result
         self_test_item("Grid calibration", grid_size == 15 and grid_size % 2 == 1, f"grid_size={grid_size}. / 网格尺寸={grid_size}。"),  # 添加网格校准检查 / Add grid calibration check
         check_runner_contract(runner_path),  # 添加 runner 合同检查 / Add runner contract check
+        check_forced_runner_contract(forced_runner_path),  # 添加强迫响应 runner 合同检查 / Add forced-response runner contract check
         check_design_contract_runner(design_runner_path),  # 添加设计变量合同脚本检查 / Add design-variable contract script check
         check_export_directory_write(export_dir),  # 添加导出目录写入检查 / Add export directory write check
         check_timeout_config(config),  # 添加超时配置检查 / Add timeout configuration check
         check_parameter_export(config),  # 添加参数导出检查 / Add parameter export check
         check_matlab_batch(config),  # 添加 MATLAB batch 检查 / Add MATLAB batch check
+        check_forced_matlab_batch(config),  # 添加强迫响应 MATLAB batch 检查 / Add forced-response MATLAB batch check
     ]  # 结束自检列表 / End self-test list
     ready = all(item["status"] == "ok" for item in checks if item.get("required", True))  # 计算自检是否通过 / Compute self-test readiness
     return {"ready": ready, "checks": checks, "diagnostics": diagnostics}  # 返回自检结果 / Return self-test result
@@ -340,6 +365,7 @@ def diagnose_comsol_environment(config: dict) -> dict:  # 诊断 COMSOL/MATLAB �
         check_license_environment(),  # 添加 license 环境提示 / Add license environment hint
         check_path("Bound MPH model", comsol_config.get("model_path", ""), True, False),  # 检查绑定模型 / Check bound model
         check_path("LiveLink runner", comsol_config.get("runner_path", ""), True, False),  # 检查 LiveLink 脚本 / Check LiveLink runner
+        check_path("Forced-response runner", comsol_config.get("forced_response_runner_path", "comsol_templates/run_chladni_forced_response.m"), True, False),  # 检查强迫响应脚本 / Check forced-response runner
         check_path("Design contract runner", comsol_config.get("design_contract_runner_path", ""), True, False),  # 检查设计合同脚本 / Check design contract runner
         check_path("Source MPH model", comsol_config.get("source_model_path", ""), False, False),  # 检查原始模型 / Check source model
         check_output_directory("COMSOL exports", paths_config.get("comsol_exports_dir", "data/comsol_exports")),  # 检查导出目录 / Check export directory

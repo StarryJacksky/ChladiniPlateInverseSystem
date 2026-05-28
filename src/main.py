@@ -13,7 +13,8 @@ from src.optimisation.random_search import score_available_candidates  # 导入�
 
 def build_parser() -> argparse.ArgumentParser:  # 创建命令行解析器 / Build command-line parser
     parser = argparse.ArgumentParser(description="Chladni inverse design MVP. / Chladni 逆向设计 MVP。")  # 初始化解析器 / Initialise parser
-    parser.add_argument("command", choices=["prepare-target", "target-ui", "run-workflow", "generate-candidates", "generate-previews", "simulate-candidate", "simulate-batch", "render-mode-previews", "audit-comsol-model", "apply-comsol-design-contract", "discover-comsol", "apply-comsol-discovery", "diagnose-comsol", "diagnose-feasibility", "self-test", "validate-comsol-exports", "score-candidates"], help="Workflow command. / 工作流命令。")  # 添加命令参数 / Add command argument
+    commands = ["prepare-target", "target-ui", "run-workflow", "generate-candidates", "generate-previews", "simulate-candidate", "simulate-forced-response", "simulate-batch", "render-mode-previews", "audit-comsol-model", "apply-comsol-design-contract", "discover-comsol", "apply-comsol-discovery", "diagnose-comsol", "diagnose-feasibility", "self-test", "validate-comsol-exports", "score-candidates"]  # 定义可用命令 / Define available commands
+    parser.add_argument("command", choices=commands, help="Workflow command. / 工作流命令。")  # 添加命令参数 / Add command argument
     parser.add_argument("--config", default="config.yaml", help="Config file path. / 配置文件路径。")  # 添加配置路径参数 / Add config path argument
     parser.add_argument("--host", default="127.0.0.1", help="Target UI host. / 目标 UI 主机。")  # 添加 UI 主机参数 / Add UI host argument
     parser.add_argument("--port", type=int, default=8765, help="Target UI port. / 目标 UI 端口。")  # 添加 UI 端口参数 / Add UI port argument
@@ -69,6 +70,12 @@ def main() -> None:  # 主程序入口 / Main program entry
             raise ValueError("--candidate-id is required for simulate-candidate. / simulate-candidate 需要 --candidate-id。")  # 抛出参数错误 / Raise argument error
         result = run_livelink_candidate(config, args.candidate_id, args.num_modes or None, args.model or None)  # 运行候选仿真 / Run candidate simulation
         print(f"Simulated {result['candidate_id']} into {result['export_dir']}. / 已仿真 {result['candidate_id']}，导出到 {result['export_dir']}。")  # 打印仿真结果 / Print simulation result
+    if args.command == "simulate-forced-response":  # 判断是否运行强迫响应验证 / Check forced-response simulation command
+        from src.comsol.run_livelink import run_livelink_forced_response  # 延迟导入强迫响应 runner / Lazily import forced-response runner
+        if not args.candidate_id:  # 检查候选编号 / Check candidate id
+            raise ValueError("--candidate-id is required for simulate-forced-response. / simulate-forced-response 需要 --candidate-id。")  # 抛出参数错误 / Raise argument error
+        result = run_livelink_forced_response(config, args.candidate_id, args.model or None)  # 运行强迫响应仿真 / Run forced-response simulation
+        print(f"Forced-response simulated {result['candidate_id']} into {result['export_dir']}. / 已完成 {result['candidate_id']} 的强迫响应仿真，导出到 {result['export_dir']}。")  # 打印强迫响应结果 / Print forced-response result
     if args.command == "simulate-batch":  # 判断是否批量仿真 / Check batch-simulation command
         from src.comsol.run_livelink import run_livelink_batch  # 延迟导入批量 LiveLink runner / Lazily import batch LiveLink runner
         candidate_ids = [args.candidate_id] if args.candidate_id else None  # 读取指定候选编号 / Read optional candidate id
