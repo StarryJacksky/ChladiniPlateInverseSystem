@@ -282,6 +282,18 @@ def is_likely_mphserver_problem(output: str, returncode: int) -> bool:
     return False
 
 
+CREDENTIALS_REQUIRED_MESSAGE = (
+    "COMSOL_CREDENTIALS_REQUIRED: COMSOL Server username or password is missing or incorrect. "
+    "/ COMSOL Server 用户名或密码缺失或错误。"
+)
+
+
+def _emit_retry(progress, event_base: dict | None, message: str, log_path: Path) -> None:
+    if progress is None:
+        return
+    progress({**(event_base or {}), "stage": "retry", "message": message, "log_path": str(log_path)})
+
+
 def run_matlab_with_mphserver_retry(
     command: list[str],
     log_path: Path,
@@ -293,18 +305,31 @@ def run_matlab_with_mphserver_retry(
     max_attempts: int | None = None,
 ) -> tuple[int, str]:
     """Run a MATLAB ``-batch`` command and self-heal transient COMSOL
-    mphserver failures.
+    mphserver failures, borrowing all the safety nets the legacy
+    ``run_livelink_candidate`` path already had:
 
-    Each attempt streams output to ``log_path`` (subsequent attempts append
-    a clearly marked "--- retry ---" section). On a non-zero return code we
-    inspect the log; if it looks transient (LiveLink connection refused,
-    license / engine errors, near-empty output) we call ``reset_mphserver``
-    — which **kills any stale ``comsolmphserver`` process on the configured
-    port** and starts a fresh one — then retry. Hard MATLAB / model errors
-    fail fast without wasting cycles on a retry that would re-trigger the
-    same crash.
+    * **Refresh COMSOL credentials and server env vars before every attempt**
+      so a stale ``os.environ`` (or a worker forked before
+      ``ensure_comsol_credentials`` ran) can't silently break MATLAB's
+      login.
+    * **Fail fast on credential errors** — re-raise with the
+      ``COMSOL_CREDENTIALS_REQUIRED:`` token prefix the frontend matches in
+      ``frontend/comsol_credentials.js`` to pop the username/password
+      prompt. Retrying with bad creds would just burn another 7200-second
+      timeout for nothing.
+    * **Escalating retry policy**: the first retry only re-runs
+      ``ensure_comsol_server`` (cheap — just starts a server if the port
+      is unreachable). Only if a *second* retry is needed do we hard-reset
+      via ``reset_mphserver`` (kill the stale ``comsolmphserver`` on the
+      configured port, then start a fresh one). This avoids tearing down
+      a healthy server when the failure was a one-off LiveLink hiccup.
+    * **Skip retries on hard MATLAB / model errors** (``Error using``,
+      ``Undefined function``, ``Index exceeds``, ...) — they're not going
+      to fix themselves and a retry just doubles the wall-clock cost.
 
-    Returns the final ``(returncode, accumulated_output)``.
+    Each attempt streams output to ``log_path``; retries append a
+    ``--- retry ---`` section to the same log so users can read one file
+    to see the full history. Returns ``(returncode, accumulated_output)``.
     """
     from src.comsol.server import reset_mphserver  # 延迟导入避免循环 / Lazy import avoids a cycle
 
@@ -312,11 +337,22 @@ def run_matlab_with_mphserver_retry(
     if max_attempts is None:
         max_attempts = int(comsol_config.get("retry_max_attempts", 2))
     max_attempts = max(1, int(max_attempts))
-    server_wait_s = float(comsol_config.get("server_start_timeout_s", 60.0))
+    server_wait_s = float(comsol_config.get("server_start_timeout_s", 30.0))
 
     accumulated_output = ""
     rc = 0
+    last_output = ""
+
     for attempt in range(1, max_attempts + 1):
+        # Defensive refresh: a previous attempt may have killed the server,
+        # forks may have lost the env vars, etc. Both helpers are idempotent. /
+        # 每次发车前补一遍凭据 + server env vars，避免 fork/重启把环境弄丢
+        try:
+            ensure_comsol_credentials(runtime_config)
+            apply_comsol_server_environment(runtime_config)
+        except Exception:
+            pass
+
         rc, output = run_command_streamed(
             command,
             log_path,
@@ -326,29 +362,59 @@ def run_matlab_with_mphserver_retry(
             append=(attempt > 1),
         )
         accumulated_output = (accumulated_output + "\n" + (output or "")) if accumulated_output else (output or "")
+        last_output = output or ""
+
         if rc == 0:
             return 0, accumulated_output
+
+        # Credential failure → fail fast with the token-prefixed message so the
+        # UI's credential prompt fires (``frontend/comsol_credentials.js``
+        # matches the lowercased token). / 凭据错误 → 立刻抛出带 token 的异常让前端弹凭据界面
+        if is_credential_failure(last_output):
+            raise RuntimeError(CREDENTIALS_REQUIRED_MESSAGE)
+
         if attempt >= max_attempts:
             break
-        if not is_likely_mphserver_problem(output, rc):
-            # Looks like a hard error (model bug, missing input, syntax) — don't burn another COMSOL invocation. /
-            # 看起来是硬错误（模型/输入/语法），不浪费一次 COMSOL 调用重试
+
+        if not is_likely_mphserver_problem(last_output, rc):
+            # Hard MATLAB / model error — retry won't help. /
+            # 模型/语法等硬错误，重试无效
             break
-        retry_msg = (
-            f"{label}: attempt {attempt}/{max_attempts} failed (rc={rc}); "
-            f"resetting mphserver and retrying. / 第 {attempt}/{max_attempts} 次失败 (rc={rc})，正在重置 mphserver 并重试。"
-        )
-        if progress is not None:
-            progress({**(event_base or {}), "stage": "retry", "message": retry_msg, "log_path": str(log_path)})
+
         try:
-            reset_mphserver(runtime_config, wait_s=server_wait_s)
+            if attempt == 1:
+                # Cheap recovery: just make sure the server is up. /
+                # 先做便宜的恢复：确保 server 还活着
+                _emit_retry(
+                    progress, event_base,
+                    f"{label}: attempt {attempt}/{max_attempts} failed (rc={rc}); ensuring mphserver and retrying. "
+                    f"/ 第 {attempt}/{max_attempts} 次失败 (rc={rc})，确保 mphserver 在并重试。",
+                    log_path,
+                )
+                ensure_comsol_server(runtime_config, wait_s=server_wait_s)
+            else:
+                # Stronger recovery: kill any stale listener and start fresh. /
+                # 更狠的恢复：杀掉端口上的旧 mphserver 再起新的
+                _emit_retry(
+                    progress, event_base,
+                    f"{label}: attempt {attempt}/{max_attempts} failed (rc={rc}); hard-resetting mphserver and retrying. "
+                    f"/ 第 {attempt}/{max_attempts} 次失败 (rc={rc})，硬重置 mphserver 并重试。",
+                    log_path,
+                )
+                reset_mphserver(runtime_config, wait_s=server_wait_s)
         except Exception as exc:
-            # If even the reset fails just give up — outer code will surface the underlying error. /
-            # 连重置都失败就直接放弃，让外层把根本错误抛出来
-            if progress is not None:
-                progress({**(event_base or {}), "stage": "retry", "message": f"reset_mphserver raised: {exc}", "log_path": str(log_path)})
+            # Recovery itself failed — surface the original MATLAB error to the caller. /
+            # 连恢复都挂了就不再重试，让外层把原始 MATLAB 错误抛上去
+            _emit_retry(progress, event_base, f"server recovery raised: {exc}", log_path)
             break
+
         time.sleep(2.0)  # 给 mphserver 一点缓冲再发下一发 / Give mphserver a brief warm-up before re-firing
+
+    # Final guard: if a credential failure only showed up after a retry, still surface it cleanly. /
+    # 兜底：某次重试后才露出凭据错误也照样抛 token 异常
+    if rc != 0 and is_credential_failure(last_output):
+        raise RuntimeError(CREDENTIALS_REQUIRED_MESSAGE)
+
     return rc, accumulated_output
 
 
@@ -372,16 +438,14 @@ def run_livelink_candidate(config: dict, candidate_id: str, num_modes: int | Non
     command = [matlab, "-nosplash", "-noFigureWindows", "-sd", str(Path.cwd()), "-batch", batch]
     log_path = export_dir / "livelink.log"
     timeout_s = float(runtime_config.get("comsol", {}).get("livelink_timeout_s", 7200))
-    returncode, output = run_command_streamed(command, log_path, progress, {"current_candidate": candidate_id}, timeout_s)
-    if returncode != 0 and is_credential_failure(output):
-        raise RuntimeError("COMSOL_CREDENTIALS_REQUIRED: COMSOL Server username or password is missing or incorrect. / COMSOL Server 用户名或密码缺失或错误。")
-    if returncode != 0 and is_livelink_connection_failure(output):
-        if progress is not None:
-            progress({"current_candidate": candidate_id, "stage": "retry", "message": "LiveLink connection failed once; restarting COMSOL server and retrying. / LiveLink 首次连接失败，正在重启 COMSOL server 并重试。", "log_path": str(log_path)})
-        ensure_comsol_server(runtime_config, wait_s=float(runtime_config.get("comsol", {}).get("server_start_timeout_s", 30.0)))
-        returncode, output = run_command_streamed(command, log_path, progress, {"current_candidate": candidate_id}, timeout_s, append=True)
-    if returncode != 0 and is_credential_failure(output):
-        raise RuntimeError("COMSOL_CREDENTIALS_REQUIRED: COMSOL Server username or password is missing or incorrect. / COMSOL Server 用户名或密码缺失或错误。")
+    # 统一走带 mphserver 重置 + 凭据 fail-fast 的 retry wrapper / Route through the unified wrapper (mphserver reset + credential fail-fast)
+    returncode, _output = run_matlab_with_mphserver_retry(
+        command, log_path, runtime_config,
+        label=f"LiveLink eigenfreq ({candidate_id})",
+        timeout_s=timeout_s,
+        progress=progress,
+        event_base={"current_candidate": candidate_id},
+    )
     if returncode != 0:
         raise RuntimeError(f"LiveLink simulation failed for {candidate_id}. See {log_path}. / {candidate_id} 的 LiveLink 仿真失败，见 {log_path}。")
     return {"candidate_id": candidate_id, "export_dir": str(export_dir), "num_modes": modes, "returncode": returncode, "log_path": str(log_path)}
@@ -408,20 +472,18 @@ def run_livelink_forced_response(config: dict, candidate_id: str, model_path: st
     log_path = export_dir / "livelink_forced_response.log"  # 构造日志路径 / Build log path
     timeout_s = float(comsol_config.get("livelink_timeout_s", 7200))  # 读取 LiveLink 超时 / Read LiveLink timeout
     event_base = {"current_candidate": candidate_id, "simulation_type": "forced_response"}  # 构造进度基础字段 / Build progress base fields
-    returncode, output = run_command_streamed(command, log_path, progress, event_base, timeout_s)  # 运行 MATLAB batch / Run MATLAB batch
-    if returncode != 0 and is_credential_failure(output):  # 检查凭据错误 / Check credential failure
-        raise RuntimeError("COMSOL_CREDENTIALS_REQUIRED: COMSOL Server username or password is missing or incorrect. / COMSOL Server 用户名或密码缺失或错误。")  # 抛出凭据错误 / Raise credential error
-    if returncode != 0 and is_livelink_connection_failure(output):  # 检查连接失败 / Check connection failure
-        if progress is not None:  # 检查是否有进度回调 / Check whether progress callback exists
-            progress({**event_base, "stage": "retry", "message": "Forced-response LiveLink connection failed once; restarting COMSOL server and retrying. / 强迫响应 LiveLink 首次连接失败，正在重启 COMSOL server 并重试。", "log_path": str(log_path)})  # 发送重试进度 / Emit retry progress
-        ensure_comsol_server(runtime_config, wait_s=float(comsol_config.get("server_start_timeout_s", 30.0)))  # 确保 server 再次可用 / Ensure server is reachable again
-        returncode, output = run_command_streamed(command, log_path, progress, event_base, timeout_s, append=True)  # 重试 MATLAB batch / Retry MATLAB batch
-    if returncode != 0 and is_credential_failure(output):  # 再次检查凭据错误 / Check credential failure again
-        raise RuntimeError("COMSOL_CREDENTIALS_REQUIRED: COMSOL Server username or password is missing or incorrect. / COMSOL Server 用户名或密码缺失或错误。")  # 抛出凭据错误 / Raise credential error
-    if returncode != 0:  # 检查最终返回码 / Check final return code
-        raise RuntimeError(f"Forced-response LiveLink simulation failed for {candidate_id}. See {log_path}. / {candidate_id} 的强迫响应 LiveLink 仿真失败，见 {log_path}。")  # 抛出仿真失败 / Raise simulation failure
+    # 统一走带 mphserver 重置 + 凭据 fail-fast 的 retry wrapper / Route through the unified wrapper (mphserver reset + credential fail-fast)
+    returncode, _output = run_matlab_with_mphserver_retry(
+        command, log_path, runtime_config,
+        label=f"LiveLink forced-response ({candidate_id})",
+        timeout_s=timeout_s,
+        progress=progress,
+        event_base=event_base,
+    )
+    if returncode != 0:
+        raise RuntimeError(f"Forced-response LiveLink simulation failed for {candidate_id}. See {log_path}. / {candidate_id} 的强迫响应 LiveLink 仿真失败，见 {log_path}。")
     response_path = export_dir / "forced_response.csv"  # 构造响应文件路径 / Build response file path
-    return {"candidate_id": candidate_id, "export_dir": str(export_dir), "response_path": str(response_path), "returncode": returncode, "log_path": str(log_path)}  # 返回运行结果 / Return run result
+    return {"candidate_id": candidate_id, "export_dir": str(export_dir), "response_path": str(response_path), "returncode": returncode, "log_path": str(log_path)}
 
 
 def list_candidate_ids(config: dict, generation: int | None = None, limit: int | None = None) -> list[str]:
@@ -464,9 +526,12 @@ def run_livelink_batch(config: dict, candidate_ids: list[str] | None = None, gen
     command = [matlab, "-nosplash", "-noFigureWindows", "-sd", str(Path.cwd()), "-batch", "; ".join(batch_parts)]
     log_path = export_root / "livelink_batch.log"
     timeout_s = float(runtime_config.get("comsol", {}).get("livelink_timeout_s", 7200))
-    returncode, output = run_command_streamed(command, log_path, timeout_s=timeout_s)
-    if returncode != 0 and is_credential_failure(output):
-        raise RuntimeError("COMSOL_CREDENTIALS_REQUIRED: COMSOL Server username or password is missing or incorrect. / COMSOL Server 用户名或密码缺失或错误。")
+    # 统一走带 mphserver 重置 + 凭据 fail-fast 的 retry wrapper / Route through the unified wrapper
+    returncode, _output = run_matlab_with_mphserver_retry(
+        command, log_path, runtime_config,
+        label=f"LiveLink batch ({len(selected_ids)} candidates)",
+        timeout_s=timeout_s,
+    )
     if returncode != 0:
         raise RuntimeError(f"LiveLink batch simulation failed. See {log_path}. / LiveLink 批量仿真失败，见 {log_path}。")
     for result in results:
