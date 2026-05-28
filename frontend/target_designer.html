@@ -6890,39 +6890,27 @@
     });
     // 前端逻辑 / Frontend logic
     undoButton.addEventListener("click", () => {
-      // 前端逻辑 / Frontend logic
+      // Undo 之前先关 Stretch 面板，否则后续滑块会用旧 anchor 覆盖 undo 后的画布 /
+      // Close Stretch panel before undo so slider drags don't overwrite the restored canvas.
+      if (stretchActive) { try { closeStretchPanel(false); } catch (_) {} }
       if (history.length <= 1) {
-        // 前端逻辑 / Frontend logic
         return;
-      // 前端逻辑 / Frontend logic
       }
-      // 前端逻辑 / Frontend logic
       future.push(history.pop());
-      // 前端逻辑 / Frontend logic
       restoreState(history[history.length - 1]);
-    // 前端逻辑 / Frontend logic
     });
-    // 前端逻辑 / Frontend logic
     redoButton.addEventListener("click", () => {
-      // 前端逻辑 / Frontend logic
+      if (stretchActive) { try { closeStretchPanel(false); } catch (_) {} }
       if (future.length === 0) {
-        // 前端逻辑 / Frontend logic
         return;
-      // 前端逻辑 / Frontend logic
       }
-      // 前端逻辑 / Frontend logic
       const state = future.pop();
-      // 前端逻辑 / Frontend logic
       history.push(state);
-      // 前端逻辑 / Frontend logic
       restoreState(state);
-    // 前端逻辑 / Frontend logic
     });
-    // 前端逻辑 / Frontend logic
     clearButton.addEventListener("click", () => {
-      // 前端逻辑 / Frontend logic
+      if (stretchActive) { try { closeStretchPanel(false); } catch (_) {} }
       fillWhite();
-      // 前端逻辑 / Frontend logic
       pushHistory();
       // 前端逻辑 / Frontend logic
       setStatus("Canvas cleared");
@@ -6972,6 +6960,11 @@
         setStatus("Canvas snapshot failed — try Import or draw something first", "warn");
         return false;
       }
+      // 切到非 Stretch 模式时，把可能还开着的 Stretch 面板关掉（它的 anchor 与新模式无关）/
+      // Switching to a non-stretch placement closes any open Stretch panel (its anchor is stale).
+      if (mode !== "stretch" && stretchActive) {
+        try { closeStretchPanel(false); } catch (_) {}
+      }
       // 切换 mode 时跳过 trim（已经 trim 过了）和 polarity（用户已确认）/ Skip trim & auto-polarity when switching mode
       loadImageToCanvas(currentImportSrc, mode, { skipTrim: true, onComplete: opts.onComplete });
       return true;
@@ -6994,6 +6987,7 @@
       reapplyImportMode("stretch", { onComplete: openStretchPanel });
     });
     if (importToolButtons.crop) importToolButtons.crop.addEventListener("click", () => {
+      if (stretchActive) { try { closeStretchPanel(true); } catch (_) {} }  // 进 Crop 前提交 stretch，避免两个模式叠加 / Commit any open Stretch panel before entering Crop
       if (!ensureImportSource()) {
         setStatus("Canvas snapshot failed", "warn");
         return;
@@ -7012,6 +7006,7 @@
       updateImportModeButtons();
     });
     if (importToolButtons.invert) importToolButtons.invert.addEventListener("click", () => {
+      if (stretchActive) { try { closeStretchPanel(true); } catch (_) {} }  // Invert 在 Stretch 当前结果上动 — 先 Commit / Commit stretch first so invert hits the visible canvas
       invertCanvas();
       flashButton(importToolButtons.invert);
       setStatus("Polarity flipped", "good");
