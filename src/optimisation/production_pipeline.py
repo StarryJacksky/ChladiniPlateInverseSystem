@@ -73,6 +73,8 @@ def build_default_pipeline_config(config_yaml_path: str | Path = "config.yaml",
         phase1_top_k_modes=int(take("phase1_top_k_modes", 6)),
         phase1_off_resonance_hz=float(take("phase1_off_resonance_hz", 1.5)),
         magic_off_resonance_hz=magic,
+        enable_magic_freqs=bool(take("enable_magic_freqs", True)),
+        phase1_w10_topn=int(take("phase1_w10_topn", 3)),
         eig_n_modes=int(take("eig_n_modes", 30)),
         phase1_band_slack_hz=float(take("phase1_band_slack_hz", 20.0)),
         phase2_max_iters=int(take("phase2_max_iters", 3)),
@@ -126,6 +128,17 @@ class ProductionPipelineConfig:
     phase1_top_k_modes: int = 6
     phase1_off_resonance_hz: float = 1.5
     magic_off_resonance_hz: tuple[float, ...] = (165.0,)
+    # Magic freqs are tier1 (sr=3.0) empirical values; off by default for
+    # other materials. When True, also adds them to the drive list. /
+    # magic 是 tier1 经验值；可关闭，避免污染其他材料的设计
+    enable_magic_freqs: bool = True
+    # Number of W10-trained frequencies (sorted by their learned weight) to
+    # inject into the Phase 1 drive list. P1 bridge fix 2026-05: pre-fix the
+    # surrogate's K=6 trained frequencies were silently discarded; Phase 1
+    # only drove COMSOL at top-K eigfreqs + magic. Now top-N W10 freqs are
+    # also offered to the composite search. /
+    # 把 W10 训练频率（按权重排序）的 top-N 接入 Phase 1 drive 列表
+    phase1_w10_topn: int = 3
     eig_n_modes: int = 30
     # In-band gate for Phase 1 drive-freq selection. W10 only designs H+θ in
     # [w10_f_min_hz, w10_f_max_hz]; the plate's fundamental modes (~70 Hz for
@@ -296,7 +309,54 @@ def _compute_ic_likeness_per_mode(eig_dir: Path, target: np.ndarray, image_size:
     return rows
 
 
-def _select_phase1_drive_freqs(rows: list[dict], cfg: ProductionPipelineConfig) -> list[float]:
+def _load_w10_freqs_weights(candidate_dir: Path) -> tuple[list[float], list[float]] | None:
+    """Load W10-trained frequencies + weights from a candidate's summary.
+
+    Returns (frequencies_hz, weights) or None if not available. Reads from
+    w10_optimization_summary.json (preferred — has weights for ranking) and
+    falls back to frequencies_hz.csv if that's missing. /
+    读取候选目录里 W10 训练出来的频率+权重；优先用 summary（有权重做排序）
+    """
+    summary_path = candidate_dir / "w10_optimization_summary.json"
+    if summary_path.exists():
+        try:
+            data = json.loads(summary_path.read_text(encoding="utf-8"))
+            freqs = data.get("frequencies_hz") or []
+            weights = data.get("weights") or [1.0 / max(len(freqs), 1)] * len(freqs)
+            if freqs:
+                return [float(f) for f in freqs], [float(w) for w in weights]
+        except Exception:
+            pass
+    csv_path = candidate_dir / "frequencies_hz.csv"
+    if csv_path.exists():
+        try:
+            arr = np.loadtxt(csv_path, delimiter=",")
+            freqs = arr.flatten().tolist()
+            return freqs, [1.0 / max(len(freqs), 1)] * len(freqs)
+        except Exception:
+            pass
+    return None
+
+
+def _select_phase1_drive_freqs(rows: list[dict], cfg: ProductionPipelineConfig,
+                                 w10_freqs_weights: tuple[list[float], list[float]] | None = None) -> list[float]:
+    """Pick COMSOL forced-response drive frequencies for Phase 1.
+
+    Sources (in order of inclusion):
+    1. Top-K in-band COMSOL eigfreqs ranked by IC-likeness (existing).
+    2. Top-``cfg.phase1_w10_topn`` W10-trained frequencies ranked by their
+       optimised weights (P1 fix 2026-05). W10 trained H+θ to give the target
+       pattern *at these exact frequencies*; previously Phase 1 ignored them
+       entirely, throwing away the surrogate's main optimisation signal.
+    3. Optional magic frequencies (tier1-empirical; gated by
+       ``cfg.enable_magic_freqs``).
+
+    Dedup with 5 Hz tolerance — if a W10 freq is within 5 Hz of an already-
+    selected COMSOL eigfreq, drop the W10 freq (the COMSOL one is the true
+    resonance and gives stronger response). /
+    Phase 1 \u9009\u9891\u6c47\u6c47\u603b\uff1aCOMSOL top-K eigfreq + W10 \u8bad\u51fa\u6765\u7684 top-N \u9891\u7387
+    \uff08\u6309 W10 \u6743\u91cd\u6392\u5e8f\uff09+ \u53ef\u5173 magic\uff1b5 Hz \u5bb9\u5dee\u53bb\u91cd
+    """
     rows_valid = [r for r in rows if not np.isnan(r["ic_score"])]
     slack = float(cfg.phase1_band_slack_hz)
     f_lo = float(cfg.w10_f_min_hz) - slack
@@ -319,7 +379,42 @@ def _select_phase1_drive_freqs(rows: list[dict], cfg: ProductionPipelineConfig) 
     in_band.sort(key=lambda r: -r["ic_score"])
     top_rows = in_band[:cfg.phase1_top_k_modes]
     drive = [r["freq_hz"] + cfg.phase1_off_resonance_hz for r in top_rows]
-    drive.extend(cfg.magic_off_resonance_hz)
+
+    # P1 bridge: add W10-trained frequencies (top-N by weight). /
+    # P1 桥接：把 W10 训练频率（按权重排）的 top-N 加进来
+    if w10_freqs_weights is not None and int(cfg.phase1_w10_topn) > 0:
+        w10_freqs, w10_weights = w10_freqs_weights
+        if w10_freqs:
+            ranked = sorted(zip(w10_freqs, w10_weights), key=lambda fw: -fw[1])
+            top_n = ranked[:int(cfg.phase1_w10_topn)]
+            added = []
+            for f_w10, w_w10 in top_n:
+                if not (f_lo <= float(f_w10) <= f_hi):
+                    continue
+                # Dedup vs already-selected drive freqs with 5 Hz tolerance
+                f_drive = float(f_w10) + float(cfg.phase1_off_resonance_hz)
+                if any(abs(f_drive - existing) < 5.0 for existing in drive):
+                    continue
+                drive.append(f_drive)
+                added.append((float(f_w10), float(w_w10)))
+            if added:
+                summary_str = ", ".join(f"{f:.1f}Hz(w={w:.2f})" for f, w in added)
+                print(f"[Phase 1] adding {len(added)} W10-trained drive freqs: {summary_str}")
+            else:
+                print(f"[Phase 1] no W10 freqs added (all out-of-band or within 5 Hz of selected eigfreqs)")
+
+    # Magic frequencies (tier1-empirical). Gated by enable_magic_freqs. /
+    # Magic 频率（tier1 经验值）；可关
+    if bool(cfg.enable_magic_freqs) and cfg.magic_off_resonance_hz:
+        if abs(float(cfg.stiffness_ratio) - 3.0) > 0.5:
+            # tier1 magic was calibrated at sr=3.0; warn if user is using
+            # a different anisotropy ratio so they can disable. /
+            # magic 是 tier1 sr=3.0 经验值；其他 sr 提示用户考虑关闭
+            print(f"[Phase 1] WARNING: enable_magic_freqs=True but stiffness_ratio={cfg.stiffness_ratio:.2f} "
+                  f"differs from tier1 (sr=3.0); magic freqs {list(cfg.magic_off_resonance_hz)} may not apply. "
+                  f"Consider config production.enable_magic_freqs: false")
+        drive.extend(cfg.magic_off_resonance_hz)
+
     drive = list(dict.fromkeys(round(f, 1) for f in drive))
     return drive
 
@@ -376,6 +471,17 @@ def _composite(amps: list[np.ndarray], method: str) -> np.ndarray:
 
 
 def _score_amp(amp: np.ndarray, target: np.ndarray) -> dict:
+    """Score a forced-response amplitude grid against the target binary.
+
+    NOTE on metric alignment (P1 fix 2026-05): broad sigma_rel=0.05 and
+    percentile=20 MUST match W10's final training values
+    (recognisability_placement_w10.W10AnisotropyConfig.sigma_rel = 0.05 and
+    recall_percentile_frac = 0.20) so that W10's self-reported surrogate
+    enrichment is on the same scale as the Phase 1 broad enrich reported
+    here. If the W10 defaults move, update these too. /
+    broad 分数与 W10 训练 metric 必须对齐（sigma_rel=0.05, percentile=20）
+    才能让 W10 surrogate enrichment 和 Phase 1 broad enrich 可比
+    """
     from src.scoring.recognisability_score import coverage_recall, recognisability_score_grid
 
     sb = recognisability_score_grid(amp, target.astype(bool), sigma_rel=0.05, percentile=20.0)
@@ -408,7 +514,8 @@ def _evaluate_design(cfg: ProductionPipelineConfig, project_root: Path, candidat
     """Run COMSOL eigfreq + Phase 1 + forced response + composite search for a candidate."""
     eig_dir = _run_comsol_eigfreq(cfg, project_root, candidate_id, progress=progress)
     rows = _compute_ic_likeness_per_mode(eig_dir, target, cfg.image_size, plate_length_mm, cfg.eig_n_modes)
-    drive_freqs = _select_phase1_drive_freqs(rows, cfg)
+    w10_fw = _load_w10_freqs_weights(project_root / "candidates" / candidate_id)  # P1 bridge / P1 桥接
+    drive_freqs = _select_phase1_drive_freqs(rows, cfg, w10_freqs_weights=w10_fw)
     csvs = _run_comsol_forced_response(cfg, project_root, candidate_id, drive_freqs, variant_prefix, progress=progress)
     amps = {}
     for f, p in zip(drive_freqs, csvs):
@@ -431,6 +538,7 @@ def _evaluate_design(cfg: ProductionPipelineConfig, project_root: Path, candidat
         "eig_dir": str(eig_dir),
         "top_modes": sorted([r for r in rows if not np.isnan(r["ic_score"])], key=lambda r: -r["ic_score"])[:cfg.phase1_top_k_modes],
         "drive_freqs": drive_freqs,
+        "w10_freqs_weights": ({"frequencies_hz": list(w10_fw[0]), "weights": list(w10_fw[1])} if w10_fw is not None else None),
         "per_freq": per_freq,
         "best_composite": best,
         "best_composite_amp": best_amp,
@@ -607,6 +715,44 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
             "best_enrichment": float(best_enr),
             "improvement_pct": float((best_enr - history[0]["best_composite"]["broad"]["enrich"]) / history[0]["best_composite"]["broad"]["enrich"] * 100),
         }
+
+    # === S7.5: W10 → COMSOL gap monitor ===
+    # Compare W10's self-reported surrogate enrichment vs what the COMSOL
+    # forced response actually achieves on the same H+θ. A large gap means
+    # the surrogate (orthotropic Kirchhoff plate, 25x25 proxy) is mis-
+    # estimating the real plate physics, and W10 is optimising for an
+    # imaginary objective. /
+    # W10 自评 enrichment vs COMSOL Phase 1 实测 broad enrich 的差距监控
+    surr_enr = float(surr_metrics.get("enrichment", 0.0))
+    p1_enr = float(p1_result["best_composite"]["broad"]["enrich"])
+    p2_enr = float(final.get("phase2", {}).get("best_enrichment", p1_enr))
+    final_comsol_enr = max(p1_enr, p2_enr)
+    gap_abs = float(surr_enr - final_comsol_enr)
+    gap_rel = float(gap_abs / max(surr_enr, 1.0e-9))
+    gap_status = "ok"
+    if surr_enr >= 1.5 and gap_rel > 0.7:  # surrogate predicted >>1, COMSOL got <30% → big gap
+        gap_status = "large_surrogate_overestimate"
+    elif final_comsol_enr > surr_enr * 1.5 and surr_enr > 0.5:  # COMSOL beat surrogate by 1.5x (pleasant surprise; possibly target dilation effect)
+        gap_status = "comsol_outperformed_surrogate"
+    final["w10_comsol_gap"] = {
+        "surrogate_enrichment": surr_enr,
+        "comsol_final_enrichment": final_comsol_enr,
+        "gap_absolute": gap_abs,
+        "gap_relative": gap_rel,
+        "status": gap_status,
+    }
+    if gap_status == "large_surrogate_overestimate":
+        msg = (f"[gap monitor] W10 surrogate predicted {surr_enr:.2f}× but COMSOL achieved only "
+               f"{final_comsol_enr:.2f}× (gap {gap_rel*100:.0f}%). Surrogate is over-promising; "
+               f"consider lowering --target-dilation-px or tightening --sigma-anneal-end to make "
+               f"the surrogate train against a harder objective. / "
+               f"surrogate 与 COMSOL gap 过大，建议降低 dilation 或收紧 sigma-anneal-end")
+        print(msg)
+        _emit(progress, "gap_warning", msg)
+    elif gap_status == "comsol_outperformed_surrogate":
+        print(f"[gap monitor] COMSOL ({final_comsol_enr:.2f}×) outperformed surrogate ({surr_enr:.2f}×) — "
+              f"unusual but harmless; usually means target dilation gave the surrogate a softer goal "
+              f"than the real physics could deliver.")
 
     # === S8: Final summary JSON ===
     summary_path = output_dir / "production_summary.json"

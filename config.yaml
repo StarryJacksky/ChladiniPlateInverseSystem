@@ -61,7 +61,9 @@ production:
   w10_min_surrogate_enrichment: 0.5 # 健康度阈值；surrogate enrichment 低于此值直接拒绝喂 COMSOL / Health-check threshold
   phase1_top_k_modes: 6 # IC-likeness 选 top-K 模态 / Top-K IC-likeness modes
   phase1_off_resonance_hz: 1.5 # 偏离本征频率的驱动偏移 / Off-resonance offset
-  magic_off_resonance_hz: [165.0] # tier1 经验发现的 magic 频率（探索新材料请重新扫频） / tier1 empirically-discovered magic freq
+  magic_off_resonance_hz: [165.0] # tier1 经验发现的 magic 频率（探索新材料请重新扫频或关闭 enable_magic_freqs） / tier1 empirically-discovered magic freq
+  enable_magic_freqs: true # 是否把 magic 加入 Phase 1 drive；非 tier1 材料建议改 false / Whether to include magic freqs in P1 drive list
+  phase1_w10_topn: 3 # Phase 1 drive 列表里追加 W10 训练频率的 top-N（按 W10 权重排序）；0 关闭 / Include top-N W10-trained freqs in P1 drive list (sorted by W10 weight)
   eig_n_modes: 30 # COMSOL eigenfreq 求解阶数 / COMSOL eigenfrequency modes
   phase1_band_slack_hz: 20.0 # Phase 1 选频允许超出 W10 设计带宽的 slack；防止低频"中心一坨"基频混进 drive 列表 / Slack for Phase 1 in-band gate (rejects out-of-band fundamentals like 72 Hz central blobs)
   phase2_max_iters: 3 # 信任域外层迭代数（0 = 跳过 Phase 2；旧默认 1 实质 delta=0） / Trust-region outer iters (was 1, raised so P2 can actually escape the P1 basin)
