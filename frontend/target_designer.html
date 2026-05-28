@@ -1996,6 +1996,12 @@
         </section> <!-- 页面结构 / Page structure -->
         </div> <!-- 页面结构 / Page structure -->
         <div class="tab-panel" data-tab-panel="results"> <!-- 页面结构 / Page structure -->
+        <section class="panel"> <!-- 生产 pipeline 输出 / Production pipeline output -->
+          <h2>Production Runs</h2> <!-- 页面结构 / Page structure -->
+          <p class="field-hint" style="font-size:0.85em;opacity:0.7;margin:0 0 8px 0">Completed runs from the W10 + Phase 1 + Phase 2 pipeline. Each row shows surrogate enrichment, the best COMSOL composite (when COMSOL ran), and Phase 2 improvement. Click <strong>Open .mph</strong> to inspect a run in COMSOL. / 完成的 W10 + Phase 1 + Phase 2 流水线运行。每行显示 surrogate enrichment、最佳 COMSOL 合成（启用 COMSOL 时）以及 Phase 2 改进。点击 <strong>Open .mph</strong> 可以在 COMSOL 中检查。</p>
+          <div id="productionRunsSummary" class="result-summary">0 runs</div> <!-- 计数 / Run count -->
+          <div id="productionRunsList" class="results">No production runs yet</div> <!-- 列表 / List -->
+        </section> <!-- 页面结构 / Page structure -->
         <section class="panel"> <!-- 页面结构 / Page structure -->
           <h2>Result Overview</h2> <!-- 页面结构 / Page structure -->
           <div id="resultOverview" class="result-overview">No ranking yet</div> <!-- 页面结构 / Page structure -->
@@ -2240,6 +2246,10 @@
     const frequencyMaxInput = document.getElementById("frequencyMaxInput");
     // 前端逻辑 / Frontend logic
     const saveScoringButton = document.getElementById("saveScoringButton");
+    // 前端逻辑 / Frontend logic
+    const productionRunsList = document.getElementById("productionRunsList");
+    // 前端逻辑 / Frontend logic
+    const productionRunsSummary = document.getElementById("productionRunsSummary");
     // 前端逻辑 / Frontend logic
     const resultOverview = document.getElementById("resultOverview");
     // 前端逻辑 / Frontend logic
@@ -3761,6 +3771,107 @@
     // 前端逻辑 / Frontend logic
     }
 
+    // 渲染生产 pipeline 运行列表 / Render the production-pipeline run list
+    function renderProductionRuns(rows) {
+      // 前端逻辑 / Frontend logic
+      if (!productionRunsList || !productionRunsSummary) {
+        // DOM 缺失 / Missing DOM
+        return;
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      productionRunsSummary.textContent = `${rows.length} run${rows.length === 1 ? "" : "s"}`;
+      // 前端逻辑 / Frontend logic
+      if (!rows.length) {
+        // 前端逻辑 / Frontend logic
+        productionRunsList.innerHTML = emptyState("No production runs yet", "Hit Run on the Run tab. Completed runs will appear here with their surrogate, Phase 1, and Phase 2 metrics.");
+        // 前端逻辑 / Frontend logic
+        return;
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      const fmt = (v, digits = 2) => (v === null || v === undefined || Number.isNaN(Number(v))) ? "–" : Number(v).toFixed(digits);
+      // 前端逻辑 / Frontend logic
+      productionRunsList.innerHTML = rows.map((row) => {
+        // 前端逻辑 / Frontend logic
+        const cells = [];
+        // 顶部行：候选 + 阶段 + 材料 / Top row: candidate + stage + material
+        cells.push(`<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:baseline"><strong>${escapeText(row.candidate_id || "")}</strong><span class="status">stage: ${escapeText(row.stage_reached || "?")}</span><span class="status">sr=${fmt(row.stiffness_ratio, 2)}, shear=${fmt(row.shear_ratio, 2)}</span><span class="status">${escapeText(row.modified_at || "")}</span></div>`);
+        // surrogate 指标 / Surrogate metrics
+        if (row.surrogate_enrichment !== null && row.surrogate_enrichment !== undefined) {
+          // 前端逻辑 / Frontend logic
+          cells.push(`<div>Surrogate (W10): enrich=<strong>${fmt(row.surrogate_enrichment)}×</strong>, recall=${fmt(row.surrogate_recall)}, contrast=${fmt(row.surrogate_contrast)}×</div>`);
+        // 前端逻辑 / Frontend logic
+        }
+        // Phase 1 最佳合成 / Phase 1 best composite
+        if (row.phase1_method) {
+          // 前端逻辑 / Frontend logic
+          const subset = (row.phase1_best_subset || []).join(" + ");
+          // 前端逻辑 / Frontend logic
+          cells.push(`<div>Phase 1 best: <strong>${escapeText(row.phase1_method)}</strong>(${escapeText(subset)}) — broad enr=<strong>${fmt(row.phase1_broad_enrich)}×</strong> rec=${fmt(row.phase1_broad_recall)} · tight enr=${fmt(row.phase1_tight_enrich)}× rec=${fmt(row.phase1_tight_recall)}</div>`);
+          // 驱动频率列表 / Drive frequency list
+          if (Array.isArray(row.phase1_drive_freqs) && row.phase1_drive_freqs.length) {
+            // 前端逻辑 / Frontend logic
+            cells.push(`<div class="status">drive freqs: ${row.phase1_drive_freqs.map((f) => Number(f).toFixed(1)).join(", ")} Hz</div>`);
+          // 前端逻辑 / Frontend logic
+          }
+        // 前端逻辑 / Frontend logic
+        }
+        // Phase 2 改善 / Phase 2 improvement
+        if (row.phase2_best_enrichment !== null && row.phase2_best_enrichment !== undefined) {
+          // 前端逻辑 / Frontend logic
+          const sign = (row.phase2_improvement_pct ?? 0) >= 0 ? "+" : "";
+          // 前端逻辑 / Frontend logic
+          cells.push(`<div>Phase 2: best iter <strong>${escapeText(String(row.phase2_best_iter ?? "?"))}</strong> → <strong>${fmt(row.phase2_best_enrichment)}×</strong> (${sign}${fmt(row.phase2_improvement_pct, 1)}%)</div>`);
+        // 前端逻辑 / Frontend logic
+        }
+        // 计时 / Wallclock
+        const wcParts = [];
+        // 前端逻辑 / Frontend logic
+        if (row.wallclock_surrogate_s) { wcParts.push(`surrogate ${fmt(row.wallclock_surrogate_s, 0)} s`); }
+        // 前端逻辑 / Frontend logic
+        if (row.wallclock_phase1_s) { wcParts.push(`phase1 ${fmt(row.wallclock_phase1_s, 0)} s`); }
+        // 前端逻辑 / Frontend logic
+        if (wcParts.length) { cells.push(`<div class="status">wallclock: ${wcParts.join(" · ")}</div>`); }
+        // 操作按钮 / Action buttons
+        const cid = escapeText(row.candidate_id || "");
+        // 前端逻辑 / Frontend logic
+        const summaryUrl = row.summary_path ? `/api/file?path=${encodeURIComponent(row.summary_path)}` : "";
+        // 前端逻辑 / Frontend logic
+        const actionButtons = [`<button type="button" data-action="open-mph" data-candidate-id="${cid}">Open .mph in COMSOL</button>`];
+        // 前端逻辑 / Frontend logic
+        cells.push(`<div class="sweep-actions" style="margin-top:4px">${actionButtons.join("")}</div>`);
+        // 拼一张卡 / Compose one card
+        return `<div class="result-row">${cells.join("")}</div>`;
+      // 前端逻辑 / Frontend logic
+      }).join("");
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 加载生产 pipeline 运行列表 / Fetch the production-pipeline run list
+    async function loadProductionRuns() {
+      // 前端逻辑 / Frontend logic
+      try {
+        // 前端逻辑 / Frontend logic
+        const response = await fetch(`/api/production-runs?t=${Date.now()}`);
+        // 前端逻辑 / Frontend logic
+        if (!response.ok) {
+          // 前端逻辑 / Frontend logic
+          return;
+        // 前端逻辑 / Frontend logic
+        }
+        // 前端逻辑 / Frontend logic
+        const result = await response.json();
+        // 前端逻辑 / Frontend logic
+        renderProductionRuns(result.runs || []);
+      // 前端逻辑 / Frontend logic
+      } catch (error) {
+        // 静默失败 / Silent failure
+      // 前端逻辑 / Frontend logic
+      }
+    // 前端逻辑 / Frontend logic
+    }
+
     // 前端逻辑 / Frontend logic
     function filterGenerationHistory(rows) {
       // 前端逻辑 / Frontend logic
@@ -4244,6 +4355,8 @@
         }
         // 前端逻辑 / Frontend logic
         renderProductionResult(state);
+        // 前端逻辑 / Frontend logic
+        await loadProductionRuns();
         // 前端逻辑 / Frontend logic
         await loadRanking();
         // 前端逻辑 / Frontend logic
@@ -5564,6 +5677,24 @@
       }
     // 前端逻辑 / Frontend logic
     });
+    // Production Runs 操作 / Production runs click handler
+    if (productionRunsList) {
+      // 前端逻辑 / Frontend logic
+      productionRunsList.addEventListener("click", (event) => {
+        // 前端逻辑 / Frontend logic
+        const btn = event.target.closest("[data-action='open-mph']");
+        // 前端逻辑 / Frontend logic
+        if (btn && btn.dataset.candidateId) {
+          // 前端逻辑 / Frontend logic
+          event.preventDefault();
+          // 前端逻辑 / Frontend logic
+          openCandidateInComsol(btn.dataset.candidateId);
+        // 前端逻辑 / Frontend logic
+        }
+      // 前端逻辑 / Frontend logic
+      });
+    // 前端逻辑 / Frontend logic
+    }
     // 前端逻辑 / Frontend logic
     resultOverview.addEventListener("click", (event) => {
       // 前端逻辑 / Frontend logic
@@ -5902,7 +6033,7 @@
     // 前端逻辑 / Frontend logic
     pushHistory();
     // 前端逻辑 / Frontend logic
-    loadConfig().then(loadExistingTarget).then(loadTargetAnalysis).then(loadRanking).then(loadHistory).then(loadDiagnostics).then(loadLogs).then(loadArtifacts).then(pollWorkflow).catch((error) => {
+    loadConfig().then(loadExistingTarget).then(loadTargetAnalysis).then(loadProductionRuns).then(loadRanking).then(loadHistory).then(loadDiagnostics).then(loadLogs).then(loadArtifacts).then(pollWorkflow).catch((error) => {
       // 前端逻辑 / Frontend logic
       setStatus(error.message, "warn");
       // 前端逻辑 / Frontend logic

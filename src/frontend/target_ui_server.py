@@ -593,6 +593,66 @@ def load_ranking(config: dict) -> list[dict[str, str]]:  # 读取评分排行 / 
         return list(csv.DictReader(file_obj))  # 读取排行行 / Read ranking rows
 
 
+def _summarise_production_run(data: dict, run_dir: Path, summary_path: Path) -> dict:  # 把 production_summary.json 压成一行 / Distil production_summary.json into a row
+    cand_id = str(data.get("candidate_id", run_dir.name))  # 候选编号 / Candidate id
+    stage = str(data.get("stage_reached", "unknown"))  # 完成阶段 / Stage reached
+    surrogate = data.get("surrogate_metrics", {}) or {}  # surrogate 指标 / Surrogate metrics
+    phase1 = data.get("phase1") or {}  # Phase 1 块 / Phase 1 block
+    best_comp = phase1.get("best_composite") or {}  # 最佳合成 / Best composite
+    broad = best_comp.get("broad") or {}  # broad 子集 / Broad scoring
+    tight = best_comp.get("tight") or {}  # tight 子集 / Tight scoring
+    phase2 = data.get("phase2") or {}  # Phase 2 块 / Phase 2 block
+    wallclock = data.get("wallclock_seconds") or {}  # 计时 / Wallclock seconds
+    return {  # 一条 production run 摘要 / One production-run summary row
+        "candidate_id": cand_id,  # 候选编号 / Candidate id
+        "stage_reached": stage,  # 阶段 / Stage
+        "stiffness_ratio": data.get("stiffness_ratio"),  # 各向异性比 / Stiffness ratio
+        "shear_ratio": data.get("shear_ratio"),  # 剪切比 / Shear ratio
+        "surrogate_enrichment": surrogate.get("enrichment"),  # surrogate enrichment / Surrogate enrichment
+        "surrogate_recall": surrogate.get("recall"),  # surrogate recall / Surrogate recall
+        "surrogate_contrast": surrogate.get("contrast"),  # surrogate contrast / Surrogate contrast
+        "phase1_drive_freqs": phase1.get("drive_freqs", []),  # 驱动频率 / Drive frequencies
+        "phase1_best_subset": best_comp.get("subset", []),  # 最佳子集 / Best subset
+        "phase1_method": best_comp.get("method", ""),  # 合成方法 / Composite method
+        "phase1_broad_enrich": broad.get("enrich"),  # broad enrichment / Broad enrichment
+        "phase1_broad_recall": broad.get("recall"),  # broad recall / Broad recall
+        "phase1_broad_contrast": broad.get("contrast"),  # broad contrast / Broad contrast
+        "phase1_tight_enrich": tight.get("enrich"),  # tight enrichment / Tight enrichment
+        "phase1_tight_recall": tight.get("recall"),  # tight recall / Tight recall
+        "phase2_best_iter": phase2.get("best_iter"),  # Phase 2 最佳迭代 / Best iter
+        "phase2_best_enrichment": phase2.get("best_enrichment"),  # Phase 2 enrichment / Phase 2 enrichment
+        "phase2_improvement_pct": phase2.get("improvement_pct"),  # Phase 2 改善 % / Improvement
+        "wallclock_surrogate_s": wallclock.get("surrogate"),  # surrogate 时长 / Surrogate elapsed
+        "wallclock_phase1_s": wallclock.get("phase1"),  # Phase 1 时长 / Phase 1 elapsed
+        "modified_at": datetime.fromtimestamp(summary_path.stat().st_mtime).isoformat(timespec="seconds"),  # 修改时间 / Modified at
+        "summary_path": str(summary_path),  # 摘要文件 / Summary file
+        "output_dir": str(run_dir),  # 输出目录 / Output directory
+    }
+
+
+def load_production_runs() -> list[dict]:  # 列出所有生产 pipeline 完成的运行 / List every completed production-pipeline run
+    base = project_root() / "reports" / "production"  # 生产输出目录 / Production output directory
+    if not base.exists():  # 没有运行过 / No runs yet
+        return []  # 返回空列表 / Empty list
+    rows: list[dict] = []  # 行列表 / Row list
+    for d in base.iterdir():  # 遍历子目录 / Iterate subdirs
+        if not d.is_dir():  # 跳过非目录 / Skip non-dirs
+            continue  # / Continue
+        summary = d / "production_summary.json"  # 摘要路径 / Summary path
+        if not summary.exists():  # 缺摘要 / Missing summary
+            continue  # / Skip
+        try:  # 容错读取 / Tolerate parse errors
+            data = json.loads(summary.read_text(encoding="utf-8"))  # 解析 / Parse
+        except Exception:  # 解析失败 / Parse failed
+            continue  # / Skip
+        try:  # 容错压缩 / Tolerate summary build errors
+            rows.append(_summarise_production_run(data, d, summary))  # 压缩 / Distil
+        except Exception:  # 略过 / Skip on summarise error
+            continue  # / Continue
+    rows.sort(key=lambda r: r.get("modified_at") or "", reverse=True)  # 最新优先 / Newest first
+    return rows  # 返回 / Return
+
+
 def candidate_generation(candidate_path: Path, metadata: dict) -> int:  # 读取候选代数 / Read candidate generation
     if metadata.get("generation") is not None:  # 检查元数据是否包含代数 / Check whether metadata has generation
         return int(metadata["generation"])  # 返回元数据代数 / Return metadata generation
@@ -1304,6 +1364,12 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 return  # 结束请求 / Finish request
             if route == "/api/target-analysis":  # 判断是否请求目标分析 / Check target-analysis request
                 self.send_json(load_target_analysis_summary(config))  # 返回目标分析 / Return target analysis
+                return  # 结束请求 / Finish request
+            if route == "/api/production-runs":  # 列出生产 pipeline 完成的运行 / List completed production runs
+                try:  # 容错 / Tolerate read errors
+                    self.send_json({"runs": load_production_runs()})  # 返回 / Return
+                except Exception as exc:  # 处理异常 / Handle exception
+                    self.send_json({"error": str(exc), "runs": []}, HTTPStatus.INTERNAL_SERVER_ERROR)  # / 500
                 return  # 结束请求 / Finish request
             if route == "/api/logs":  # 判断是否请求运行日志 / Check run-log request
                 self.send_json(load_log_tails(config))  # 返回日志尾部 / Return log tails
