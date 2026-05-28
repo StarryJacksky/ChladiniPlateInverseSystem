@@ -31,7 +31,7 @@ from src.comsol.run_livelink import (
     apply_comsol_server_environment,
     matlab_path_from_comsol_command,
     matlab_quote,
-    run_command_streamed,
+    run_matlab_with_mphserver_retry,
 )
 from src.comsol.server import ensure_comsol_server
 from src.config import load_config
@@ -120,7 +120,12 @@ def main() -> None:
     )
     cmd = [matlab, "-nosplash", "-noFigureWindows", "-sd", str(Path.cwd()), "-batch", "; ".join(parts)]
     log_path = export_dir / "livelink_eigenfrequency.log"
-    rc, _ = run_command_streamed(cmd, log_path, timeout_s=7200.0)
+    # 自动重试：失败 → 重置 mphserver → 再试（最多 retry_max_attempts 次） / Auto retry: on failure reset mphserver, then re-fire (up to retry_max_attempts)
+    rc, _ = run_matlab_with_mphserver_retry(
+        cmd, log_path, runtime_config,
+        label=f"COMSOL eigfreq ({args.candidate_name})",
+        timeout_s=7200.0,
+    )
     if rc != 0: raise RuntimeError(f"MATLAB eigenfreq rc={rc}; see {log_path}")
 
     eig_csv = export_dir / "eigenfrequencies.csv"

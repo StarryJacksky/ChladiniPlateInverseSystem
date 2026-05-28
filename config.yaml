@@ -79,6 +79,7 @@ comsol:
   server_port: 2036 # COMSOL server 端口 / COMSOL server port
   auto_start_server: true # 自动启动 COMSOL server / Automatically start COMSOL server
   server_start_timeout_s: 30 # COMSOL server 启动等待秒数 / COMSOL server startup wait seconds
+  retry_max_attempts: 2 # MATLAB 失败时最多重试次数（含首次）。失败若是 mphserver/license/连接异常，会先 kill stale mphserver 再重启后重试。/ Max MATLAB attempts (including the first). On transient mphserver/license/connection failures the wrapper kills any stale mphserver, restarts, then retries.
   matlab_path: "/Applications/MATLAB_R2024a.app/bin/matlab" # MATLAB 路径 / MATLAB path
   livelink_timeout_s: 7200 # 单次 LiveLink 运行超时秒数 / Single LiveLink run timeout seconds
   runner_path: "comsol_templates/run_chladni_candidate.m" # LiveLink 运行脚本 / LiveLink runner script

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -196,9 +197,159 @@ def run_command_streamed(command: list[str], log_path: Path, progress=None, even
 
 
 def is_livelink_connection_failure(output: str) -> bool:
-    lowered = output.lower()
+    lowered = (output or "").lower()
     tokens = ["mphstart", "connection refused", "failed to connect to server", "could not be established"]
     return any(token in lowered for token in tokens)
+
+
+def is_likely_mphserver_problem(output: str, returncode: int) -> bool:
+    """Heuristic: does this MATLAB failure look like a transient mphserver /
+    LiveLink / license issue worth retrying after a server reset?
+
+    Returns True for any of:
+    * Explicit LiveLink connection-failure tokens (covered by ``is_livelink_connection_failure``).
+    * Broader transient patterns (license server, MATLAB engine, broken pipe,
+      Java exceptions, socket errors, timeouts during connect).
+    * Non-zero return code with essentially no useful log output — typically a
+      startup-time failure (server died before MATLAB could print anything).
+    """
+    lowered = (output or "").lower()
+    if is_livelink_connection_failure(lowered):
+        return True
+    transient_patterns = (
+        # Connection / socket
+        "no connection could be made",
+        "broken pipe",
+        "socket closed",
+        "socket exception",
+        "socketexception",
+        "timed out connecting",
+        "connect timed out",
+        "address already in use",
+        # COMSOL / LiveLink internals
+        "com.comsol.util.exceptions",
+        "flexnetlicensingexception",
+        "license manager",
+        "license error",
+        "license token",
+        "license check-out failed",
+        "lmgrd",
+        # MATLAB engine on the Python/COMSOL boundary
+        "matlab engine",
+        "java.lang.runtimeexception",
+        "java.io.ioexception",
+        # Server lifecycle
+        "server stopped responding",
+        "server has gone away",
+        "rmi exception",
+    )
+    if any(pat in lowered for pat in transient_patterns):
+        return True
+    # Hard-error patterns: MATLAB / COMSOL surface-level mistakes the retry
+    # won't fix. Keep this list narrow so transient mphserver crashes still
+    # win the "near-empty output" fallback below. /
+    # MATLAB / COMSOL 业务硬错误，重试也救不了，必须先排除掉再走"几乎空 → 重试"兜底
+    hard_error_patterns = (
+        "error using ",
+        "undefined function",
+        "undefined variable",
+        "unrecognized function or variable",
+        "unrecognized variable",
+        "reference to non-existent field",
+        "index exceeds the number",
+        "subscript indices",
+        "incorrect dimensions",
+        "out of memory",
+        "comsol:domain",
+        "no boundary condition",
+        "geometry contains no",
+        "physics interface",
+    )
+    if any(pat in lowered for pat in hard_error_patterns):
+        return False
+    # If MATLAB returned non-zero with nearly empty output the server almost
+    # certainly died before MATLAB could write anything useful — retry. /
+    # 失败但日志几乎为空：mphserver 通常在 MATLAB 输出任何信息前就挂了，值得重试
+    if returncode != 0:
+        meaningful = [
+            line for line in lowered.splitlines()
+            if line.strip() and not line.startswith((
+                "command=", "started_at=", "timeout_s=", "returncode=",
+                "--- retry", "started_at"))
+        ]
+        if len(meaningful) < 5:
+            return True
+    return False
+
+
+def run_matlab_with_mphserver_retry(
+    command: list[str],
+    log_path: Path,
+    runtime_config: dict,
+    label: str,
+    timeout_s: float | None = None,
+    progress=None,
+    event_base: dict | None = None,
+    max_attempts: int | None = None,
+) -> tuple[int, str]:
+    """Run a MATLAB ``-batch`` command and self-heal transient COMSOL
+    mphserver failures.
+
+    Each attempt streams output to ``log_path`` (subsequent attempts append
+    a clearly marked "--- retry ---" section). On a non-zero return code we
+    inspect the log; if it looks transient (LiveLink connection refused,
+    license / engine errors, near-empty output) we call ``reset_mphserver``
+    — which **kills any stale ``comsolmphserver`` process on the configured
+    port** and starts a fresh one — then retry. Hard MATLAB / model errors
+    fail fast without wasting cycles on a retry that would re-trigger the
+    same crash.
+
+    Returns the final ``(returncode, accumulated_output)``.
+    """
+    from src.comsol.server import reset_mphserver  # 延迟导入避免循环 / Lazy import avoids a cycle
+
+    comsol_config = (runtime_config or {}).get("comsol", {})
+    if max_attempts is None:
+        max_attempts = int(comsol_config.get("retry_max_attempts", 2))
+    max_attempts = max(1, int(max_attempts))
+    server_wait_s = float(comsol_config.get("server_start_timeout_s", 60.0))
+
+    accumulated_output = ""
+    rc = 0
+    for attempt in range(1, max_attempts + 1):
+        rc, output = run_command_streamed(
+            command,
+            log_path,
+            progress,
+            event_base,
+            timeout_s,
+            append=(attempt > 1),
+        )
+        accumulated_output = (accumulated_output + "\n" + (output or "")) if accumulated_output else (output or "")
+        if rc == 0:
+            return 0, accumulated_output
+        if attempt >= max_attempts:
+            break
+        if not is_likely_mphserver_problem(output, rc):
+            # Looks like a hard error (model bug, missing input, syntax) — don't burn another COMSOL invocation. /
+            # 看起来是硬错误（模型/输入/语法），不浪费一次 COMSOL 调用重试
+            break
+        retry_msg = (
+            f"{label}: attempt {attempt}/{max_attempts} failed (rc={rc}); "
+            f"resetting mphserver and retrying. / 第 {attempt}/{max_attempts} 次失败 (rc={rc})，正在重置 mphserver 并重试。"
+        )
+        if progress is not None:
+            progress({**(event_base or {}), "stage": "retry", "message": retry_msg, "log_path": str(log_path)})
+        try:
+            reset_mphserver(runtime_config, wait_s=server_wait_s)
+        except Exception as exc:
+            # If even the reset fails just give up — outer code will surface the underlying error. /
+            # 连重置都失败就直接放弃，让外层把根本错误抛出来
+            if progress is not None:
+                progress({**(event_base or {}), "stage": "retry", "message": f"reset_mphserver raised: {exc}", "log_path": str(log_path)})
+            break
+        time.sleep(2.0)  # 给 mphserver 一点缓冲再发下一发 / Give mphserver a brief warm-up before re-firing
+    return rc, accumulated_output
 
 
 def run_livelink_candidate(config: dict, candidate_id: str, num_modes: int | None = None, model_path: str | Path | None = None, matlab_path: str | Path | None = None, runner_path: str | Path | None = None, progress=None) -> dict:

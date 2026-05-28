@@ -46,7 +46,7 @@ from src.comsol.run_livelink import (
     build_forced_matlab_batch,
     matlab_path_from_comsol_command,
     matlab_quote,
-    run_command_streamed,
+    run_matlab_with_mphserver_retry,
 )
 from src.comsol.server import ensure_comsol_server
 from src.config import load_config
@@ -273,7 +273,12 @@ def run_matlab_forced_response(runtime_config: dict, candidate_dir: Path, export
     command = [matlab, "-nosplash", "-noFigureWindows", "-sd", str(Path.cwd()), "-batch", batch]
     log_path = export_dir / "livelink_forced_response.log"
     timeout_s = float(comsol_config.get("livelink_timeout_s", 7200))
-    returncode, _ = run_command_streamed(command, log_path, timeout_s=timeout_s)
+    # 自动重试：失败 → 重置 mphserver → 再试 / Auto retry: on failure reset mphserver, then re-fire
+    returncode, _ = run_matlab_with_mphserver_retry(
+        command, log_path, runtime_config,
+        label=f"COMSOL forced response ({export_dir.name})",
+        timeout_s=timeout_s,
+    )
     return returncode
 
 

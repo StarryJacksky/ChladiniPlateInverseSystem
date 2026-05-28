@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import socket
+import sys
 import time
 from pathlib import Path
 
@@ -128,3 +130,96 @@ def ensure_comsol_server(config: dict, wait_s: float | None = None) -> bool:
             return False
         time.sleep(1.0)
     return is_server_reachable(host, port)
+
+
+def kill_mphserver_on_port(port: int) -> int:
+    """Kill any process listening on the given COMSOL server port.
+
+    Cross-platform best-effort: uses ``netstat -ano`` + ``taskkill`` on
+    Windows and ``lsof -ti`` + ``kill -9`` elsewhere. Also drains any
+    ``subprocess.Popen`` handles we started in this Python process so
+    they don't linger as zombies.
+
+    Returns the number of PIDs killed.
+    """
+    killed_pids: set[str] = set()
+    try:
+        if sys.platform == "win32":
+            # netstat -ano returns lines like "TCP   127.0.0.1:2036   0.0.0.0:0   LISTENING   12345"
+            result = subprocess.run(
+                ["netstat", "-ano"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=10.0,
+            )
+            for line in result.stdout.splitlines():
+                upper = line.upper()
+                if f":{port}" in line and "LISTENING" in upper:
+                    parts = line.split()
+                    if parts and parts[-1].isdigit():
+                        killed_pids.add(parts[-1])
+            for pid in killed_pids:
+                subprocess.run(
+                    ["taskkill", "/F", "/PID", pid],
+                    capture_output=True,
+                    check=False,
+                    timeout=10.0,
+                )
+        else:
+            # ``lsof -ti :PORT`` matches ANY socket touching the port, including
+            # outgoing connections from unrelated processes. Restrict to actual
+            # TCP LISTEN sockets so we never accidentally kill a remote-side
+            # client. / 限定 LISTEN，避免误杀任何端口 2036 的远端连接进程
+            result = subprocess.run(
+                ["lsof", "-ti", f"tcp:{port}", "-sTCP:LISTEN"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5.0,
+            )
+            for pid in result.stdout.split():
+                if pid.isdigit():
+                    killed_pids.add(pid)
+                    subprocess.run(
+                        ["kill", "-9", pid],
+                        capture_output=True,
+                        check=False,
+                        timeout=5.0,
+                    )
+    except Exception:
+        # netstat / lsof may not exist or may be blocked by AV;
+        # we still need to drain our owned subprocess handles below.
+        pass
+
+    # Reap any Popen handles we still own so they don't linger as zombies
+    # even if the OS-level kill above missed them. / 顺手回收 Python 自己拉起来的 server 进程
+    for process in list(STARTED_SERVERS):
+        try:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5.0)
+        except Exception:
+            pass
+        try:
+            STARTED_SERVERS.remove(process)
+        except ValueError:
+            pass
+
+    return len(killed_pids)
+
+
+def reset_mphserver(config: dict, wait_s: float | None = None, settle_s: float = 2.0) -> bool:
+    """Hard-reset the COMSOL mphserver: kill whatever is on the port, then
+    start a fresh server and wait until it's reachable.
+
+    Returns True if the new server became reachable within the timeout.
+    """
+    runtime_config, _applied, _discovery = config_with_runtime_discovery(config)
+    comsol_config = runtime_config.get("comsol", {})
+    port = int(comsol_config.get("server_port", 2036))
+    kill_mphserver_on_port(port)
+    # Give the kernel a moment to release the TCP socket before re-binding. /
+    # 给内核一点时间释放 TCP socket，避免 bind 时被 "Address already in use" 卡住
+    time.sleep(max(0.0, float(settle_s)))
+    return ensure_comsol_server(runtime_config, wait_s=wait_s)
