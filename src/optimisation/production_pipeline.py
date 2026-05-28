@@ -70,6 +70,8 @@ def build_default_pipeline_config(config_yaml_path: str | Path = "config.yaml",
         w10_sigma_anneal_steps=int(take("w10_sigma_anneal_steps", 100)),
         w10_target_dilation_px=int(take("w10_target_dilation_px", 2)),
         w10_min_surrogate_enrichment=float(take("w10_min_surrogate_enrichment", 0.5)),
+        multistart_n=int(take("multistart_n", 1)),
+        multistart_uplift_threshold=float(take("multistart_uplift_threshold", 0.05)),
         phase1_top_k_modes=int(take("phase1_top_k_modes", 6)),
         phase1_off_resonance_hz=float(take("phase1_off_resonance_hz", 1.5)),
         magic_off_resonance_hz=magic,
@@ -123,6 +125,15 @@ class ProductionPipelineConfig:
     # learned anything. /
     # 健康度阈值：W10 自评 enrichment 低于此值就拒绝下推到 COMSOL
     w10_min_surrogate_enrichment: float = 0.5
+    # Multi-start: run N W10 surrogates with different theta seeds, pick
+    # the best by composite score, fall back to seed=42 if no seed beats
+    # it by ``multistart_uplift_threshold``. Defaults to 1 (off) to keep
+    # the canonical single-start cost; users on Win/Mac with budget can
+    # raise to 4-8 to escape local minima. /
+    # 多启动：N 个不同 theta_seed 跑 W10，按复合 score 选赢家；保底 seed=42
+    multistart_n: int = 1
+    multistart_uplift_threshold: float = 0.05  # 赢家相对 seed=42 至少 +5%
+    multistart_seeds: tuple[int, ...] = (42, 1, 2, 3, 4, 5, 6, 7)  # 取前 multistart_n 个
 
     # Phase 1 selection
     phase1_top_k_modes: int = 6
@@ -203,7 +214,9 @@ def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progre
                          initial_H_csv: Path | None = None, initial_theta_csv: Path | None = None,
                          candidate_id: str | None = None, num_steps: int | None = None,
                          lr_h: float | None = None, lr_theta: float | None = None,
-                         freeze_freq_first_steps: int | None = None) -> dict:
+                         freeze_freq_first_steps: int | None = None,
+                         theta_seed: int | None = None,
+                         skip_health_check: bool = False) -> dict:
     """Run W10 surrogate optimisation. Returns its summary dict.
 
     ``freeze_freq_first_steps`` (when not None) overrides the W10 default of
@@ -237,6 +250,8 @@ def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progre
         cmd.extend(["--initial-theta-rad", str(initial_theta_csv)])
     if freeze_freq_first_steps is not None:
         cmd.extend(["--freeze-freq-first-steps", str(int(freeze_freq_first_steps))])
+    if theta_seed is not None:
+        cmd.extend(["--theta-seed", str(int(theta_seed))])
     _emit(progress, "surrogate", f"Running W10 surrogate ({int(num_steps or cfg.w10_num_steps)} steps)", candidate_id=cand_id)
     _run_subprocess(cmd, project_root, label=f"W10 surrogate ({cand_id})")
     summary_path = project_root / "candidates" / cand_id / "w10_optimization_summary.json"
@@ -248,7 +263,7 @@ def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progre
     # 健康度检查：W10 自评 enrichment 太低就直接拒绝下推 COMSOL
     surr = float(summary.get("best_surrogate_metrics", {}).get("enrichment", 0.0))
     threshold = float(cfg.w10_min_surrogate_enrichment)
-    if surr < threshold:  # 失败 / Failed
+    if (not skip_health_check) and surr < threshold:  # 失败 / Failed
         msg = (f"W10 surrogate convergence failure: best enrichment={surr:.3e} < threshold={threshold:.2f}. "
                f"Likely causes: thin/sparse target hitting the loss gradient cliff (enrichment underflowed "
                f"below 1e-9 → -log(x+eps) saturated → no gradient). Try raising --target-dilation-px or "
@@ -256,6 +271,136 @@ def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progre
                f"W10 收敛失败：surrogate enrichment 远低于阈值，多半是细线/稀疏目标触发梯度悬崖；"
                f"加大 --target-dilation-px / --sigma-anneal-start 再试")
         raise RuntimeError(msg)  # 抛错 / Raise
+    return summary
+
+
+def _composite_score(summary: dict) -> dict:
+    """Compute a composite quality score from a W10 summary.
+
+    Score = enrichment · √recall · min(1, effective_count / 3). Designed
+    to reward *all-around healthy* designs over single-metric winners:
+    a seed that scores 5× enrichment but 10% recall (looks great on
+    surrogate, collapses in COMSOL) gets penalised; one with 3× enrichment,
+    60% recall and effective_count ≥ 3 wins. /
+    复合 score：奖励 enr+recall+多频 三者都健康的设计，避免单指标作弊
+    """
+    metrics = summary.get("best_surrogate_metrics", {}) or {}
+    wdist = summary.get("weight_distribution", {}) or {}
+    enr = float(metrics.get("enrichment", 0.0))
+    rec = float(metrics.get("recall", 0.0))
+    eff = float(wdist.get("effective_count", 1.0))
+    score = enr * (max(rec, 0.0) ** 0.5) * min(1.0, eff / 3.0)
+    return {"enrichment": enr, "recall": rec, "effective_count": eff, "score": float(score)}
+
+
+def _run_w10_multistart(cfg: ProductionPipelineConfig, project_root: Path, progress=None) -> dict:
+    """Multi-start W10: run N seeds, pick the winner by composite score.
+
+    Anti-regression contract — three guards keep this from making things worse:
+      1. ``seed=42`` (the canonical single-start) is always included so multi-
+         start ≥ single-start in the worst case.
+      2. Winner must beat the seed=42 baseline by ``multistart_uplift_threshold``
+         (default +5%) to be promoted; otherwise we keep seed=42. This filters
+         out noise-level "wins" that won't survive COMSOL re-validation.
+      3. Score uses recall + effective_count, not just enrichment — so a single-
+         mode high-enrichment seed (that surrogate loves but COMSOL hates) can't
+         hijack the decision.
+    Result: when N=1, behaviour is identical to single-start (zero overhead). /
+    多启动；3 重防退化：保底 seed=42、5% uplift 阈值、复合 score（防单指标作弊）
+    """
+    N = max(1, int(cfg.multistart_n))
+    if N == 1:
+        return _run_w10_surrogate(cfg, project_root, progress=progress)
+
+    base_cand_id = cfg.candidate_id
+    seeds = list(cfg.multistart_seeds)[:N]
+    if 42 not in seeds:  # 强制保底 / Always include baseline
+        seeds[0] = 42
+
+    _emit(progress, "multistart_start", f"Multi-start: {N} W10 seeds {seeds}", n=N, seeds=seeds)
+
+    results: list[dict] = []
+    for i, seed in enumerate(seeds):
+        tmp_cand = f"{base_cand_id}_ms_s{seed}"
+        tmp_dir = project_root / "candidates" / tmp_cand
+        if tmp_dir.exists():
+            shutil.rmtree(tmp_dir)
+        _emit(progress, "multistart_seed_start", f"seed {seed} ({i+1}/{N})", seed=seed)
+        try:
+            summary = _run_w10_surrogate(cfg, project_root, progress=progress,
+                                          candidate_id=tmp_cand, theta_seed=int(seed),
+                                          skip_health_check=True)
+            scored = _composite_score(summary)
+            ok = scored["enrichment"] >= float(cfg.w10_min_surrogate_enrichment)
+            results.append({"seed": int(seed), "candidate_id": tmp_cand,
+                            **scored, "ok": bool(ok), "summary_path": str(tmp_dir / "w10_optimization_summary.json")})
+            _emit(progress, "multistart_seed_done",
+                  f"seed {seed}: enr={scored['enrichment']:.2f}× rec={scored['recall']:.2f} eff={scored['effective_count']:.1f} → score={scored['score']:.3f}",
+                  seed=seed, **scored)
+        except RuntimeError as e:  # subprocess / health failure
+            results.append({"seed": int(seed), "candidate_id": tmp_cand,
+                            "enrichment": 0.0, "recall": 0.0, "effective_count": 0.0,
+                            "score": 0.0, "ok": False, "error": str(e)[:240]})
+            _emit(progress, "multistart_seed_done", f"seed {seed}: FAILED — {str(e)[:80]}", seed=seed, score=0.0)
+
+    healthy = [r for r in results if r["ok"]]
+    if not healthy:
+        raise RuntimeError(
+            f"Multi-start: all {N} seeds failed W10 health check "
+            f"(enrichment < {cfg.w10_min_surrogate_enrichment}). "
+            f"Try raising --target-dilation-px / --sigma-anneal-start. / "
+            f"多启动 {N} 个种子全部失败健康度检查")
+
+    baseline = next((r for r in results if r["seed"] == 42 and r["ok"]), None)
+    best = max(healthy, key=lambda r: r["score"])
+    threshold = float(cfg.multistart_uplift_threshold)
+
+    if baseline is None:
+        winner = best
+        decision = f"seed=42 health-check failed → promote seed={best['seed']} (score={best['score']:.3f})"
+    elif best["seed"] == 42:
+        winner = baseline
+        decision = f"seed=42 wins on its own (score={baseline['score']:.3f})"
+    else:
+        uplift = best["score"] / max(baseline["score"], 1e-9) - 1.0
+        if uplift > threshold:
+            winner = best
+            decision = (f"seed={best['seed']} beats seed=42 by +{uplift*100:.1f}% "
+                        f"(> {threshold*100:.0f}% threshold) → promote")
+        else:
+            winner = baseline
+            decision = (f"best seed={best['seed']} only +{uplift*100:.1f}% over seed=42 "
+                        f"(< {threshold*100:.0f}% threshold) → KEEP seed=42 (anti-regression)")
+
+    _emit(progress, "multistart_decision", f"Decision: {decision}",
+          winner_seed=winner["seed"], all_seeds=results)
+
+    # Promote winner's artifacts into the canonical candidate dir
+    winner_dir = project_root / "candidates" / winner["candidate_id"]
+    canonical_dir = project_root / "candidates" / base_cand_id
+    if canonical_dir.exists() and canonical_dir != winner_dir:
+        shutil.rmtree(canonical_dir)
+    if canonical_dir != winner_dir:
+        shutil.copytree(winner_dir, canonical_dir)
+
+    summary_path = canonical_dir / "w10_optimization_summary.json"
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    summary["multistart_log"] = {
+        "n": N,
+        "seeds": [int(s) for s in seeds],
+        "uplift_threshold": threshold,
+        "winner_seed": int(winner["seed"]),
+        "decision": decision,
+        "candidates": results,
+    }
+    summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # Cleanup tmp dirs (keep only the canonical one)
+    for r in results:
+        d = project_root / "candidates" / r["candidate_id"]
+        if d.exists() and d.resolve() != canonical_dir.resolve():
+            shutil.rmtree(d, ignore_errors=True)
+
     return summary
 
 
@@ -588,10 +733,11 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
     np.save(output_dir / "target_resized.npy", target)
     _emit(progress, "target", f"Target loaded ({int(target.sum())} pixels)")
 
-    # === S2: W10 surrogate ===
-    _emit(progress, "surrogate_start", "Running W10 surrogate optimisation")
+    # === S2: W10 surrogate (single-start or multi-start with anti-regression decision) ===
+    _emit(progress, "surrogate_start",
+          f"Running W10 surrogate ({'multi-start ×%d' % cfg.multistart_n if cfg.multistart_n > 1 else 'single-start'})")
     t0 = time.time()
-    w10_summary = _run_w10_surrogate(cfg, project_root, progress=progress)
+    w10_summary = _run_w10_multistart(cfg, project_root, progress=progress)
     elapsed_surr = time.time() - t0
     surr_metrics = w10_summary.get("best_surrogate_metrics", {})
     _emit(progress, "surrogate_done", f"W10 done in {elapsed_surr:.0f}s; surrogate enr={surr_metrics.get('enrichment', 0):.2f}×",

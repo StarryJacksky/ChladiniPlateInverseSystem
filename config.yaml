@@ -59,6 +59,8 @@ production:
   w10_sigma_anneal_steps: 100 # Sigma 退火步数 / Anneal step count
   w10_target_dilation_px: 2 # 目标膨胀像素数（proxy 网格）/ Target dilation px on proxy grid
   w10_min_surrogate_enrichment: 0.5 # 健康度阈值；surrogate enrichment 低于此值直接拒绝喂 COMSOL / Health-check threshold
+  multistart_n: 1 # 多启动种子数；1=关闭（无开销），4~8=逃避局部极小；保底永远包含 seed=42 / Multi-start seed count
+  multistart_uplift_threshold: 0.05 # 赢家相对 seed=42 最少 +5% 复合 score 才会被采纳（防退化）/ Anti-regression uplift threshold
   phase1_top_k_modes: 6 # IC-likeness 选 top-K 模态 / Top-K IC-likeness modes
   phase1_off_resonance_hz: 1.5 # 偏离本征频率的驱动偏移 / Off-resonance offset
   magic_off_resonance_hz: [165.0] # tier1 经验发现的 magic 频率（探索新材料请重新扫频或关闭 enable_magic_freqs） / tier1 empirically-discovered magic freq

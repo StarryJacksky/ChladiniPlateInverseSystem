@@ -45,6 +45,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--skip-phase2", action="store_true")
     p.add_argument("--skip-comsol", action="store_true",
                      help="Fast preview: surrogate only, no COMSOL.")
+    p.add_argument("--multistart-n", type=int, default=1,
+                     help="Number of W10 seeds (1=off; 4-8 to escape local minima). "
+                          "Always includes seed=42 baseline + anti-regression 5%% uplift guard.")
+    p.add_argument("--multistart-uplift-threshold", type=float, default=0.05,
+                     help="Min relative score improvement over seed=42 for a multi-start winner "
+                          "to be promoted (default 0.05 = +5%%).")
     return p.parse_args()
 
 
@@ -65,6 +71,8 @@ def main() -> int:
         phase2_max_iters=args.phase2_max_iters,
         skip_phase2=args.skip_phase2,
         skip_comsol=args.skip_comsol,
+        multistart_n=args.multistart_n,
+        multistart_uplift_threshold=args.multistart_uplift_threshold,
     )
 
     def progress_printer(event: dict) -> None:
