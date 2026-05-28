@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import threading
 import time
@@ -115,6 +116,15 @@ def write_livelink_log(log_path: Path, command: list[str], output: str, returnco
         file_obj.write(output or "")
 
 
+def _cleanup_stale_windows_matlab_runtime(log_path: Path) -> None:
+    runtime_root = log_path.parent / ".matlab_runtime"
+    try:
+        if runtime_root.exists():
+            shutil.rmtree(runtime_root)
+    except OSError:
+        pass
+
+
 def command_environment(command: list[str], log_path: Path) -> dict[str, str]:
     env = os.environ.copy()
     # Use plain string ops so this works no matter what os.name pathlib
@@ -151,6 +161,13 @@ def command_environment(command: list[str], log_path: Path) -> dict[str, str]:
             # Windows 上保持 MATLAB 看到的环境与用户双击 matlab.exe 时一致：
             # 任何对 MATLAB_PREFDIR/TEMP/USERPROFILE/APPDATA 的重定向都会触发
             # "Fatal Startup Error: File system inconsistency" 启动崩溃
+            _cleanup_stale_windows_matlab_runtime(log_path)
+            env.pop("MATLAB_PREFDIR", None)
+            env.pop("MATLAB_LOG_DIR", None)
+            for env_name in ("TEMP", "TMP", "HOME"):
+                value = env.get(env_name, "")
+                if ".matlab_runtime" in value.replace("\\", "/").lower():
+                    env.pop(env_name, None)
             return env
 
         # POSIX (Mac/Linux): isolate MATLAB's per-run state under the log
@@ -255,6 +272,8 @@ def is_likely_mphserver_problem(output: str, returncode: int) -> bool:
     lowered = (output or "").lower()
     if is_livelink_connection_failure(lowered):
         return True
+    if is_likely_matlab_startup_runtime_failure(lowered):
+        return True
     transient_patterns = (
         # Connection / socket
         "no connection could be made",
@@ -317,11 +336,6 @@ def is_likely_mphserver_problem(output: str, returncode: int) -> bool:
         "not enough input arguments",
         "too many input arguments",
         "invalid expression",
-        # MATLAB startup itself blew up - retry can't fix this, fix env vars instead /
-        # MATLAB 自己启动就崩，重试无意义，根因在环境变量配置
-        "fatal startup error",
-        "file system inconsistency",
-        "matlab error exit status",
     )
     if any(pat in lowered for pat in hard_error_patterns):
         return False
@@ -338,6 +352,25 @@ def is_likely_mphserver_problem(output: str, returncode: int) -> bool:
         if len(meaningful) < 5:
             return True
     return False
+
+
+def is_likely_matlab_startup_runtime_failure(output: str) -> bool:
+    lowered = (output or "").lower()
+    if "fatal startup error" not in lowered and "matlab error exit status" not in lowered:
+        return False
+    runtime_tokens = (
+        "createfile failed",
+        "system:5",
+        "access is denied",
+        "access denied",
+        "permission denied",
+        "file system inconsistency",
+        "matlab_prefdir",
+        ".matlab_runtime",
+        "temp",
+        "tmp",
+    )
+    return "fatal startup error" in lowered or any(token in lowered for token in runtime_tokens)
 
 
 CREDENTIALS_REQUIRED_MESSAGE = (
@@ -449,10 +482,21 @@ def run_matlab_with_mphserver_retry(
             retry_log.append(f"attempt {attempt}/{max_attempts}: rc={rc}, classification=hard_error (will not retry)")
             break
 
+        startup_runtime_failure = is_likely_matlab_startup_runtime_failure(last_output)
         retry_log.append(f"attempt {attempt}/{max_attempts}: rc={rc}, classification=transient (retrying)")
 
         try:
-            if attempt == 1:
+            if startup_runtime_failure:
+                _cleanup_stale_windows_matlab_runtime(log_path)
+                _emit_retry(
+                    progress, event_base,
+                    f"{label}: attempt {attempt}/{max_attempts} failed during MATLAB startup (rc={rc}); "
+                    f"cleaning MATLAB runtime environment and retrying. "
+                    f"/ 第 {attempt}/{max_attempts} 次在 MATLAB 启动阶段失败 (rc={rc})，清理 MATLAB runtime 环境后重试。",
+                    log_path,
+                )
+                retry_log.append("  recovery=clean_windows_matlab_runtime_env")
+            elif attempt == 1 and max_attempts > 2:
                 # Cheap recovery: just make sure the server is up. /
                 # 先做便宜的恢复：确保 server 还活着
                 _emit_retry(
