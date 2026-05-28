@@ -59,6 +59,7 @@ production:
   phase1_off_resonance_hz: 1.5 # 偏离本征频率的驱动偏移 / Off-resonance offset
   magic_off_resonance_hz: [165.0] # tier1 经验发现的 magic 频率（探索新材料请重新扫频） / tier1 empirically-discovered magic freq
   eig_n_modes: 30 # COMSOL eigenfreq 求解阶数 / COMSOL eigenfrequency modes
+  phase1_band_slack_hz: 20.0 # Phase 1 选频允许超出 W10 设计带宽的 slack；防止低频"中心一坨"基频混进 drive 列表 / Slack for Phase 1 in-band gate (rejects out-of-band fundamentals like 72 Hz central blobs)
   phase2_max_iters: 3 # 信任域外层迭代数（0 = 跳过 Phase 2；旧默认 1 实质 delta=0） / Trust-region outer iters (was 1, raised so P2 can actually escape the P1 basin)
   phase2_inner_steps: 200 # 每次 Phase 2 内层 W10 步数（旧默认 80 太短） / Inner W10 steps per Phase 2 iter (was 80)
   phase2_lr_h_init: 0.025 # / Trust-region H LR initial

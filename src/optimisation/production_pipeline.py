@@ -70,6 +70,7 @@ def build_default_pipeline_config(config_yaml_path: str | Path = "config.yaml",
         phase1_off_resonance_hz=float(take("phase1_off_resonance_hz", 1.5)),
         magic_off_resonance_hz=magic,
         eig_n_modes=int(take("eig_n_modes", 30)),
+        phase1_band_slack_hz=float(take("phase1_band_slack_hz", 20.0)),
         phase2_max_iters=int(take("phase2_max_iters", 3)),
         phase2_inner_steps=int(take("phase2_inner_steps", 200)),
         phase2_lr_h_init=float(take("phase2_lr_h_init", 0.025)),
@@ -105,6 +106,16 @@ class ProductionPipelineConfig:
     phase1_off_resonance_hz: float = 1.5
     magic_off_resonance_hz: tuple[float, ...] = (165.0,)
     eig_n_modes: int = 30
+    # In-band gate for Phase 1 drive-freq selection. W10 only designs H+θ in
+    # [w10_f_min_hz, w10_f_max_hz]; the plate's fundamental modes (~70 Hz for
+    # a thin plate) are "central blob" patterns whose amplitude covers the
+    # whole plate, which trivially passes the IC-likeness score
+    # (enrichment×recall) even though they have nothing to do with the target.
+    # Reject any eigenmode outside [w10_f_min_hz - slack, w10_f_max_hz + slack]
+    # so out-of-band modes can never become drive candidates. /
+    # W10 设计带宽以外的 eigenmode（尤其低频"中心一坨"基频）会因 recall≈1
+    # 在 IC-likeness 评分里轻易胜出，但根本和目标无关；此 slack 内才允许入选
+    phase1_band_slack_hz: float = 20.0
 
     # Phase 2 trust-region (set max_iters=0 to skip).
     # Defaults bumped (2026-05): old (1 iter / 80 steps / freeze=60 from W10
@@ -247,8 +258,26 @@ def _compute_ic_likeness_per_mode(eig_dir: Path, target: np.ndarray, image_size:
 
 def _select_phase1_drive_freqs(rows: list[dict], cfg: ProductionPipelineConfig) -> list[float]:
     rows_valid = [r for r in rows if not np.isnan(r["ic_score"])]
-    rows_valid.sort(key=lambda r: -r["ic_score"])
-    top_rows = rows_valid[:cfg.phase1_top_k_modes]
+    slack = float(cfg.phase1_band_slack_hz)
+    f_lo = float(cfg.w10_f_min_hz) - slack
+    f_hi = float(cfg.w10_f_max_hz) + slack
+    in_band = [r for r in rows_valid if f_lo <= float(r["freq_hz"]) <= f_hi]
+    if not in_band and rows_valid:
+        # Defensive fallback: should not happen with eig_n_modes >= 30 covering
+        # the W10 band, but if it does, fall through to the legacy behaviour
+        # with a loud warning so the user can investigate. /
+        # 防御：30 阶 eigfreq 几乎不可能完全错过 W10 带宽；若发生则回退到全集并告警
+        rejected = sorted({round(float(r["freq_hz"]), 1) for r in rows_valid})
+        print(f"[Phase 1] WARNING: no eigenmodes within W10 design band [{f_lo:.0f},{f_hi:.0f}] Hz; "
+              f"falling back to full mode list. Eigenfreqs seen: {rejected}")
+        in_band = rows_valid
+    else:
+        out_of_band = sorted({round(float(r["freq_hz"]), 1) for r in rows_valid if r not in in_band})
+        if out_of_band:
+            print(f"[Phase 1] rejecting {len(out_of_band)} eigenmodes outside W10 band "
+                  f"[{f_lo:.0f},{f_hi:.0f}] Hz: {out_of_band[:6]}{'…' if len(out_of_band) > 6 else ''}")
+    in_band.sort(key=lambda r: -r["ic_score"])
+    top_rows = in_band[:cfg.phase1_top_k_modes]
     drive = [r["freq_hz"] + cfg.phase1_off_resonance_hz for r in top_rows]
     drive.extend(cfg.magic_off_resonance_hz)
     drive = list(dict.fromkeys(round(f, 1) for f in drive))
