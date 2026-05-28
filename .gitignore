@@ -11,6 +11,7 @@ reports/*_export.m
 reports/*_export.m.status
 reports/*_export.m.recovery
 reports/comsol_model_audit.json
+comsol_templates/*.bak.mph
 !data/processed_targets/.gitkeep
 !data/comsol_exports/.gitkeep
 !candidates/.gitkeep
