@@ -117,40 +117,57 @@ def write_livelink_log(log_path: Path, command: list[str], output: str, returnco
 
 def command_environment(command: list[str], log_path: Path) -> dict[str, str]:
     env = os.environ.copy()
-    executable_name = Path(command[0]).name.lower() if command else ""
-    if executable_name.startswith("matlab"):
-        runtime_root = (log_path.parent / ".matlab_runtime").resolve()
-        prefs_dir = runtime_root / "prefs"
-        tmp_dir = runtime_root / "tmp"
-        for path in [prefs_dir, tmp_dir]:
-            path.mkdir(parents=True, exist_ok=True)
-        # Only redirect the MATLAB-specific dirs that are safe to isolate per-run.
-        # Critical Windows env vars (USERPROFILE / APPDATA / LOCALAPPDATA) are
-        # left pointing at the real user profile - MATLAB on Windows needs to
-        # read license info, preferences, and cache from those locations during
-        # startup, and pointing them at an empty folder causes a
-        # ``Fatal Startup Error: File system inconsistency`` (matlab.exe Exit
-        # Status 0x00000001) before MATLAB ever runs our -batch expression. /
-        # 只重定向 MATLAB 自己用的 prefs 和 TEMP；USERPROFILE / APPDATA / LOCALAPPDATA
-        # 在 Windows 上是核心系统变量，重定向到空目录会让 MATLAB 直接 Fatal Startup
-        # Error: File system inconsistency 启动崩溃
-        env["MATLAB_PREFDIR"] = str(prefs_dir)
-        env["TEMP"] = str(tmp_dir)
-        env["TMP"] = str(tmp_dir)
-        # On non-Windows it has historically been safe to also redirect HOME
-        # (so parallel MATLAB runs don't fight over ~/.matlab); on Windows we
-        # leave HOME / USERPROFILE / APPDATA / LOCALAPPDATA alone. /
-        # 在 Windows 上保持 HOME/USERPROFILE/APPDATA/LOCALAPPDATA 为系统默认
-        if os.name != "nt":
-            home_dir = runtime_root / "home"
-            home_dir.mkdir(parents=True, exist_ok=True)
-            env["HOME"] = str(home_dir)
+    # Use plain string ops so this works no matter what os.name pathlib
+    # initialised against (matters for unit-testing the Windows branch on
+    # POSIX, where Path('foo.exe') would try to construct WindowsPath). /
+    # 用纯字符串切分，便于在 POSIX 单测里 mock os.name='nt' 时不挂掉 pathlib
+    exe_str = (command[0] if command else "")
+    exe_tail = exe_str.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    if exe_tail.startswith("matlab"):
+        # COMSOL Server credentials always need to be present so MATLAB can
+        # connect via LiveLink. / COMSOL Server 凭据始终要有，否则 LiveLink 连不上
         env.update({
             "COMSOL_SERVER_USER": os.environ.get("COMSOL_SERVER_USER") or os.environ.get("USERNAME") or os.environ.get("USER") or "",
             "COMSOL_SERVER_PASSWORD": os.environ.get("COMSOL_SERVER_PASSWORD", ""),
             "COMSOL_SERVER_HOST": os.environ.get("COMSOL_SERVER_HOST", "127.0.0.1"),
             "COMSOL_SERVER_PORT": os.environ.get("COMSOL_SERVER_PORT", "2036"),
         })
+
+        if os.name == "nt":
+            # On Windows we deliberately keep MATLAB's environment as vanilla
+            # as the user's shell. Overriding MATLAB_PREFDIR / TEMP / TMP /
+            # USERPROFILE / APPDATA / LOCALAPPDATA to anything other than the
+            # OS defaults has been observed to cause
+            #     Fatal Startup Error:
+            #     Dynamic exception type: class std::runtime_error
+            #     std::exception::what: System Error: File system inconsistency
+            #     ERROR: MATLAB error Exit Status: 0x00000001
+            # *before* MATLAB even parses ``-batch``. MATLAB's Windows
+            # startup expects to find license, prefs, and cache layout in
+            # the OS-default locations; pointing them at a project-local
+            # ``.matlab_runtime`` folder confuses MATLAB's own consistency
+            # checks. Just pass COMSOL_SERVER_* through and let MATLAB
+            # behave exactly as it does when you double-click matlab.exe. /
+            # Windows 上保持 MATLAB 看到的环境与用户双击 matlab.exe 时一致：
+            # 任何对 MATLAB_PREFDIR/TEMP/USERPROFILE/APPDATA 的重定向都会触发
+            # "Fatal Startup Error: File system inconsistency" 启动崩溃
+            return env
+
+        # POSIX (Mac/Linux): isolate MATLAB's per-run state under the log
+        # directory so concurrent runs don't fight over ~/.matlab and tmp
+        # files don't pollute the user's real $HOME. This has been safe on
+        # POSIX for months. / Mac/Linux 保持老行为：把 prefs/temp/home 隔离到
+        # log 目录下，避免并发 MATLAB 互相踩
+        runtime_root = (log_path.parent / ".matlab_runtime").resolve()
+        prefs_dir = runtime_root / "prefs"
+        tmp_dir = runtime_root / "tmp"
+        home_dir = runtime_root / "home"
+        for path in [prefs_dir, tmp_dir, home_dir]:
+            path.mkdir(parents=True, exist_ok=True)
+        env["MATLAB_PREFDIR"] = str(prefs_dir)
+        env["TEMP"] = str(tmp_dir)
+        env["TMP"] = str(tmp_dir)
+        env["HOME"] = str(home_dir)
     return env
 
 
