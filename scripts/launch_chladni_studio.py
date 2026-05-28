@@ -2,8 +2,14 @@ from __future__ import annotations  # 启用现代类型注解 / Enable modern t
 
 import argparse  # 导入命令行参数工具 / Import command-line argument tools
 import socket  # 导入端口探测工具 / Import port probing tools
+import sys  # 导入模块搜索路径工具 / Import module search path tools
 import threading  # 导入延迟打开浏览器工具 / Import delayed browser-opening tools
 import webbrowser  # 导入浏览器打开工具 / Import browser-opening tools
+from pathlib import Path  # 导入路径工具 / Import path helper
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]  # 计算项目根目录 / Compute project root
+if str(PROJECT_ROOT) not in sys.path:  # 检查搜索路径 / Check search path
+    sys.path.insert(0, str(PROJECT_ROOT))  # 添加项目根 / Add project root
 
 from src.config import ensure_project_dirs  # 导入目录创建函数 / Import directory creation helper
 from src.config import load_config  # 导入配置读取函数 / Import configuration loader
