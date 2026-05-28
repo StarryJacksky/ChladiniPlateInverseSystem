@@ -185,6 +185,19 @@
     } /* 样式设置 / Style setting */
     button:disabled:hover, .file-button:disabled:hover { background: transparent; border-color: transparent; } /* 样式设置 / Style setting */
 
+    /* Crop 模式：画布加蓝色虚线边框，立刻能看出"已经切到 ROI 工具"
+       Crop mode: visible blue dashed border on the canvas so the user can
+       tell the active tool has switched away from brush. */
+    #stage.crop-mode .stage-content { outline: 3px dashed rgba(38, 132, 255, 0.75); outline-offset: -3px; } /* 样式设置 / Style setting */
+
+    /* 一次性按钮（Invert/Cover/Fit/Stretch）点完后短暂闪一下，证明确实生效了
+       Brief flash on one-shot buttons so the user sees the click registered. */
+    @keyframes import-tool-flash {
+      0%   { background: rgba(38, 132, 255, 0.85); color: #fff; }
+      100% { background: transparent; color: inherit; }
+    }
+    button.flash { animation: import-tool-flash 380ms ease-out; } /* 样式设置 / Style setting */
+
     .topbar button.active { /* 样式设置 / Style setting */
       background: #fffdf8; /* 样式设置 / Style setting */
       color: var(--ink); /* 样式设置 / Style setting */
@@ -2638,13 +2651,16 @@
 
     // 前端逻辑 / Frontend logic
     function selectTool(nextTool) {
-      // 前端逻辑 / Frontend logic
       tool = nextTool;
-      // 前端逻辑 / Frontend logic
+      // 切到画笔 / 橡皮时如果还在 crop 模式，自动退出 / Exit crop mode when user picks brush/eraser
+      if (cropMode) {
+        cropMode = false;
+        cropRect = null;
+        try { drawOverlay(); } catch (_) {}
+        try { updateImportModeButtons(); } catch (_) {}
+      }
       brushTool.classList.toggle("active", tool === "brush");
-      // 前端逻辑 / Frontend logic
       eraserTool.classList.toggle("active", tool === "eraser");
-    // 前端逻辑 / Frontend logic
     }
 
     // 前端逻辑 / Frontend logic
@@ -2840,6 +2856,21 @@
       }
       const apply = document.getElementById("importCropApply");
       if (apply) apply.hidden = !(cropMode && cropRect);
+      // 进入 / 退出 crop 模式时同步画布外观与 brush 工具状态，让用户一眼看出"工具已切换" /
+      // Reflect crop-mode in canvas cursor + brush button state so the user can
+      // tell at a glance that the drawing tool is no longer active.
+      try {
+        canvas.style.cursor = cropMode ? "crosshair" : "";
+        const stageEl = document.getElementById("stage");
+        if (stageEl) stageEl.classList.toggle("crop-mode", cropMode);
+        if (cropMode) {
+          if (brushTool) brushTool.classList.remove("active");
+          if (eraserTool) eraserTool.classList.remove("active");
+        } else {
+          if (brushTool) brushTool.classList.toggle("active", tool === "brush");
+          if (eraserTool) eraserTool.classList.toggle("active", tool === "eraser");
+        }
+      } catch (_) { /* tolerate missing nodes in headless tests */ }
     }
 
     // 兜底：在没有 currentImportSrc（没 Import / 没加载已有 target）的情况下，
@@ -6355,9 +6386,18 @@
       // 切换 mode 时跳过 trim（已经 trim 过了）和 polarity（用户已确认）/ Skip trim & auto-polarity when switching mode
       loadImageToCanvas(currentImportSrc, mode, { skipTrim: true });
     }
-    if (importToolButtons.cover) importToolButtons.cover.addEventListener("click", () => reapplyImportMode("cover"));
-    if (importToolButtons.fit) importToolButtons.fit.addEventListener("click", () => reapplyImportMode("fit"));
-    if (importToolButtons.stretch) importToolButtons.stretch.addEventListener("click", () => reapplyImportMode("stretch"));
+    // 一次性动作按钮：闪一下证明点击生效（避免画布上看不出变化时用户以为按钮坏了）/
+    // Flash the button briefly so the user sees the click registered even when
+    // the canvas change is too subtle to notice (e.g. on a blank canvas).
+    function flashButton(btn) {
+      if (!btn) return;
+      btn.classList.remove("flash");
+      void btn.offsetWidth;  // 强制重新触发动画 / Re-trigger the CSS animation
+      btn.classList.add("flash");
+    }
+    if (importToolButtons.cover) importToolButtons.cover.addEventListener("click", () => { reapplyImportMode("cover"); flashButton(importToolButtons.cover); });
+    if (importToolButtons.fit) importToolButtons.fit.addEventListener("click", () => { reapplyImportMode("fit"); flashButton(importToolButtons.fit); });
+    if (importToolButtons.stretch) importToolButtons.stretch.addEventListener("click", () => { reapplyImportMode("stretch"); flashButton(importToolButtons.stretch); });
     if (importToolButtons.crop) importToolButtons.crop.addEventListener("click", () => {
       if (!ensureImportSource()) {
         setStatus("Canvas snapshot failed", "warn");
@@ -6378,6 +6418,7 @@
     });
     if (importToolButtons.invert) importToolButtons.invert.addEventListener("click", () => {
       invertCanvas();
+      flashButton(importToolButtons.invert);
       setStatus("Polarity flipped", "good");
     });
     updateImportModeButtons();
