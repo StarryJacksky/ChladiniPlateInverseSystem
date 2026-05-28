@@ -459,7 +459,10 @@ def main() -> None:
                 rc = run_matlab_forced_response(runtime_config, target_dir, export_dir, use_orthotropic_runner)
                 elapsed = time.time() - t0
                 if rc != 0:
-                    raise RuntimeError(f"MATLAB failed for {variant_id} (rc={rc}); see {export_dir/'livelink_forced_response.log'}")
+                    raise RuntimeError(
+                        f"MATLAB failed for {variant_id} (rc={rc}); see {export_dir/'livelink_forced_response.log'}. "
+                        f"Scroll to '=== mphserver-retry wrapper summary ===' at the bottom of the log for attempts/classification."
+                    )
                 print(f"  freq={freq:.1f}Hz weight={weight:.3f} done in {elapsed:.1f}s")
         if not response_csv.exists():
             raise FileNotFoundError(f"Missing forced_response.csv after run: {response_csv}")

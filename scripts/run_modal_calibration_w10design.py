@@ -126,7 +126,12 @@ def main() -> None:
         label=f"COMSOL eigfreq ({args.candidate_name})",
         timeout_s=7200.0,
     )
-    if rc != 0: raise RuntimeError(f"MATLAB eigenfreq rc={rc}; see {log_path}")
+    if rc != 0:
+        raise RuntimeError(
+            f"MATLAB eigenfreq rc={rc}; see {log_path}. "
+            f"Scroll to '=== mphserver-retry wrapper summary ===' at the bottom of the log to see attempts/classification. "
+            f"/ 看日志末尾 '=== mphserver-retry wrapper summary ===' 段查重试次数和分类。"
+        )
 
     eig_csv = export_dir / "eigenfrequencies.csv"
     eigfreqs = np.loadtxt(eig_csv, delimiter=",", skiprows=1)

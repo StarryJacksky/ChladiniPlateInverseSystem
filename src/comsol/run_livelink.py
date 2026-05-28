@@ -198,7 +198,18 @@ def run_command_streamed(command: list[str], log_path: Path, progress=None, even
 
 def is_livelink_connection_failure(output: str) -> bool:
     lowered = (output or "").lower()
-    tokens = ["mphstart", "connection refused", "failed to connect to server", "could not be established"]
+    tokens = [
+        # COMSOL LiveLink connect entry points
+        "mphstart", "mphsave", "mphload", "mphquit", "mphtag",
+        # COMSOL Server Java side (these names appear in MATLAB stack traces
+        # when the connection drops mid-call)
+        "modelutil.connectserver", "modelutil.disconnect", "modelutil",
+        "comsolserver", "comsolmphserver", "mphremoteconnector",
+        # Plain English connection errors
+        "connection refused", "connection reset",
+        "failed to connect to server", "could not be established",
+        "could not connect to comsol", "unable to connect",
+    ]
     return any(token in lowered for token in tokens)
 
 
@@ -245,25 +256,39 @@ def is_likely_mphserver_problem(output: str, returncode: int) -> bool:
     )
     if any(pat in lowered for pat in transient_patterns):
         return True
-    # Hard-error patterns: MATLAB / COMSOL surface-level mistakes the retry
-    # won't fix. Keep this list narrow so transient mphserver crashes still
-    # win the "near-empty output" fallback below. /
-    # MATLAB / COMSOL 业务硬错误，重试也救不了，必须先排除掉再走"几乎空 → 重试"兜底
+    # Hard-error patterns: only genuine MATLAB / model bugs go here. MUST NOT
+    # include the bare ``"error using "`` prefix because MATLAB prints it for
+    # **every** error including mphserver/LiveLink connection failures (e.g.
+    # ``Error using mphstart`` or ``Error using ModelUtil/connectServer``)
+    # which we want to retry. Connection-side ``Error using ...`` lines are
+    # already caught above by ``is_livelink_connection_failure`` (mphstart /
+    # modelutil / etc. are in its token list). /
+    # 硬错误黑名单：不要包含光秃秃的 "error using " — MATLAB 给所有错误（包括 mphserver
+    # 抽风）都加这个前缀，会误杀。LiveLink 连接相关的 "Error using ..." 上面就被
+    # is_livelink_connection_failure 捕获了
     hard_error_patterns = (
-        "error using ",
+        # Undefined / unrecognised — strong signal of a setup or model bug,
+        # not a transient server issue (would have shown a connection-side
+        # token above)
         "undefined function",
         "undefined variable",
         "unrecognized function or variable",
         "unrecognized variable",
+        # Field / index issues — pure MATLAB / data bugs
         "reference to non-existent field",
         "index exceeds the number",
         "subscript indices",
         "incorrect dimensions",
+        # Resource / model
         "out of memory",
         "comsol:domain",
         "no boundary condition",
         "geometry contains no",
         "physics interface",
+        # Bad MATLAB input
+        "not enough input arguments",
+        "too many input arguments",
+        "invalid expression",
     )
     if any(pat in lowered for pat in hard_error_patterns):
         return False
@@ -342,8 +367,11 @@ def run_matlab_with_mphserver_retry(
     accumulated_output = ""
     rc = 0
     last_output = ""
+    attempts_used = 0
+    retry_log: list[str] = []  # 简短重试记录，最后写入 log 末尾便于 postmortem / Short retry trace appended to log footer for postmortems
 
     for attempt in range(1, max_attempts + 1):
+        attempts_used = attempt
         # Defensive refresh: a previous attempt may have killed the server,
         # forks may have lost the env vars, etc. Both helpers are idempotent. /
         # 每次发车前补一遍凭据 + server env vars，避免 fork/重启把环境弄丢
@@ -365,21 +393,30 @@ def run_matlab_with_mphserver_retry(
         last_output = output or ""
 
         if rc == 0:
+            retry_log.append(f"attempt {attempt}/{max_attempts}: rc=0 (success)")
+            _write_wrapper_footer(log_path, retry_log, attempts_used, rc, classification="success")
             return 0, accumulated_output
 
         # Credential failure → fail fast with the token-prefixed message so the
         # UI's credential prompt fires (``frontend/comsol_credentials.js``
         # matches the lowercased token). / 凭据错误 → 立刻抛出带 token 的异常让前端弹凭据界面
         if is_credential_failure(last_output):
+            retry_log.append(f"attempt {attempt}/{max_attempts}: rc={rc}, classification=credential_failure (fail-fast, will not retry)")
+            _write_wrapper_footer(log_path, retry_log, attempts_used, rc, classification="credential_failure")
             raise RuntimeError(CREDENTIALS_REQUIRED_MESSAGE)
 
         if attempt >= max_attempts:
+            retry_log.append(f"attempt {attempt}/{max_attempts}: rc={rc} (max attempts reached)")
             break
 
-        if not is_likely_mphserver_problem(last_output, rc):
+        is_transient = is_likely_mphserver_problem(last_output, rc)
+        if not is_transient:
             # Hard MATLAB / model error — retry won't help. /
             # 模型/语法等硬错误，重试无效
+            retry_log.append(f"attempt {attempt}/{max_attempts}: rc={rc}, classification=hard_error (will not retry)")
             break
+
+        retry_log.append(f"attempt {attempt}/{max_attempts}: rc={rc}, classification=transient (retrying)")
 
         try:
             if attempt == 1:
@@ -392,6 +429,7 @@ def run_matlab_with_mphserver_retry(
                     log_path,
                 )
                 ensure_comsol_server(runtime_config, wait_s=server_wait_s)
+                retry_log.append("  recovery=ensure_comsol_server")
             else:
                 # Stronger recovery: kill any stale listener and start fresh. /
                 # 更狠的恢复：杀掉端口上的旧 mphserver 再起新的
@@ -402,10 +440,12 @@ def run_matlab_with_mphserver_retry(
                     log_path,
                 )
                 reset_mphserver(runtime_config, wait_s=server_wait_s)
+                retry_log.append("  recovery=reset_mphserver (kill + restart)")
         except Exception as exc:
             # Recovery itself failed — surface the original MATLAB error to the caller. /
             # 连恢复都挂了就不再重试，让外层把原始 MATLAB 错误抛上去
             _emit_retry(progress, event_base, f"server recovery raised: {exc}", log_path)
+            retry_log.append(f"  recovery RAISED: {exc} (will not retry)")
             break
 
         time.sleep(2.0)  # 给 mphserver 一点缓冲再发下一发 / Give mphserver a brief warm-up before re-firing
@@ -413,9 +453,28 @@ def run_matlab_with_mphserver_retry(
     # Final guard: if a credential failure only showed up after a retry, still surface it cleanly. /
     # 兜底：某次重试后才露出凭据错误也照样抛 token 异常
     if rc != 0 and is_credential_failure(last_output):
+        _write_wrapper_footer(log_path, retry_log, attempts_used, rc, classification="credential_failure")
         raise RuntimeError(CREDENTIALS_REQUIRED_MESSAGE)
 
+    _write_wrapper_footer(log_path, retry_log, attempts_used, rc, classification="exhausted" if rc != 0 else "success")
     return rc, accumulated_output
+
+
+def _write_wrapper_footer(log_path: Path, retry_log: list[str], attempts: int, final_rc: int, classification: str) -> None:
+    """Append a clearly labeled summary block to the MATLAB log so a user
+    inspecting ``livelink_*.log`` can immediately see how many attempts the
+    wrapper made and what the final classification was."""
+    try:
+        with log_path.open("a", encoding="utf-8") as file_obj:
+            file_obj.write("\n=== mphserver-retry wrapper summary / 重试封装总结 ===\n")
+            file_obj.write(f"attempts_used={attempts}\n")
+            file_obj.write(f"final_returncode={final_rc}\n")
+            file_obj.write(f"classification={classification}\n")
+            for line in retry_log:
+                file_obj.write(line + "\n")
+            file_obj.write("======================================================\n")
+    except OSError:
+        pass
 
 
 def run_livelink_candidate(config: dict, candidate_id: str, num_modes: int | None = None, model_path: str | Path | None = None, matlab_path: str | Path | None = None, runner_path: str | Path | None = None, progress=None) -> dict:
