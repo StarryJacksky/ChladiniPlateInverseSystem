@@ -771,7 +771,13 @@ def _summarise_production_run(data: dict, run_dir: Path, summary_path: Path) -> 
         "phase1_tight_recall": tight.get("recall"),  # tight recall / Tight recall
         "phase2_best_iter": phase2.get("best_iter"),  # Phase 2 最佳迭代 / Best iter
         "phase2_best_enrichment": phase2.get("best_enrichment"),  # Phase 2 enrichment / Phase 2 enrichment
+        "phase2_best_recall": phase2.get("best_recall"),  # Phase 2 recall / Phase 2 recall
+        "phase2_best_score": phase2.get("best_score"),  # Phase 2 composite 分 / Phase 2 composite score
+        "phase2_baseline_score": phase2.get("baseline_score"),  # Phase 2 baseline 分 / Phase 2 baseline composite
+        "phase2_score_mode": phase2.get("score_mode"),  # Phase 2 评分模式 / Phase 2 score mode
         "phase2_improvement_pct": phase2.get("improvement_pct"),  # Phase 2 改善 % / Improvement
+        "phase2_posthoc_rebuilt": bool(phase2.get("_posthoc_rebuilt_from_legacy_enr_only", False)),  # 是否由 post-hoc 脚本重建 / Whether post-hoc-rebuilt
+        "phase2_history_len": int(len(phase2.get("history", []))),  # P2 历史长度 / Phase 2 history length
         "wallclock_surrogate_s": wallclock.get("surrogate"),  # surrogate 时长 / Surrogate elapsed
         "wallclock_phase1_s": wallclock.get("phase1"),  # Phase 1 时长 / Phase 1 elapsed
         "modified_at": datetime.fromtimestamp(summary_path.stat().st_mtime).isoformat(timespec="seconds"),  # 修改时间 / Modified at

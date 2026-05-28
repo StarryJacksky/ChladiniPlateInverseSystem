@@ -4155,17 +4155,58 @@
       }
       // 前端逻辑 / Frontend logic
       if (previews["phase2_powder_broad.png"] || previews["phase2_amp.png"]) {
-        // 前端逻辑 / Frontend logic
-        sections.push(`
-          <!-- 模板内容 / Template content --><section class="candidate-section">
-            <!-- 模板内容 / Template content --><h3>Phase 2 best composite (trust-region refinement)</h3>
-            <!-- 模板内容 / Template content --><div class="comparison-grid">
-              <!-- 模板内容 / Template content --><div><div class="status">Powder density (broad)</div>${imgBlock(previews["phase2_powder_broad.png"], "phase2 powder broad", "Phase 2 powder broad")}</div>
-              <!-- 模板内容 / Template content --><div><div class="status">Powder density (sharp)</div>${imgBlock(previews["phase2_powder_sharp.png"], "phase2 powder sharp", "Phase 2 powder sharp")}</div>
-              <!-- 模板内容 / Template content --><div><div class="status">Raw amplitude (inverted)</div>${imgBlock(previews["phase2_amp.png"], "phase2 amplitude", "Phase 2 amplitude")}</div>
-            <!-- 模板内容 / Template content --></div>
-          <!-- 模板内容 / Template content --></section>
-        <!-- 模板内容 / Template content -->`);
+        // Phase 2 "Phase 1 retained" 案例：composite 评分让 iter 0 (Phase 1) 拿回 best，
+        // 此时 phase2_best_*.npy 与 phase1_best_*.npy 内容相同——画一遍只会跟 Phase 1 视觉重复，
+        // 容易让人误判为"没跑 Phase 2"。这里改成一个明确的解释性横幅。
+        // Phase 2 "Phase 1 retained" case: when composite scoring picks iter 0
+        // as best, the phase2_best_* npy duplicates phase1_best_* visually.
+        // Show an explicit banner instead so the user can tell Phase 2 ran
+        // but found no improvement.
+        const p2BestIter = digest.phase2_best_iter;
+        const p2HistoryLen = digest.phase2_history_len ?? 0;
+        const p2ScoreMode = digest.phase2_score_mode || "composite";
+        const p2Posthoc = digest.phase2_posthoc_rebuilt === true;
+        const p2BestScore = digest.phase2_best_score;
+        const p2BaselineScore = digest.phase2_baseline_score;
+        const p2BestEnr = digest.phase2_best_enrichment;
+        const p2BestRecall = digest.phase2_best_recall;
+        const phase1Retained = p2BestIter === 0 && p2HistoryLen > 1;
+        if (phase1Retained) {
+          const triedIters = Math.max(p2HistoryLen - 1, 0);
+          const scoreBreak = (p2BestScore !== null && p2BestScore !== undefined && p2BaselineScore !== null && p2BaselineScore !== undefined)
+            ? `Composite (${escapeText(p2ScoreMode)} = enr·√recall): baseline ${fmtNumber(p2BaselineScore)} · best ${fmtNumber(p2BestScore)}. `
+            : "";
+          const enrRecBreak = (p2BestEnr !== null && p2BestEnr !== undefined)
+            ? `Phase 1 broad enr=${fmtNumber(p2BestEnr)}×, recall=${fmtNumber(p2BestRecall)}. `
+            : "";
+          const posthocNote = p2Posthoc
+            ? `<div style="margin-top:6px;font-size:12px;opacity:0.75;">(Re-scored post-hoc by <code>scripts/_phase2_rebuild_best_posthoc.py</code> — legacy enrichment-only winner overridden.)</div>`
+            : "";
+          sections.push(`
+            <!-- 模板内容 / Template content --><section class="candidate-section">
+              <!-- 模板内容 / Template content --><h3>Phase 2 (trust-region refinement) — Phase 1 retained</h3>
+              <!-- 模板内容 / Template content --><div class="status" style="padding:10px 12px;border-left:3px solid #ffb84d;background:rgba(255,184,77,0.08);">
+                <!-- 模板内容 / Template content --><strong>Phase 2 ran (${triedIters} trust-region iter${triedIters === 1 ? "" : "s"} attempted) but no iter beat Phase 1.</strong><br>
+                <!-- 模板内容 / Template content -->${scoreBreak}${enrRecBreak}Phase 1 baseline kept as final best — Phase 2 image panels would duplicate the Phase 1 ones, so they are hidden here. See the Phase 2 history in <code>production_summary.json</code> for per-iter detail.
+                <!-- 模板内容 / Template content -->${posthocNote}
+              <!-- 模板内容 / Template content --></div>
+            <!-- 模板内容 / Template content --></section>
+          <!-- 模板内容 / Template content -->`);
+        } else {
+          const posthocTag = p2Posthoc
+            ? ` <span style="font-size:11px;opacity:0.7;">[post-hoc rebuilt]</span>`
+            : "";
+          sections.push(`
+            <!-- 模板内容 / Template content --><section class="candidate-section">
+              <!-- 模板内容 / Template content --><h3>Phase 2 best composite (trust-region refinement, iter ${p2BestIter ?? "?"})${posthocTag}</h3>
+              <!-- 模板内容 / Template content --><div class="comparison-grid">
+                <!-- 模板内容 / Template content --><div><div class="status">Powder density (broad)</div>${imgBlock(previews["phase2_powder_broad.png"], "phase2 powder broad", "Phase 2 powder broad")}</div>
+                <!-- 模板内容 / Template content --><div><div class="status">Powder density (sharp)</div>${imgBlock(previews["phase2_powder_sharp.png"], "phase2 powder sharp", "Phase 2 powder sharp")}</div>
+                <!-- 模板内容 / Template content --><div><div class="status">Raw amplitude (inverted)</div>${imgBlock(previews["phase2_amp.png"], "phase2 amplitude", "Phase 2 amplitude")}</div>
+              <!-- 模板内容 / Template content --></div>
+            <!-- 模板内容 / Template content --></section>
+          <!-- 模板内容 / Template content -->`);
+        }
       // 前端逻辑 / Frontend logic
       }
       // 前端逻辑 / Frontend logic
