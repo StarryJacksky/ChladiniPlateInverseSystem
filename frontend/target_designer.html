@@ -171,6 +171,20 @@
       border-color: var(--accent); /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
+    /* 修：HTML5 [hidden] 默认 display:none 被上面的 button{display:inline-flex} 盖掉了，
+       这里显式恢复，否则 hidden 属性的按钮还是会被画出来。
+       Fix: button{display:inline-flex} above overrides browser's [hidden]{display:none};
+       restore it explicitly so toggling el.hidden actually hides the button. */
+    button[hidden], .file-button[hidden] { display: none !important; } /* 样式设置 / Style setting */
+
+    /* disabled 视觉对比加强，深色 topbar 下原生灰几乎看不见 /
+       Make disabled state visually obvious on the dark topbar. */
+    button:disabled, .file-button:disabled { /* 样式设置 / Style setting */
+      opacity: 0.35; /* 样式设置 / Style setting */
+      cursor: not-allowed; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+    button:disabled:hover, .file-button:disabled:hover { background: transparent; border-color: transparent; } /* 样式设置 / Style setting */
+
     .topbar button.active { /* 样式设置 / Style setting */
       background: #fffdf8; /* 样式设置 / Style setting */
       color: var(--ink); /* 样式设置 / Style setting */
@@ -1889,13 +1903,13 @@
           <input id="importInput" type="file" accept="image/png,image/jpeg,image/webp"> <!-- 页面结构 / Page structure -->
           <button id="saveButton" class="primary" type="button" title="Save target">Save</button> <!-- 页面结构 / Page structure -->
         </div> <!-- 页面结构 / Page structure -->
-        <div class="group" id="importToolsGroup" role="group" aria-label="import placement" title="Adjust placement of imported image"> <!-- 页面结构 / Page structure -->
-          <button id="importModeCover" type="button" title="Fill canvas (crop overflow)" aria-label="Cover" disabled>Cover</button> <!-- 页面结构 / Page structure -->
-          <button id="importModeFit" type="button" title="Fit aspect ratio (white bars)" aria-label="Fit" disabled>Fit</button> <!-- 页面结构 / Page structure -->
-          <button id="importModeStretch" type="button" title="Stretch to canvas (distort)" aria-label="Stretch" disabled>Stretch</button> <!-- 页面结构 / Page structure -->
-          <button id="importCropButton" type="button" title="Drag a square ROI then Apply" aria-label="Crop ROI" disabled>Crop</button> <!-- 页面结构 / Page structure -->
+        <div class="group" id="importToolsGroup" role="group" aria-label="import placement" title="Placement / preprocessing for the canvas content"> <!-- 页面结构 / Page structure -->
+          <button id="importModeCover" type="button" title="Fill canvas (crop overflow). Snapshots current canvas if nothing imported." aria-label="Cover">Cover</button> <!-- 页面结构 / Page structure -->
+          <button id="importModeFit" type="button" title="Fit aspect ratio (white bars). Snapshots current canvas if nothing imported." aria-label="Fit">Fit</button> <!-- 页面结构 / Page structure -->
+          <button id="importModeStretch" type="button" title="Stretch to fill canvas (distort). Snapshots current canvas if nothing imported." aria-label="Stretch">Stretch</button> <!-- 页面结构 / Page structure -->
+          <button id="importCropButton" type="button" title="Drag a square ROI on the canvas then click Apply" aria-label="Crop ROI">Crop</button> <!-- 页面结构 / Page structure -->
           <button id="importCropApply" type="button" title="Apply ROI crop" aria-label="Apply crop" hidden>Apply</button> <!-- 页面结构 / Page structure -->
-          <button id="importInvertButton" type="button" title="Flip black / white (polarity)" aria-label="Invert" disabled>Invert</button> <!-- 页面结构 / Page structure -->
+          <button id="importInvertButton" type="button" title="Flip black / white (polarity)" aria-label="Invert">Invert</button> <!-- 页面结构 / Page structure -->
         </div> <!-- 页面结构 / Page structure -->
       </div> <!-- 页面结构 / Page structure -->
     </header> <!-- 页面结构 / Page structure -->
@@ -2806,11 +2820,13 @@
     }
 
     function updateImportModeButtons() {
-      const hasImport = !!currentImportSrc;
+      // 5 个按钮一直可用：没有 currentImportSrc 时点击会以"当前画布"为源做快照 /
+      // All five buttons are always usable; when there is no remembered import,
+      // they snapshot the current canvas as the source.
       ["importModeCover", "importModeFit", "importModeStretch",
        "importCropButton", "importInvertButton"].forEach((id) => {
         const btn = document.getElementById(id);
-        if (btn) btn.disabled = !hasImport;
+        if (btn) btn.disabled = false;
       });
       const map = { cover: "importModeCover", fit: "importModeFit", stretch: "importModeStretch" };
       Object.entries(map).forEach(([m, id]) => {
@@ -2824,6 +2840,17 @@
       }
       const apply = document.getElementById("importCropApply");
       if (apply) apply.hidden = !(cropMode && cropRect);
+    }
+
+    // 兜底：在没有 currentImportSrc（没 Import / 没加载已有 target）的情况下，
+    // 把当前画布快照成源，这样手画的内容也能走 mode-switch / crop。 /
+    // Fallback: snapshot the current canvas as the source so freshly-drawn
+    // content can also flow through cover/fit/stretch/crop.
+    function ensureImportSource() {
+      if (!currentImportSrc) {
+        try { currentImportSrc = canvas.toDataURL("image/png"); } catch (_) { return false; }
+      }
+      return !!currentImportSrc;
     }
 
     // 前端逻辑 / Frontend logic
@@ -6321,7 +6348,10 @@
       invert: document.getElementById("importInvertButton"),
     };
     function reapplyImportMode(mode) {
-      if (!currentImportSrc) return;
+      if (!ensureImportSource()) {
+        setStatus("Canvas snapshot failed — try Import or draw something first", "warn");
+        return;
+      }
       // 切换 mode 时跳过 trim（已经 trim 过了）和 polarity（用户已确认）/ Skip trim & auto-polarity when switching mode
       loadImageToCanvas(currentImportSrc, mode, { skipTrim: true });
     }
@@ -6329,7 +6359,10 @@
     if (importToolButtons.fit) importToolButtons.fit.addEventListener("click", () => reapplyImportMode("fit"));
     if (importToolButtons.stretch) importToolButtons.stretch.addEventListener("click", () => reapplyImportMode("stretch"));
     if (importToolButtons.crop) importToolButtons.crop.addEventListener("click", () => {
-      if (!currentImportSrc) return;
+      if (!ensureImportSource()) {
+        setStatus("Canvas snapshot failed", "warn");
+        return;
+      }
       cropMode = !cropMode;
       if (!cropMode) {
         cropRect = null;
