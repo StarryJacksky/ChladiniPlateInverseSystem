@@ -66,6 +66,10 @@ def build_default_pipeline_config(config_yaml_path: str | Path = "config.yaml",
         w10_num_frequencies=int(take("w10_num_frequencies", 6)),
         w10_f_min_hz=float(take("w10_f_min_hz", 120.0)),
         w10_f_max_hz=float(take("w10_f_max_hz", 1200.0)),
+        w10_sigma_anneal_start=float(take("w10_sigma_anneal_start", 0.20)),
+        w10_sigma_anneal_steps=int(take("w10_sigma_anneal_steps", 100)),
+        w10_target_dilation_px=int(take("w10_target_dilation_px", 2)),
+        w10_min_surrogate_enrichment=float(take("w10_min_surrogate_enrichment", 0.5)),
         phase1_top_k_modes=int(take("phase1_top_k_modes", 6)),
         phase1_off_resonance_hz=float(take("phase1_off_resonance_hz", 1.5)),
         magic_off_resonance_hz=magic,
@@ -100,6 +104,23 @@ class ProductionPipelineConfig:
     w10_num_frequencies: int = 6
     w10_f_min_hz: float = 120.0
     w10_f_max_hz: float = 1200.0
+    # P0 fix (2026-05): sigma annealing + target dilation guard the surrogate
+    # against gradient-cliff collapse on thin / sparse targets. Without these,
+    # the recognisability loss (-log(enrichment + 1e-9)) saturates at the
+    # epsilon floor for any target whose initial random forced-response
+    # produces enrichment < 1e-9, killing the gradient signal and leaving the
+    # design essentially random (observed: 4-pointed star outline yielded
+    # surrogate enrichment = 4e-36 after 300 steps). /
+    # P0 修复：sigma 退火 + 目标膨胀，防止细线/稀疏目标在初始随机 H+θ 下
+    # enrichment 起步即 1e-40、梯度被 -log(x+1e-9) 的 epsilon 削平
+    w10_sigma_anneal_start: float = 0.20
+    w10_sigma_anneal_steps: int = 100
+    w10_target_dilation_px: int = 2
+    # Health-check threshold: abort the pipeline before sinking 5+ minutes
+    # of COMSOL on a W10 design whose surrogate self-report says it never
+    # learned anything. /
+    # 健康度阈值：W10 自评 enrichment 低于此值就拒绝下推到 COMSOL
+    w10_min_surrogate_enrichment: float = 0.5
 
     # Phase 1 selection
     phase1_top_k_modes: int = 6
@@ -193,6 +214,9 @@ def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progre
         "--shear-ratio", f"{float(cfg.shear_ratio)}",
         "--target", cfg.target_path,
         "--snapshot-every", "999999",
+        "--sigma-anneal-start", f"{float(cfg.w10_sigma_anneal_start)}",
+        "--sigma-anneal-steps", str(int(cfg.w10_sigma_anneal_steps)),
+        "--target-dilation-px", str(int(cfg.w10_target_dilation_px)),
     ]
     if initial_H_csv is not None:
         cmd.extend(["--initial-H", str(initial_H_csv)])
@@ -203,7 +227,23 @@ def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progre
     _emit(progress, "surrogate", f"Running W10 surrogate ({int(num_steps or cfg.w10_num_steps)} steps)", candidate_id=cand_id)
     _run_subprocess(cmd, project_root, label=f"W10 surrogate ({cand_id})")
     summary_path = project_root / "candidates" / cand_id / "w10_optimization_summary.json"
-    return json.loads(summary_path.read_text(encoding="utf-8"))
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    # Health check: refuse to send a clearly-failed surrogate run downstream
+    # to COMSOL. A surrogate enrichment < ~0.5 means the loss collapsed to
+    # the epsilon floor (gradient cliff) and the design is essentially
+    # random — sinking 5+ min of COMSOL on it is wasted compute. /
+    # 健康度检查：W10 自评 enrichment 太低就直接拒绝下推 COMSOL
+    surr = float(summary.get("best_surrogate_metrics", {}).get("enrichment", 0.0))
+    threshold = float(cfg.w10_min_surrogate_enrichment)
+    if surr < threshold:  # 失败 / Failed
+        msg = (f"W10 surrogate convergence failure: best enrichment={surr:.3e} < threshold={threshold:.2f}. "
+               f"Likely causes: thin/sparse target hitting the loss gradient cliff (enrichment underflowed "
+               f"below 1e-9 → -log(x+eps) saturated → no gradient). Try raising --target-dilation-px or "
+               f"--sigma-anneal-start. See {summary_path} for trace details. / "
+               f"W10 收敛失败：surrogate enrichment 远低于阈值，多半是细线/稀疏目标触发梯度悬崖；"
+               f"加大 --target-dilation-px / --sigma-anneal-start 再试")
+        raise RuntimeError(msg)  # 抛错 / Raise
+    return summary
 
 
 def _run_comsol_eigfreq(cfg: ProductionPipelineConfig, project_root: Path, candidate_id: str, progress=None) -> Path:

@@ -76,6 +76,23 @@ class W10AnisotropyConfig:  # W10 配置 / W10 config
     contrast_weight: float = 1.0  # 对比权重 / Contrast
     recall_weight: float = 0.5  # recall 权重 / Recall
     sigma_rel: float = 0.05  # 高斯 σ / Gaussian σ
+    # Sigma annealing: start with a broader Gaussian powder window and linearly
+    # shrink to ``sigma_rel`` over the first ``sigma_anneal_steps`` steps. The
+    # default loss with sigma_rel=0.05 is so sharp that initial enrichment for
+    # thin/sparse targets underflows to ~1e-40 and the gradient cliff
+    # (-log(x + 1e-9)) zeroes out — Adam never gets a useful signal. Starting
+    # sigma at e.g. 0.20 keeps initial enrichment near O(1), so the optimiser
+    # can actually move H+θ in a meaningful direction before tightening. /
+    # Sigma 退火：起步用宽 powder（粗），训练前 N 步线性收紧到 sigma_rel；
+    # 防止细线/稀疏目标在 sigma=0.05 下 enrichment 起步即 1e-40、梯度被 epsilon 削平
+    sigma_anneal_start: float | None = None  # None = 关闭 / None disables
+    sigma_anneal_steps: int = 100  # 退火步数 / Anneal steps
+    # Target dilation (on proxy grid). For thin-curve targets (1-2 px wide
+    # outlines), even a 25×25 proxy preserves the sharpness — leaving the
+    # optimiser with too little overlap area for the gradient signal. /
+    # 目标膨胀（proxy 网格上）：细线 target 在 25×25 proxy 上仍是 1-2 像素宽，
+    # 几乎没有 powder 重叠区域；膨胀 1-2 像素能给优化提供有效梯度
+    target_dilation_px: int = 0  # 0 = 不膨胀 / 0 disables
     recall_percentile_frac: float = 0.20  # recall 分位 / Recall percentile
     sinkhorn_weight: float = 0.0  # Sinkhorn 权重 / Sinkhorn weight
     sinkhorn_epsilon: float = 0.01  # Sinkhorn ε / Sinkhorn ε
@@ -127,9 +144,17 @@ def _build_thickness(h_logit: torch.Tensor, grid_size: int, h_min: float, h_max:
     return apply_center_clamp(H_clipped, float(default_h), centre_cells)  # 中心夹持 / Clamp
 
 
-def _build_target_mask_proxy(target_binary_full: np.ndarray, proxy_grid_size: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:  # 目标降采样 / Downsample target
+def _build_target_mask_proxy(target_binary_full: np.ndarray, proxy_grid_size: int, device: torch.device, dtype: torch.dtype, dilation_px: int = 0) -> torch.Tensor:  # 目标降采样 / Downsample target
     from src.scoring.geometry_helpers import resize_binary_nearest  # 延迟导入 / Lazy
     resized = resize_binary_nearest(target_binary_full.astype(bool), int(proxy_grid_size))  # 调整 / Resize
+    if int(dilation_px) > 0:  # 膨胀 / Dilation
+        try:
+            from scipy.ndimage import binary_dilation  # 延迟导入 / Lazy
+            from scipy.ndimage import generate_binary_structure  # 延迟导入 / Lazy
+            struct = generate_binary_structure(2, 2)  # 8-邻接 / 8-connectivity
+            resized = binary_dilation(resized, structure=struct, iterations=int(dilation_px))  # 多次膨胀 / Iterate
+        except ImportError:
+            print(f"[W10] scipy.ndimage unavailable; skipping target dilation (requested {dilation_px} px). / scipy 不可用，跳过目标膨胀")
     return torch.as_tensor(resized.astype(np.float64), dtype=dtype, device=device)  # 张量 / Tensor
 
 
@@ -149,7 +174,11 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
     plate = OrthotropicPlate(config, proxy_grid_size=int(opt_config.proxy_grid_size), base_accel=float(opt_config.base_accel_m_s2), default_damping=float(opt_config.damping_ratio), reference_frequency_hz=0.5 * (float(opt_config.f_min_hz) + float(opt_config.f_max_hz)), stiffness_ratio=opt_config.stiffness_ratio, shear_ratio=opt_config.shear_ratio, dtype=dtype, device=device)  # 正交板 / Ortho plate
     print(f"[W10] OrthotropicPlate ready: N={plate.N}, stiffness_ratio={plate.stiffness_ratio:.3f}, shear_ratio={plate.shear_ratio:.3f}")  # 打印 / Print
     print(f"[W10] E_||={plate.E_parallel_pa:.3e} Pa, E_⊥={plate.E_perp_pa:.3e} Pa, G={plate.G_pp_pa:.3e} Pa")  # 打印 / Print
-    target_proxy = _build_target_mask_proxy(target_binary, plate.N, device=device, dtype=dtype)  # 代理目标 / Proxy target
+    target_proxy = _build_target_mask_proxy(target_binary, plate.N, device=device, dtype=dtype, dilation_px=int(opt_config.target_dilation_px))  # 代理目标 / Proxy target
+    target_area_frac = float(target_proxy.sum().item()) / float(target_proxy.numel())  # 占地比 / Area frac
+    print(f"[W10] target_proxy: {int(target_proxy.sum().item())}/{int(target_proxy.numel())} pixels (area_frac={target_area_frac:.3%}), dilation_px={int(opt_config.target_dilation_px)}")  # / Print
+    if target_area_frac < 0.01:  # 极稀疏目标 / Very sparse target
+        print(f"[W10] WARNING: target_proxy area_frac={target_area_frac:.3%} is extremely sparse — consider raising --target-dilation-px to give the loss gradient a chance. / 目标过稀疏，建议 --target-dilation-px 加大")  # / Warn
 
     # === 决策变量初始化 / Initialise decision variables ===
     # H logit / H logit
@@ -186,7 +215,18 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
         {"params": [weight_logits], "lr": float(opt_config.learning_rate_weight)},  # w / w
     ], weight_decay=float(opt_config.weight_decay))  # Adam / Adam
 
-    loss_weights = RecognisabilityLossWeights(enrichment=float(opt_config.enrichment_weight), contrast=float(opt_config.contrast_weight), recall=float(opt_config.recall_weight), sigma_rel=float(opt_config.sigma_rel), percentile_frac=float(opt_config.recall_percentile_frac))  # 损失权重 / Loss weights
+    sigma_end = float(opt_config.sigma_rel)  # 末态 σ / Final sigma
+    sigma_start = float(opt_config.sigma_anneal_start) if opt_config.sigma_anneal_start is not None else sigma_end  # 起态 σ / Initial sigma
+    sigma_anneal_steps = max(1, int(opt_config.sigma_anneal_steps))  # 退火步数 / Anneal steps
+    if sigma_start != sigma_end:  # 退火生效 / Annealing on
+        print(f"[W10] sigma annealing: {sigma_start:.3f} → {sigma_end:.3f} over first {sigma_anneal_steps} steps / Sigma 退火")  # / Print
+    def _current_sigma(step: int) -> float:  # 线性退火 / Linear anneal
+        if sigma_start == sigma_end:  # 关闭 / Off
+            return sigma_end  # / Return
+        frac = min(1.0, max(0.0, float(step) / float(sigma_anneal_steps)))  # 比例 / Fraction
+        return float(sigma_start + (sigma_end - sigma_start) * frac)  # 插值 / Lerp
+
+    loss_weights = RecognisabilityLossWeights(enrichment=float(opt_config.enrichment_weight), contrast=float(opt_config.contrast_weight), recall=float(opt_config.recall_weight), sigma_rel=float(sigma_start), percentile_frac=float(opt_config.recall_percentile_frac))  # 损失权重 / Loss weights
 
     trace = W10Trace()  # 轨迹 / Trace
     best_loss = math.inf  # 最佳 / Best
@@ -226,6 +266,7 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
             per_freq_responses.append(u_grid)  # 加入 / Append
         composite_amp = compose_multifreq_amplitude_with_weights(per_freq_responses, weights)  # 合成 / Compose
         composite_complex = composite_amp.to(dtype=torch.complex128 if composite_amp.dtype == torch.float64 else torch.complex64) + 0.0j  # 包装 / Wrap
+        loss_weights.sigma_rel = _current_sigma(step)  # 当步 σ / Current sigma (annealed)
         recog_loss, parts = combined_recognisability_loss(composite_complex, target_proxy, weights=loss_weights)  # 综合损失 / Combined
 
         sinkhorn_part = composite_amp.new_tensor(0.0)  # Sinkhorn 默认 0 / Default 0

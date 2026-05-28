@@ -83,6 +83,9 @@ def build_argument_parser() -> argparse.ArgumentParser:  # 解析器 / Parser
     parser.add_argument("--theta-init-mode", type=str, default="random", choices=["random", "zeros", "diagonal"], help="θ initial mode. / θ 初始模式。")  # / mode
     parser.add_argument("--theta-seed", type=int, default=42, help="θ random seed. / θ 随机种子。")  # / seed
     parser.add_argument("--torch-num-threads", type=int, default=_DEFAULT_TORCH_THREADS, help="torch.set_num_threads value (default 1 for Win/Mac reproducibility; raise for speed). / torch 线程数，默认 1 以求跨平台一致。")  # / threads
+    parser.add_argument("--sigma-anneal-start", type=float, default=None, help="Initial sigma_rel for powder loss; linearly shrinks to --sigma-rel over --sigma-anneal-steps. Larger value (e.g. 0.20) protects against gradient-cliff collapse on thin / sparse targets. None disables (uses sigma_rel throughout). / 损失中 powder σ 起步值，逐步收紧到 --sigma-rel；防止细线目标梯度悬崖；None 关闭")  # / sigma anneal
+    parser.add_argument("--sigma-anneal-steps", type=int, default=100, help="Number of steps over which sigma anneals from start to end. / Sigma 退火步数")  # / anneal steps
+    parser.add_argument("--target-dilation-px", type=int, default=0, help="Pixels of binary dilation applied to the proxy-grid target mask. >0 helps thin targets (e.g. 1-2px outlines). / 目标膨胀像素数；细线/稀疏 target 建议 2-3")  # / dilation
     return parser  # / Return
 
 
@@ -143,6 +146,9 @@ def main(argv: list[str] | None = None) -> int:  # 主 / Main
         shear_ratio=args.shear_ratio,
         theta_init_mode=str(args.theta_init_mode),
         theta_seed=int(args.theta_seed),
+        sigma_anneal_start=(float(args.sigma_anneal_start) if args.sigma_anneal_start is not None else None),
+        sigma_anneal_steps=int(args.sigma_anneal_steps),
+        target_dilation_px=int(args.target_dilation_px),
     )  # 配置 / Config
 
     sr_print = args.stiffness_ratio if args.stiffness_ratio is not None else config.get("material", {}).get("stiffness_ratio", 1.05)  # 显示用 / Display

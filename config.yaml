@@ -55,6 +55,10 @@ production:
   w10_num_frequencies: 6 # 联合频率数 K / Joint frequency count K
   w10_f_min_hz: 120.0 # / Frequency lower bound
   w10_f_max_hz: 1200.0 # / Frequency upper bound
+  w10_sigma_anneal_start: 0.20 # Sigma 退火起点（防止细线 target 梯度悬崖）/ Sigma annealing start; protects against thin-target gradient cliff
+  w10_sigma_anneal_steps: 100 # Sigma 退火步数 / Anneal step count
+  w10_target_dilation_px: 2 # 目标膨胀像素数（proxy 网格）/ Target dilation px on proxy grid
+  w10_min_surrogate_enrichment: 0.5 # 健康度阈值；surrogate enrichment 低于此值直接拒绝喂 COMSOL / Health-check threshold
   phase1_top_k_modes: 6 # IC-likeness 选 top-K 模态 / Top-K IC-likeness modes
   phase1_off_resonance_hz: 1.5 # 偏离本征频率的驱动偏移 / Off-resonance offset
   magic_off_resonance_hz: [165.0] # tier1 经验发现的 magic 频率（探索新材料请重新扫频） / tier1 empirically-discovered magic freq
