@@ -3109,7 +3109,14 @@
     }
 
     function clearOverlay() {
-      if (overlayCtx) overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+      // 不是单纯清空——要把 base overlay（15x15 网格 + 中心夹持圈）重画一遍，
+      // 否则每次 shape/curve 预览或 commit 之后网格就消失了。
+      // Not a raw clear — re-render the base overlay (15x15 grid + centre clamp).
+      // Otherwise the grid disappears every time we draw / commit a shape preview.
+      try { drawOverlay(); }
+      catch (_) {
+        if (overlayCtx) overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+      }
     }
 
     function shapeStrokeStyle() {
