@@ -128,8 +128,12 @@ def _emit(progress: Callable[[dict], None] | None, stage: str, message: str, **e
 
 
 def _run_subprocess(cmd: list[str], cwd: Path, label: str) -> subprocess.CompletedProcess:
+    env = os.environ.copy()
+    existing_pythonpath = env.get("PYTHONPATH", "")
+    project_path = str(cwd)
+    env["PYTHONPATH"] = project_path if not existing_pythonpath else project_path + os.pathsep + existing_pythonpath
     try:
-        res = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, check=False)
+        res = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, check=False, env=env)
     except FileNotFoundError as exc:
         raise FileNotFoundError(
             f"{label} could not start because the executable was not found: {cmd[0]!r}. "
