@@ -113,8 +113,31 @@ end % 结束研究状态检查 / End study status check
 mphsave(model, fullfile(export_dir, 'debug_before_export_forced_response_model.mph'), 'copy', 'on'); % 保存导出前调试模型 / Save pre-export debug model
 export_forced_response(model, export_dir); % 导出强迫响应结果 / Export forced response results
 prepare_forced_response_view(model, drive_frequency_hz, export_dir); % 保存前创建默认查看图 / Create default viewer plot before save
-mphsave(model, fullfile(export_dir, 'last_forced_response_model.mph'), 'copy', 'on'); % 保存验证模型副本 / Save validation model copy
+save_forced_response_model_copy(model, export_dir); % 保存验证模型副本，锁定时容错 / Save validation model copy, tolerating locks
 end % 结束主函数 / End main function
+
+function save_forced_response_model_copy(model, export_dir)
+summary_path = fullfile(export_dir, 'forced_response_mphsave_summary.txt');
+summary_file = fopen(summary_path, 'w');
+primary_path = fullfile(export_dir, 'last_forced_response_model.mph');
+fprintf(summary_file, 'primary_path=%s\n', primary_path);
+try
+    mphsave(model, primary_path, 'copy', 'on');
+    fprintf(summary_file, 'status=primary_ok\n');
+catch primary_err
+    fprintf(summary_file, 'primary_status=failed:%s\n', primary_err.message);
+    fallback_path = fullfile(export_dir, sprintf('last_forced_response_model_%s.mph', datestr(now, 'yyyymmdd_HHMMSS')));
+    fprintf(summary_file, 'fallback_path=%s\n', fallback_path);
+    try
+        mphsave(model, fallback_path, 'copy', 'on');
+        fprintf(summary_file, 'status=fallback_ok\n');
+    catch fallback_err
+        fprintf(summary_file, 'fallback_status=failed:%s\n', fallback_err.message);
+        fprintf(summary_file, 'status=skipped_mph_save\n');
+    end
+end
+fclose(summary_file);
+end
 
 function table_data = read_optional_table(path) % 读取可选 CSV 表 / Read optional CSV table
 if exist(path, 'file') % 检查文件是否存在 / Check whether file exists

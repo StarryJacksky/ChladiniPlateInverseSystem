@@ -109,10 +109,33 @@ end
 mphsave(model, fullfile(export_dir, 'debug_before_export_forced_response_model.mph'), 'copy', 'on');
 export_forced_response(model, export_dir);
 prepare_forced_response_view(model, drive_frequency_hz, export_dir);
-mphsave(model, fullfile(export_dir, 'last_forced_response_model.mph'), 'copy', 'on');
+save_forced_response_model_copy(model, export_dir);
 end
 
 % ====== helpers below (mirrored from run_chladni_forced_response.m) ======
+function save_forced_response_model_copy(model, export_dir)
+summary_path = fullfile(export_dir, 'forced_response_mphsave_summary.txt');
+summary_file = fopen(summary_path, 'w');
+primary_path = fullfile(export_dir, 'last_forced_response_model.mph');
+fprintf(summary_file, 'primary_path=%s\n', primary_path);
+try
+    mphsave(model, primary_path, 'copy', 'on');
+    fprintf(summary_file, 'status=primary_ok\n');
+catch primary_err
+    fprintf(summary_file, 'primary_status=failed:%s\n', primary_err.message);
+    fallback_path = fullfile(export_dir, sprintf('last_forced_response_model_%s.mph', datestr(now, 'yyyymmdd_HHMMSS')));
+    fprintf(summary_file, 'fallback_path=%s\n', fallback_path);
+    try
+        mphsave(model, fallback_path, 'copy', 'on');
+        fprintf(summary_file, 'status=fallback_ok\n');
+    catch fallback_err
+        fprintf(summary_file, 'fallback_status=failed:%s\n', fallback_err.message);
+        fprintf(summary_file, 'status=skipped_mph_save\n');
+    end
+end
+fclose(summary_file);
+end
+
 function table_data = read_optional_table(path)
 if exist(path, 'file')
     table_data = readtable(path, 'TextType', 'string', 'VariableNamingRule', 'preserve');

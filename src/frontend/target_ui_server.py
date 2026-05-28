@@ -272,7 +272,7 @@ def select_best_candidate_mph_file(candidate_id: str) -> dict:
     forced = [file for file in design_files if file.get("kind") == "forced_response"]
     if forced:
         if target_freq is not None:
-            chosen = min(forced, key=lambda file: abs((_frequency_from_variant_dir(str(file.get("variant_dir", ""))) or target_freq) - target_freq))
+            chosen = min(forced, key=lambda file: (abs((_frequency_from_variant_dir(str(file.get("variant_dir", ""))) or target_freq) - target_freq), -Path(str(file["path"])).stat().st_mtime))
             chosen = dict(chosen)
             chosen["selection_reason"] = f"Best production forced-response model near {target_freq:g} Hz. / 打开最接近最佳频率 {target_freq:g} Hz 的强迫响应模型。"
             return chosen
@@ -984,8 +984,11 @@ def read_log_tail(path: Path, limit: int = 5000) -> dict:  # 读取日志尾部 
 def load_log_tails(config: dict) -> dict:  # 读取最近运行日志 / Load recent run logs
     exports_dir = Path(config["paths"]["comsol_exports_dir"])  # 读取导出目录 / Read export directory
     logs = [read_log_tail(exports_dir / "mphserver.log"), read_log_tail(exports_dir / "livelink_batch.log")]  # 添加全局日志 / Add global logs
-    candidate_logs = sorted(exports_dir.glob("candidate_*_*/livelink.log"), key=lambda path: path.stat().st_mtime if path.exists() else 0.0, reverse=True)  # 查找候选日志 / Find candidate logs
-    for log_path in candidate_logs[:5]:  # 限制最近五个候选日志 / Limit to five recent candidate logs
+    log_candidates = list(exports_dir.glob("candidate_*_*/livelink.log"))  # 查找候选日志 / Find candidate logs
+    log_candidates.extend(exports_dir.glob("**/livelink_forced_response.log"))  # 查找生产强迫响应日志 / Find production forced-response logs
+    log_candidates.extend(exports_dir.glob("**/livelink_eigenfrequency.log"))  # 查找生产特征频率日志 / Find production eigenfrequency logs
+    candidate_logs = sorted(set(log_candidates), key=lambda path: path.stat().st_mtime if path.exists() else 0.0, reverse=True)  # 按更新时间排序 / Sort by modification time
+    for log_path in candidate_logs[:8]:  # 限制最近日志 / Limit recent logs
         logs.append(read_log_tail(log_path))  # 添加候选日志 / Add candidate log
     return {"logs": logs}  # 返回日志列表 / Return log list
 
@@ -1023,6 +1026,8 @@ def collect_recovery_hints(config: dict) -> dict:  # 汇总恢复建议 / Collec
         append_recovery_hint(hints, titles, "fail", "Fix MATLAB command path", "MATLAB path or executable permission looks wrong.", "Use Run > Discover, then Apply paths or Save paths.", "logs")  # 添加 MATLAB 建议 / Add MATLAB hint
     if failure_state and "comsol" in text and ("not found" in text or "no such file" in text or "permission" in text):  # 检查 COMSOL 路径文本 / Check COMSOL path text
         append_recovery_hint(hints, titles, "fail", "Fix COMSOL command path", "COMSOL path or executable permission looks wrong.", "Use Run > Discover, then Apply paths or Save paths.", "logs")  # 添加 COMSOL 建议 / Add COMSOL hint
+    if failure_state and ("mphsave" in text or ("last_forced_response_model" in text and ".lock" in text) or ("last forced response model" in text and "ioexception" in text)):  # 检查 MPH 保存锁定文本 / Check MPH save lock text
+        append_recovery_hint(hints, titles, "warn", "Close locked MPH model", "The solver finished far enough to export data, but COMSOL could not overwrite the saved .mph copy because it appears to be open or locked.", "Close the corresponding model in COMSOL, then rerun. Newer versions will tolerate this and write a fallback timestamped .mph when possible.", "logs")  # 添加锁定建议 / Add lock hint
     if failure_state and (".mph" in text or "model" in text):  # 检查模型文本 / Check model text
         append_recovery_hint(hints, titles, "warn", "Verify bound MPH model", "The failure may involve the bound COMSOL model file or its parameter contract.", "Confirm comsol.model_path exists and matches the 15 x 15 parameterized model.", "logs")  # 添加模型建议 / Add model hint
     if failure_state and ("livelink" in text or "run_chladni_candidate" in text):  # 检查 LiveLink 文本 / Check LiveLink text
