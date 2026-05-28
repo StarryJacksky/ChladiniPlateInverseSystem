@@ -95,8 +95,10 @@ def main() -> int:
         print(f"    broad enr={p1['broad']['enrich']:.2f}× rec={p1['broad']['recall']:.2f}")
         print(f"    tight enr={p1['tight']['enrich']:.2f}× rec={p1['tight']['recall']:.2f}")
         if "phase2" in result:
-            print(f"  Phase 2: best iter {result['phase2']['best_iter']} → "
-                    f"{result['phase2']['best_enrichment']:.2f}× ({result['phase2']['improvement_pct']:+.1f}%)")
+            p2 = result["phase2"]
+            print(f"  Phase 2: best iter {p2['best_iter']} → score {p2.get('best_score', 0):.3f} "
+                    f"(enr {p2.get('best_enrichment', 0):.2f}× rec {p2.get('best_recall', 0):.2f})  "
+                    f"{p2['improvement_pct']:+.1f}% over Phase 1  [mode={p2.get('score_mode', 'composite')}]")
     print(f"\n  Output: {result['output_dir']}")
     print(f"  Summary: {result.get('summary_path', '(not saved)')}")
     return 0

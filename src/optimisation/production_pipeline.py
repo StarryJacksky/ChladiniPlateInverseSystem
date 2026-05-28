@@ -72,6 +72,7 @@ def build_default_pipeline_config(config_yaml_path: str | Path = "config.yaml",
         w10_min_surrogate_enrichment=float(take("w10_min_surrogate_enrichment", 0.5)),
         multistart_n=int(take("multistart_n", 1)),
         multistart_uplift_threshold=float(take("multistart_uplift_threshold", 0.05)),
+        phase2_score_mode=str(take("phase2_score_mode", "composite")),
         phase1_top_k_modes=int(take("phase1_top_k_modes", 6)),
         phase1_off_resonance_hz=float(take("phase1_off_resonance_hz", 1.5)),
         magic_off_resonance_hz=magic,
@@ -134,6 +135,13 @@ class ProductionPipelineConfig:
     multistart_n: int = 1
     multistart_uplift_threshold: float = 0.05  # 赢家相对 seed=42 至少 +5%
     multistart_seeds: tuple[int, ...] = (42, 1, 2, 3, 4, 5, 6, 7)  # 取前 multistart_n 个
+    # Phase 2 acceptance scoring. "composite" (default, new) uses
+    # enrich · √recall to reject the "collapse-to-a-bright-dot" failure
+    # mode where enrichment shoots up but the target shape is destroyed.
+    # "enrich_only" reproduces the pre-2026-05 behaviour that selected a
+    # visually-worse Phase 2 iter because its raw enrich beat Phase 1's. /
+    # Phase 2 决策分；composite 防"塌陷成单点"伪赢家
+    phase2_score_mode: str = "composite"  # "composite" | "enrich_only"
 
     # Phase 1 selection
     phase1_top_k_modes: int = 6
@@ -272,6 +280,38 @@ def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progre
                f"加大 --target-dilation-px / --sigma-anneal-start 再试")
         raise RuntimeError(msg)  # 抛错 / Raise
     return summary
+
+
+def _phase2_score(best_composite: dict, mode: str = "composite") -> dict:
+    """Compute the Phase 2 acceptance / "best" score from a best_composite dict.
+
+    The default ``mode="composite"`` returns ``broad.enrich · √(max(broad.recall, 0))``.
+    This rejects the dominant Phase 2 failure mode: gradient-step collapses
+    the COMSOL composite to a single bright spot in the middle of the plate,
+    which boosts enrichment (peak / median ratio shoots up) but kills recall
+    (the target's full shape is no longer covered). With raw enrich-only
+    acceptance, that collapse looks like a +50% "improvement" and beats
+    Phase 1's faithful 4-pointed star; with the composite, it loses.
+
+    Backward-compatibility: pass ``mode="enrich_only"`` to reproduce the
+    pre-2026-05 behaviour. /
+    Phase 2 决策分；composite 防"塌陷成中心亮点"伪赢家
+    """
+    broad = best_composite.get("broad", {}) or {}
+    tight = best_composite.get("tight", {}) or {}
+    be = float(broad.get("enrich", 0.0))
+    br = float(broad.get("recall", 0.0))
+    te = float(tight.get("enrich", 0.0))
+    tr = float(tight.get("recall", 0.0))
+    if mode == "enrich_only":
+        score = be
+    else:  # "composite" (default)
+        score = be * (max(br, 0.0) ** 0.5)
+    return {
+        "score": float(score),
+        "broad_enrich": be, "broad_recall": br,
+        "tight_enrich": te, "tight_recall": tr,
+    }
 
 
 def _composite_score(summary: dict) -> dict:
@@ -796,10 +836,22 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
     }
 
     # === S7: Phase 2 trust-region (optional) ===
+    # Acceptance / best-tracking uses the composite Phase-2 score
+    # (enrich · √recall) by default — see ``_phase2_score`` docstring and
+    # ``cfg.phase2_score_mode``. /
+    # 接受 / best 追踪默认用复合分；防 "塌陷成中心亮点" 伪赢家
     if not cfg.skip_phase2 and cfg.phase2_max_iters > 0:
-        _emit(progress, "phase2_start", f"Phase 2 trust-region ({cfg.phase2_max_iters} iters)")
-        history = [{"iter": 0, "candidate_id": cfg.candidate_id, "best_composite": p1_result["best_composite"], "accepted": True}]
-        best_enr = p1_result["best_composite"]["broad"]["enrich"]
+        _emit(progress, "phase2_start",
+              f"Phase 2 trust-region ({cfg.phase2_max_iters} iters, score_mode={cfg.phase2_score_mode})")
+        score_mode = str(cfg.phase2_score_mode)
+        history = [{
+            "iter": 0, "candidate_id": cfg.candidate_id,
+            "best_composite": p1_result["best_composite"],
+            "score": _phase2_score(p1_result["best_composite"], score_mode),
+            "accepted": True,
+        }]
+        best_score_obj = history[0]["score"]
+        best_score = float(best_score_obj["score"])
         best_iter = 0
         best_amp = p1_result["best_composite_amp"]
 
@@ -823,9 +875,11 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
             res = _evaluate_design(cfg, project_root, iter_cand,
                                      variant_prefix=f"prodp2it{it}", target=target,
                                      plate_length_mm=plate_length_mm, progress=progress)
-            new_enr = res["best_composite"]["broad"]["enrich"]
-            prev_enr = history[-1]["best_composite"]["broad"]["enrich"]
-            delta = new_enr - prev_enr
+            new_score_obj = _phase2_score(res["best_composite"], score_mode)
+            prev_score_obj = history[-1]["score"]
+            new_score = float(new_score_obj["score"])
+            prev_score = float(prev_score_obj["score"])
+            delta = new_score - prev_score
             accepted = delta > 0
             if delta > 0.10:
                 lr_h *= 1.3
@@ -834,19 +888,28 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
                 lr_h *= 0.5
                 lr_theta *= 0.5
             history.append({"iter": it, "candidate_id": iter_cand,
-                            "best_composite": res["best_composite"], "delta": float(delta),
+                            "best_composite": res["best_composite"],
+                            "score": new_score_obj,
+                            "delta": float(delta),
                             "accepted": bool(accepted),
                             "wallclock_s": float(time.time() - t2)})
             if accepted:
                 cur_H = project_root / "candidates" / iter_cand / "H.csv"
                 cur_theta = project_root / "candidates" / iter_cand / "theta_continuous_rad.csv"
-                if new_enr > best_enr:
-                    best_enr = new_enr
+                if new_score > best_score:
+                    best_score = new_score
+                    best_score_obj = new_score_obj
                     best_iter = it
                     best_amp = res["best_composite_amp"]
             _emit(progress, "phase2_iter_done",
-                  f"iter {it}: {prev_enr:.2f}× → {new_enr:.2f}× ({'ACCEPT' if accepted else 'REJECT'})",
-                  iter=it, delta=delta, accepted=accepted)
+                  (f"iter {it}: score {prev_score:.3f}→{new_score:.3f}  "
+                   f"(enr {prev_score_obj['broad_enrich']:.2f}→{new_score_obj['broad_enrich']:.2f}×, "
+                   f"rec {prev_score_obj['broad_recall']:.2f}→{new_score_obj['broad_recall']:.2f})  "
+                   f"[{'ACCEPT' if accepted else 'REJECT'}]"),
+                  iter=it, delta=delta, accepted=accepted,
+                  prev_score=prev_score, new_score=new_score,
+                  prev_enrich=prev_score_obj['broad_enrich'], new_enrich=new_score_obj['broad_enrich'],
+                  prev_recall=prev_score_obj['broad_recall'], new_recall=new_score_obj['broad_recall'])
             if lr_h < 0.005:
                 break
 
@@ -854,12 +917,18 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
         np.save(output_dir / "phase2_best_powder_broad.npy", chladni_powder_density(best_amp, sigma_rel=0.05))
         np.save(output_dir / "phase2_best_powder_sharp.npy", chladni_powder_density(best_amp, sigma_rel=0.025))
 
+        baseline_score = float(history[0]["score"]["score"])
+        improvement_pct = float((best_score - baseline_score) / max(baseline_score, 1e-9) * 100)
         final["stage_reached"] = "phase2"
         final["phase2"] = {
             "history": history,
+            "score_mode": score_mode,
             "best_iter": int(best_iter),
-            "best_enrichment": float(best_enr),
-            "improvement_pct": float((best_enr - history[0]["best_composite"]["broad"]["enrich"]) / history[0]["best_composite"]["broad"]["enrich"] * 100),
+            "best_score": float(best_score),
+            "best_enrichment": float(best_score_obj["broad_enrich"]),
+            "best_recall": float(best_score_obj["broad_recall"]),
+            "baseline_score": baseline_score,
+            "improvement_pct": improvement_pct,
         }
 
     # === S7.5: W10 → COMSOL gap monitor ===
