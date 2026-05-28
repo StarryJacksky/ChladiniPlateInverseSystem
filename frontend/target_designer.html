@@ -235,6 +235,11 @@
       box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
       font-size: 12px; min-width: 220px;
     }
+    /* 修：上面的 display:flex 把浏览器默认的 [hidden]{display:none} 覆盖了，
+       不显式恢复一下面板永远不会被隐藏。/ Fix: display:flex above
+       overrides the UA default for [hidden]; restore it so toggling
+       panel.hidden actually hides it. */
+    .stretch-panel[hidden] { display: none !important; } /* 样式设置 / Style setting */
     .stretch-panel .stretch-row { display: flex; align-items: center; justify-content: space-between; }
     .stretch-panel .stretch-hint { font-size: 11px; opacity: 0.65; }
     .stretch-panel .stretch-slider { display: flex; flex-direction: column; gap: 2px; }
