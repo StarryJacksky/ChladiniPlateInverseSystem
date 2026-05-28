@@ -122,19 +122,30 @@ def command_environment(command: list[str], log_path: Path) -> dict[str, str]:
         runtime_root = (log_path.parent / ".matlab_runtime").resolve()
         prefs_dir = runtime_root / "prefs"
         tmp_dir = runtime_root / "tmp"
-        home_dir = runtime_root / "home"
-        appdata_dir = runtime_root / "appdata"
-        local_appdata_dir = runtime_root / "local_appdata"
-        for path in [prefs_dir, tmp_dir, home_dir, appdata_dir, local_appdata_dir]:
+        for path in [prefs_dir, tmp_dir]:
             path.mkdir(parents=True, exist_ok=True)
+        # Only redirect the MATLAB-specific dirs that are safe to isolate per-run.
+        # Critical Windows env vars (USERPROFILE / APPDATA / LOCALAPPDATA) are
+        # left pointing at the real user profile - MATLAB on Windows needs to
+        # read license info, preferences, and cache from those locations during
+        # startup, and pointing them at an empty folder causes a
+        # ``Fatal Startup Error: File system inconsistency`` (matlab.exe Exit
+        # Status 0x00000001) before MATLAB ever runs our -batch expression. /
+        # 只重定向 MATLAB 自己用的 prefs 和 TEMP；USERPROFILE / APPDATA / LOCALAPPDATA
+        # 在 Windows 上是核心系统变量，重定向到空目录会让 MATLAB 直接 Fatal Startup
+        # Error: File system inconsistency 启动崩溃
+        env["MATLAB_PREFDIR"] = str(prefs_dir)
+        env["TEMP"] = str(tmp_dir)
+        env["TMP"] = str(tmp_dir)
+        # On non-Windows it has historically been safe to also redirect HOME
+        # (so parallel MATLAB runs don't fight over ~/.matlab); on Windows we
+        # leave HOME / USERPROFILE / APPDATA / LOCALAPPDATA alone. /
+        # 在 Windows 上保持 HOME/USERPROFILE/APPDATA/LOCALAPPDATA 为系统默认
+        if os.name != "nt":
+            home_dir = runtime_root / "home"
+            home_dir.mkdir(parents=True, exist_ok=True)
+            env["HOME"] = str(home_dir)
         env.update({
-            "MATLAB_PREFDIR": str(prefs_dir),
-            "TEMP": str(tmp_dir),
-            "TMP": str(tmp_dir),
-            "HOME": str(home_dir),
-            "USERPROFILE": str(home_dir),
-            "APPDATA": str(appdata_dir),
-            "LOCALAPPDATA": str(local_appdata_dir),
             "COMSOL_SERVER_USER": os.environ.get("COMSOL_SERVER_USER") or os.environ.get("USERNAME") or os.environ.get("USER") or "",
             "COMSOL_SERVER_PASSWORD": os.environ.get("COMSOL_SERVER_PASSWORD", ""),
             "COMSOL_SERVER_HOST": os.environ.get("COMSOL_SERVER_HOST", "127.0.0.1"),
@@ -289,6 +300,11 @@ def is_likely_mphserver_problem(output: str, returncode: int) -> bool:
         "not enough input arguments",
         "too many input arguments",
         "invalid expression",
+        # MATLAB startup itself blew up - retry can't fix this, fix env vars instead /
+        # MATLAB 自己启动就崩，重试无意义，根因在环境变量配置
+        "fatal startup error",
+        "file system inconsistency",
+        "matlab error exit status",
     )
     if any(pat in lowered for pat in hard_error_patterns):
         return False
