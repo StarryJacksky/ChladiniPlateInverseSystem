@@ -123,6 +123,28 @@ chmod +x scripts/launch_chladni_studio.sh
 
 The launcher runs a Python-only self-test, finds an available local port, starts the UI, and opens the browser.
 
+Windows COMSOL/MATLAB launch note:
+
+```text
+Start Chladni Studio from the same local Windows terminal/session that can start MATLAB and COMSOL.
+
+If the app is launched from a sandboxed automation terminal, remote helper, or restricted IDE shell, MATLAB may fail before LiveLink starts with:
+
+Fatal Startup Error
+CreateFile failed ... [system:5]
+System Error: File system inconsistency
+```
+
+This is a MATLAB process-environment or Windows permission problem, not a COMSOL credential problem and not a retry-wrapper bug.
+
+Before enabling COMSOL runs, test MATLAB from the same terminal that will launch the app:
+
+```powershell
+& "D:\MATLAB\bin\matlab.exe" -batch "disp('MATLAB_SMOKE_OK')"
+```
+
+If that command only works from an Administrator terminal or a non-sandboxed terminal, launch Chladni Studio the same way. After relaunching, clear any stale UI error state by restarting the UI or deleting only `data/comsol_exports/workflow_state.json`; do not delete candidate or COMSOL export folders unless you intentionally want to remove generated results.
+
 ## 6. Configure COMSOL and MATLAB
 
 The current development version reports running-process detection and common install-path discovery. If configured executable paths are missing, runtime diagnostics and LiveLink runs can temporarily use discovered paths, but users should still verify or edit `config.yaml` until the persistent setup wizard is finished.

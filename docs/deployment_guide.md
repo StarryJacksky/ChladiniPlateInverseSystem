@@ -157,6 +157,34 @@ chmod +x scripts/launch_chladni_studio.sh
 The launcher runs a Python-only self-test, finds an available local port, starts the UI, and opens the browser.
 启动器会运行 Python-only 自检、寻找可用本地端口、启动 UI 并打开浏览器。
 
+Windows COMSOL/MATLAB launch note:
+Windows COMSOL/MATLAB 启动注意事项：
+
+```text
+Start Chladni Studio from the same local Windows terminal/session that can start MATLAB and COMSOL.
+请从能够正常启动 MATLAB 和 COMSOL 的同一个本地 Windows 终端/会话启动 Chladni Studio。
+
+If the app is launched from a sandboxed automation terminal, remote helper, or restricted IDE shell, MATLAB may fail before LiveLink starts with:
+如果软件是从沙盒自动化终端、远程 helper 或受限 IDE shell 启动，MATLAB 可能会在 LiveLink 启动前失败：
+
+Fatal Startup Error
+CreateFile failed ... [system:5]
+System Error: File system inconsistency
+```
+
+This is a MATLAB process-environment or Windows permission problem, not a COMSOL credential problem and not a retry-wrapper bug.
+这属于 MATLAB 进程环境或 Windows 权限问题，不是 COMSOL 凭据问题，也不是 retry wrapper 没触发。
+
+Before enabling COMSOL runs, test MATLAB from the same terminal that will launch the app:
+启用 COMSOL 运行前，请在将要启动软件的同一个终端里测试 MATLAB：
+
+```powershell
+& "D:\MATLAB\bin\matlab.exe" -batch "disp('MATLAB_SMOKE_OK')"
+```
+
+If that command only works from an Administrator terminal or a non-sandboxed terminal, launch Chladni Studio the same way. After relaunching, clear any stale UI error state by restarting the UI or deleting only `data/comsol_exports/workflow_state.json`; do not delete candidate or COMSOL export folders unless you intentionally want to remove generated results.
+如果这条命令只有在管理员终端或非沙盒终端里才成功，请用同样方式启动 Chladni Studio。重新启动后，如界面仍显示旧错误，可重启 UI 或只删除 `data/comsol_exports/workflow_state.json`；不要删除候选目录或 COMSOL 导出目录，除非你确实想清掉生成结果。
+
 ## 6. Configure COMSOL and MATLAB / 配置 COMSOL 与 MATLAB
 
 The current development version reports running-process detection and common install-path discovery. If configured executable paths are missing, runtime diagnostics and LiveLink runs can temporarily use discovered paths, but users should still verify or edit `config.yaml` until the persistent setup wizard is finished.

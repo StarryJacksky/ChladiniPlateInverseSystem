@@ -123,6 +123,28 @@ chmod +x scripts/launch_chladni_studio.sh
 
 启动器会运行 Python-only 自检、寻找可用本地端口、启动 UI 并打开浏览器。
 
+Windows COMSOL/MATLAB 启动注意事项：
+
+```text
+请从能够正常启动 MATLAB 和 COMSOL 的同一个本地 Windows 终端/会话启动 Chladni Studio。
+
+如果软件是从沙盒自动化终端、远程 helper 或受限 IDE shell 启动，MATLAB 可能会在 LiveLink 启动前失败：
+
+Fatal Startup Error
+CreateFile failed ... [system:5]
+System Error: File system inconsistency
+```
+
+这属于 MATLAB 进程环境或 Windows 权限问题，不是 COMSOL 凭据问题，也不是 retry wrapper 没触发。
+
+启用 COMSOL 运行前，请在将要启动软件的同一个终端里测试 MATLAB：
+
+```powershell
+& "D:\MATLAB\bin\matlab.exe" -batch "disp('MATLAB_SMOKE_OK')"
+```
+
+如果这条命令只有在管理员终端或非沙盒终端里才成功，请用同样方式启动 Chladni Studio。重新启动后，如界面仍显示旧错误，可重启 UI 或只删除 `data/comsol_exports/workflow_state.json`；不要删除候选目录或 COMSOL 导出目录，除非你确实想清掉生成结果。
+
 ## 6. 配置 COMSOL 与 MATLAB
 
 当前开发版会报告运行进程检测与常见安装路径发现。如果配置里的可执行文件路径缺失，运行时诊断和 LiveLink 运行可以临时使用发现到的路径；但在持久化安装向导完成前，用户仍应检查或编辑 `config.yaml`。
