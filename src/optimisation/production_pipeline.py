@@ -128,7 +128,13 @@ def _emit(progress: Callable[[dict], None] | None, stage: str, message: str, **e
 
 
 def _run_subprocess(cmd: list[str], cwd: Path, label: str) -> subprocess.CompletedProcess:
-    res = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, check=False)
+    try:
+        res = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, check=False)
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            f"{label} could not start because the executable was not found: {cmd[0]!r}. "
+            f"Full command: {' '.join(cmd)}"
+        ) from exc
     if res.returncode != 0:
         tail = ("\n".join(res.stdout.splitlines()[-25:]) + "\n" + "\n".join(res.stderr.splitlines()[-25:]))[-4000:]
         raise RuntimeError(f"{label} failed (rc={res.returncode}):\n{tail}")
@@ -142,7 +148,7 @@ def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progre
     """Run W10 surrogate optimisation. Returns its summary dict."""
     cand_id = candidate_id or cfg.candidate_id
     cmd = [
-        ".venv/bin/python", "scripts/run_w10_anisotropy.py",
+        sys.executable, "scripts/run_w10_anisotropy.py",
         "--candidate-id", cand_id,
         "--num-steps", str(int(num_steps if num_steps is not None else cfg.w10_num_steps)),
         "--learning-rate-h", f"{float(lr_h if lr_h is not None else cfg.w10_lr_h)}",
@@ -169,7 +175,7 @@ def _run_comsol_eigfreq(cfg: ProductionPipelineConfig, project_root: Path, candi
     """Run COMSOL eigenfrequency analysis. Returns eigfreq export dir."""
     eig_name = f"prod_eig_{candidate_id}"
     cmd = [
-        ".venv/bin/python", "scripts/run_modal_calibration_w10design.py",
+        sys.executable, "scripts/run_modal_calibration_w10design.py",
         "--source-candidate", candidate_id,
         "--candidate-name", eig_name,
         "--stiffness-ratio", f"{float(cfg.stiffness_ratio)}",
@@ -230,7 +236,7 @@ def _run_comsol_forced_response(cfg: ProductionPipelineConfig, project_root: Pat
     fstr = ",".join(f"{f:.1f}" for f in freqs_hz)
     output_dir = f"reports/production/_comsol_{variant_prefix}"
     cmd = [
-        ".venv/bin/python", "scripts/run_w10_comsol_validation.py",
+        sys.executable, "scripts/run_w10_comsol_validation.py",
         "--candidate", candidate_id,
         "--stiffness-ratio", f"{float(cfg.stiffness_ratio)}",
         "--shear-ratio", f"{float(cfg.shear_ratio)}",
