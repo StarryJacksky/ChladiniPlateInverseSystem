@@ -286,6 +286,36 @@ def validate_production_payload(payload: dict, config: dict) -> dict:  # 校验�
     }
 
 
+def validate_material_sweep_payload(payload: dict, config: dict) -> dict:  # 校验材料预扫频载荷 / Validate material magic-frequency sweep payload
+    material = config.get("material", {})  # 当前材料配置 / Current material config
+    stiffness_ratio = float(payload.get("stiffness_ratio", material.get("stiffness_ratio", 1.05)))  # 各向异性比 / Stiffness ratio
+    if stiffness_ratio < 1.0 or stiffness_ratio > 20.0:  # 检查范围 / Check range
+        raise ValueError("stiffness_ratio must be between 1.0 and 20.0. / 各向异性比必须在 1.0 到 20.0 之间。")  # / Range error
+    shear_ratio = float(payload.get("shear_ratio", material.get("shear_ratio", 1.0)))  # 剪切比 / Shear ratio
+    if shear_ratio < 0.3 or shear_ratio > 3.0:  # 检查范围 / Check range
+        raise ValueError("shear_ratio must be between 0.3 and 3.0. / 剪切比必须在 0.3 到 3.0 之间。")  # / Range error
+    f_min_hz = float(payload.get("f_min_hz", 80.0))  # 起始频率 / Lower bound
+    f_max_hz = float(payload.get("f_max_hz", 1500.0))  # 终止频率 / Upper bound
+    if f_min_hz < 10.0 or f_min_hz > 10000.0:  # 检查范围 / Check range
+        raise ValueError("f_min_hz must be between 10 and 10000 Hz. / 起始频率必须在 10 到 10000 Hz 之间。")  # / Range error
+    if f_max_hz <= f_min_hz or f_max_hz > 20000.0:  # 检查范围 / Check range
+        raise ValueError("f_max_hz must be greater than f_min_hz and at most 20000 Hz. / 终止频率必须大于起始且不超过 20000 Hz。")  # / Range error
+    n_points = int(payload.get("n_points", 50))  # 扫描点数 / Sweep points
+    if n_points < 5 or n_points > 500:  # 检查范围 / Check range
+        raise ValueError("n_points must be between 5 and 500. / 扫描点数必须在 5 到 500 之间。")  # / Range error
+    top_k = int(payload.get("top_k", 3))  # 返回数 / Top-K
+    if top_k < 1 or top_k > 10:  # 检查范围 / Check range
+        raise ValueError("top_k must be between 1 and 10. / 返回数必须在 1 到 10 之间。")  # / Range error
+    return {  # 规范化载荷 / Normalised payload
+        "stiffness_ratio": stiffness_ratio,
+        "shear_ratio": shear_ratio,
+        "f_min_hz": f_min_hz,
+        "f_max_hz": f_max_hz,
+        "n_points": n_points,
+        "top_k": top_k,
+    }
+
+
 def run_production_pipeline_thread(config: dict, payload: dict) -> None:  # 后台运行生产 pipeline / Run production pipeline in background
     from src.optimisation.production_pipeline import build_default_pipeline_config, run_production_pipeline  # 延迟导入 / Lazy import
     from src.optimisation.workflow import WorkflowCancelled  # 复用取消异常 / Reuse cancellation exception
@@ -1472,6 +1502,35 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 except Exception as exc:  # 处理启动异常 / Handle startup exception
                     self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
                 return  # 结束请求 / Finish request
+            if route == "/api/material-frequency-sweep":  # 材料预扫频路由 / Material magic-frequency pre-sweep route
+                try:  # 捕获扫频错误 / Catch sweep errors
+                    length = int(self.headers.get("Content-Length", "0"))  # 读取请求体长度 / Read body length
+                    raw_payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 解析 JSON / Parse JSON
+                    params = validate_material_sweep_payload(raw_payload, config)  # 校验载荷 / Validate payload
+                    target_binary_path = Path(config["paths"]["processed_targets_dir"]) / "target_binary.npy"  # 目标二值图路径 / Target binary path
+                    if not target_binary_path.exists():  # 缺少目标 / Missing target
+                        self.send_json({"error": "Target not saved yet — draw and save a target first. / 请先在画板保存目标后再扫频。"}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                        return  # 结束 / Finish
+                    import numpy as np  # 延迟导入 NumPy / Lazy import
+                    from src.optimisation.material_frequency_sweep import MaterialSweepConfig  # 延迟导入扫频配置 / Lazy import sweep config
+                    from src.optimisation.material_frequency_sweep import run_material_frequency_sweep  # 延迟导入扫频函数 / Lazy import sweep
+                    target_binary = np.load(target_binary_path).astype(bool)  # 加载目标 / Load target
+                    sweep_cfg = MaterialSweepConfig(  # 构建扫频配置 / Build sweep config
+                        stiffness_ratio=params["stiffness_ratio"],
+                        shear_ratio=params["shear_ratio"],
+                        f_min_hz=params["f_min_hz"],
+                        f_max_hz=params["f_max_hz"],
+                        n_points=params["n_points"],
+                        top_k=params["top_k"],
+                    )
+                    result = run_material_frequency_sweep(config, target_binary, sweep_cfg)  # 同步运行（~10-30s） / Run synchronously (~10-30s)
+                    self.send_json(result)  # 返回完整结果 / Return full result
+                except ValueError as exc:  # 校验错误 / Validation error
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                except Exception as exc:  # 其他错误 / Other errors
+                    self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束 / Finish
+
             if route == "/api/run-production-pipeline":  # 检查 W10+Phase pipeline 路由 / Check W10+Phase production pipeline route
                 try:  # 捕获启动错误 / Catch startup errors
                     if workflow_snapshot().get("running"):  # 检查是否已有任务运行 / Check existing task

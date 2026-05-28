@@ -1355,6 +1355,49 @@
       line-height: 1.35; /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
+    .material-sweep-result { /* 材料扫频结果 / Material sweep result */
+      display: grid; /* 样式设置 / Style setting */
+      gap: 6px; /* 样式设置 / Style setting */
+      margin-top: 8px; /* 样式设置 / Style setting */
+      padding: 9px; /* 样式设置 / Style setting */
+      border: 1px solid rgba(0, 102, 178, 0.22); /* 边框 / Border */
+      border-radius: 8px; /* 样式设置 / Style setting */
+      background: #eef5ff; /* 背景 / Background */
+      color: var(--muted); /* 样式设置 / Style setting */
+      font-size: 12px; /* 样式设置 / Style setting */
+      line-height: 1.4; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .material-sweep-result[hidden] { /* 样式设置 / Style setting */
+      display: none; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .material-sweep-result strong { /* 样式设置 / Style setting */
+      color: var(--text); /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .material-sweep-result table { /* 样式设置 / Style setting */
+      width: 100%; /* 样式设置 / Style setting */
+      border-collapse: collapse; /* 样式设置 / Style setting */
+      font-variant-numeric: tabular-nums; /* 数字对齐 / Tabular numerics */
+    } /* 样式设置 / Style setting */
+
+    .material-sweep-result table th, .material-sweep-result table td { /* 样式设置 / Style setting */
+      padding: 2px 6px; /* 样式设置 / Style setting */
+      text-align: right; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .material-sweep-result table th:first-child, .material-sweep-result table td:first-child { /* 样式设置 / Style setting */
+      text-align: left; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
+    .material-sweep-result .sweep-actions { /* 样式设置 / Style setting */
+      display: flex; /* 样式设置 / Style setting */
+      gap: 8px; /* 样式设置 / Style setting */
+      flex-wrap: wrap; /* 样式设置 / Style setting */
+      margin-top: 4px; /* 样式设置 / Style setting */
+    } /* 样式设置 / Style setting */
+
     .timeline-hint[hidden] { /* 样式设置 / Style setting */
       display: none; /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
@@ -1931,8 +1974,11 @@
           </div> <!-- 页面结构 / Page structure -->
           <div class="panel-actions"> <!-- 页面结构 / Page structure -->
             <button id="saveMaterialButton" type="button" class="primary">Apply</button> <!-- 页面结构 / Page structure -->
+            <button id="sweepMagicFreqsButton" type="button" title="Run a quick surrogate frequency sweep with the current material parameters to find the best magic off-resonance freqs for the Run panel. / 用当前材料参数做 surrogate 扫频，找出适合写入 Run 面板的 magic off-resonance 频率。">Pre-sweep magic freqs</button> <!-- 材料扫频 / Material sweep -->
             <span class="field-hint" style="font-size:0.85em;opacity:0.7;margin-left:0.6em">Stiffness ratio: SLA grey resin ≈ 1.05, FDM PLA ≈ 1.5, carbon-fibre ≈ 2.5. 实测值请询打印厂或材料商。</span> <!-- 提示 / Hint -->
           </div> <!-- 页面结构 / Page structure -->
+          <div id="materialSweepStatus" class="status" hidden>Idle</div> <!-- 扫频状态 / Sweep status -->
+          <div id="materialSweepResult" class="material-sweep-result" hidden></div> <!-- 扫频结果 / Sweep result -->
         </section> <!-- 页面结构 / Page structure -->
         <section class="panel"> <!-- 页面结构 / Page structure -->
           <h2>Scoring</h2> <!-- 页面结构 / Page structure -->
@@ -2174,6 +2220,12 @@
     const shearRatioInput = document.getElementById("shearRatioInput");
     // 前端逻辑 / Frontend logic
     const saveMaterialButton = document.getElementById("saveMaterialButton");
+    // 材料扫频元素 / Material sweep elements
+    const sweepMagicFreqsButton = document.getElementById("sweepMagicFreqsButton");
+    // 前端逻辑 / Frontend logic
+    const materialSweepStatus = document.getElementById("materialSweepStatus");
+    // 前端逻辑 / Frontend logic
+    const materialSweepResult = document.getElementById("materialSweepResult");
     // 前端逻辑 / Frontend logic
     const scoringPresetSelect = document.getElementById("scoringPresetSelect");
     // 前端逻辑 / Frontend logic
@@ -3023,6 +3075,158 @@
       } finally {
         // 前端逻辑 / Frontend logic
         saveMaterialButton.disabled = false;
+      // 前端逻辑 / Frontend logic
+      }
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 渲染材料扫频结果 / Render material-sweep result
+    function renderMaterialSweepResult(result) {
+      // 前端逻辑 / Frontend logic
+      const rows = (result.best_rows || []).map((r, i) => `<tr><td>${i + 1}</td><td>${Number(r.frequency_hz).toFixed(1)}</td><td>${Number(r.enrichment).toFixed(2)}×</td><td>${Number(r.recall).toFixed(2)}</td><td>${Number(r.composite).toFixed(3)}</td></tr>`).join("");
+      // 前端逻辑 / Frontend logic
+      materialSweepResult.innerHTML = `
+        <!-- 模板内容 / Template content --><strong>Magic frequency sweep — sr=${Number(result.stiffness_ratio).toFixed(2)}, shear=${Number(result.shear_ratio).toFixed(2)} (${Number(result.duration_sec).toFixed(1)} s)</strong>
+        <!-- 模板内容 / Template content --><span>Top-${result.top_k} driving frequencies (Hz) ranked by composite IC-likeness on a bare uniform plate.</span>
+        <!-- 模板内容 / Template content --><table><thead><tr><th>#</th><th>freq Hz</th><th>enrich</th><th>recall</th><th>compos</th></tr></thead><tbody>${rows}</tbody></table>
+        <!-- 模板内容 / Template content --><div class="sweep-actions"><button type="button" id="applySweepToRunButton" class="primary">Apply to Run (${escapeText(result.best_freqs_str || "")})</button></div>
+      <!-- 模板内容 / Template content -->`;
+      // 前端逻辑 / Frontend logic
+      materialSweepResult.hidden = false;
+      // 前端逻辑 / Frontend logic
+      const applyButton = document.getElementById("applySweepToRunButton");
+      // 前端逻辑 / Frontend logic
+      if (applyButton) {
+        // 前端逻辑 / Frontend logic
+        applyButton.addEventListener("click", () => {
+          // 写回 Run 面板 magic 频率字段 / Write back into the Run panel's magic-freq field
+          if (prodMagicFreqsInput) {
+            // 前端逻辑 / Frontend logic
+            prodMagicFreqsInput.value = result.best_freqs_str || "";
+            // 触发 input 事件 → 标记 Run 预设为 Custom / Fire input event → mark Run preset as Custom
+            prodMagicFreqsInput.dispatchEvent(new Event("input", { bubbles: true }));
+            // 切到 Run 标签让用户看到 / Switch to the Run tab so the user can see it
+            try {
+              // 前端逻辑 / Frontend logic
+              selectSidebarTab("run");
+            } catch (err) {
+              // 忽略 / Ignore
+            }
+            // 状态提示 / Status feedback
+            if (materialSweepStatus) {
+              // 前端逻辑 / Frontend logic
+              materialSweepStatus.hidden = false;
+              // 前端逻辑 / Frontend logic
+              materialSweepStatus.className = "status good";
+              // 前端逻辑 / Frontend logic
+              materialSweepStatus.textContent = `Wrote ${result.best_freqs_str} Hz into the Run panel.`;
+            // 前端逻辑 / Frontend logic
+            }
+          // 前端逻辑 / Frontend logic
+          }
+        // 前端逻辑 / Frontend logic
+        });
+      // 前端逻辑 / Frontend logic
+      }
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 触发材料预扫频 / Trigger the material magic-frequency pre-sweep
+    async function runMaterialSweep() {
+      // 前端逻辑 / Frontend logic
+      if (!sweepMagicFreqsButton) {
+        // 缺少按钮 / Missing button
+        return;
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      const sr = Number(stiffnessRatioInput.value);
+      // 前端逻辑 / Frontend logic
+      const shear = Number(shearRatioInput.value);
+      // 前端逻辑 / Frontend logic
+      if (!(sr >= 1.0 && sr <= 20.0)) {
+        // 前端逻辑 / Frontend logic
+        materialSweepStatus.hidden = false;
+        // 前端逻辑 / Frontend logic
+        materialSweepStatus.className = "status warn";
+        // 前端逻辑 / Frontend logic
+        materialSweepStatus.textContent = "Stiffness ratio must be between 1.0 and 20.0.";
+        // 前端逻辑 / Frontend logic
+        return;
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (!(shear >= 0.3 && shear <= 3.0)) {
+        // 前端逻辑 / Frontend logic
+        materialSweepStatus.hidden = false;
+        // 前端逻辑 / Frontend logic
+        materialSweepStatus.className = "status warn";
+        // 前端逻辑 / Frontend logic
+        materialSweepStatus.textContent = "Shear ratio must be between 0.3 and 3.0.";
+        // 前端逻辑 / Frontend logic
+        return;
+      // 前端逻辑 / Frontend logic
+      }
+      // UI 状态：禁用按钮 + 显示运行中 / Disable button + show running status
+      sweepMagicFreqsButton.disabled = true;
+      // 前端逻辑 / Frontend logic
+      materialSweepResult.hidden = true;
+      // 前端逻辑 / Frontend logic
+      materialSweepStatus.hidden = false;
+      // 前端逻辑 / Frontend logic
+      materialSweepStatus.className = "status";
+      // 前端逻辑 / Frontend logic
+      materialSweepStatus.textContent = `Sweeping 50 frequencies @ sr=${sr.toFixed(2)}, shear=${shear.toFixed(2)} (~15-30 s)...`;
+      // 前端逻辑 / Frontend logic
+      try {
+        // 前端逻辑 / Frontend logic
+        const response = await fetch("/api/material-frequency-sweep", {
+          // 前端逻辑 / Frontend logic
+          method: "POST",
+          // 前端逻辑 / Frontend logic
+          headers: { "Content-Type": "application/json" },
+          // 前端逻辑 / Frontend logic
+          body: JSON.stringify({
+            // 前端逻辑 / Frontend logic
+            stiffness_ratio: sr,
+            // 前端逻辑 / Frontend logic
+            shear_ratio: shear,
+            // 前端逻辑 / Frontend logic
+            f_min_hz: 80.0,
+            // 前端逻辑 / Frontend logic
+            f_max_hz: 1500.0,
+            // 前端逻辑 / Frontend logic
+            n_points: 50,
+            // 前端逻辑 / Frontend logic
+            top_k: 3
+          // 前端逻辑 / Frontend logic
+          })
+        // 前端逻辑 / Frontend logic
+        });
+        // 前端逻辑 / Frontend logic
+        const result = await response.json();
+        // 前端逻辑 / Frontend logic
+        if (!response.ok) {
+          // 前端逻辑 / Frontend logic
+          throw new Error(result.error || "Material sweep failed");
+        // 前端逻辑 / Frontend logic
+        }
+        // 前端逻辑 / Frontend logic
+        materialSweepStatus.className = "status good";
+        // 前端逻辑 / Frontend logic
+        materialSweepStatus.textContent = `Sweep done in ${Number(result.duration_sec).toFixed(1)} s — best: ${result.best_freqs_str} Hz.`;
+        // 前端逻辑 / Frontend logic
+        renderMaterialSweepResult(result);
+      // 前端逻辑 / Frontend logic
+      } catch (error) {
+        // 前端逻辑 / Frontend logic
+        materialSweepStatus.className = "status warn";
+        // 前端逻辑 / Frontend logic
+        materialSweepStatus.textContent = error.message;
+      // 前端逻辑 / Frontend logic
+      } finally {
+        // 前端逻辑 / Frontend logic
+        sweepMagicFreqsButton.disabled = false;
       // 前端逻辑 / Frontend logic
       }
     // 前端逻辑 / Frontend logic
@@ -5217,6 +5421,12 @@
     saveButton.addEventListener("click", saveTarget);
     // 前端逻辑 / Frontend logic
     saveMaterialButton.addEventListener("click", saveMaterial);
+    // 绑定材料预扫频按钮 / Wire up the material magic-frequency sweep button
+    if (sweepMagicFreqsButton) {
+      // 前端逻辑 / Frontend logic
+      sweepMagicFreqsButton.addEventListener("click", runMaterialSweep);
+    // 前端逻辑 / Frontend logic
+    }
     // 前端逻辑 / Frontend logic
     saveScoringButton.addEventListener("click", saveScoring);
     // 前端逻辑 / Frontend logic
