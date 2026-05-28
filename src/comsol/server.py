@@ -11,7 +11,7 @@ from src.comsol.credentials import ensure_comsol_credentials
 from src.comsol.discovery import config_with_runtime_discovery
 
 
-DEFAULT_COMSOL_COMMAND = "/Applications/COMSOL64/Multiphysics/bin/comsol"
+DEFAULT_COMSOL_COMMAND = "comsol"
 STARTED_SERVERS = []
 
 

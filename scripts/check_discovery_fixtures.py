@@ -62,6 +62,17 @@ def test_windows_fixture() -> None:  # 测试 Windows 进程样例 / Test Window
     assert_true(any(item["executable"].endswith("matlab.exe") for item in parsed["processes"]), "Windows MATLAB executable missing")  # 检查 MATLAB 路径 / Check MATLAB path
 
 
+def test_mphserver_process_canonicalizes_to_gui_command() -> None:  # 测试 mphserver 路径可规范化为 GUI 命令 / Test mphserver path maps to GUI command
+    with TemporaryDirectory() as tmp:  # 创建临时目录 / Create temporary directory
+        bin_dir = Path(tmp) / "COMSOL64" / "Multiphysics" / "bin" / "win64"  # 构造 bin 目录 / Build bin dir
+        bin_dir.mkdir(parents=True)  # 创建目录 / Create directory
+        gui = bin_dir / "comsol.exe"  # 构造 GUI 命令 / Build GUI command
+        server = bin_dir / "comsolmphserver.exe"  # 构造 server 命令 / Build server command
+        gui.write_text("", encoding="utf-8")  # 写入占位 / Write placeholder
+        server.write_text("", encoding="utf-8")  # 写入占位 / Write placeholder
+        assert_equal(canonical_executable_path("comsol", str(server)), str(gui), "mphserver canonical GUI command")  # 检查规范化 / Check canonicalization
+
+
 def test_install_fixture() -> None:  # 测试安装路径样例 / Test install path fixture
     with TemporaryDirectory() as tmp:  # 创建临时安装根目录 / Create temporary install root
         root = Path(tmp)  # 转换路径对象 / Convert to path object
@@ -92,6 +103,20 @@ def test_runtime_config_fill_from_install() -> None:  # 测试配置空路径由
         assert_equal(applied, {"comsol_command_path": "install_scan", "matlab_path": "install_scan"}, "runtime applied sources")  # 检查补全来源 / Check applied sources
 
 
+def test_runtime_config_replaces_stale_comsol_path() -> None:  # 测试无效旧路径会被自动发现替换 / Test stale configured paths are replaced
+    with TemporaryDirectory() as tmp:  # 创建临时目录 / Create temporary directory
+        root = Path(tmp)  # 转换路径对象 / Convert to path object
+        comsol_path = root / "COMSOL65" / "Multiphysics" / "bin" / "comsol"  # 构造真实 COMSOL 路径 / Build real COMSOL path
+        comsol_path.parent.mkdir(parents=True)  # 创建父目录 / Create parent directory
+        comsol_path.write_text("", encoding="utf-8")  # 写入占位文件 / Write placeholder file
+        stale_path = root / "COMSOL64" / "Multiphysics" / "bin" / "comsol"  # 构造旧路径但不创建 / Build stale path without creating it
+        discovery = {"processes": [], "suggestions": {"comsol_command_path": str(comsol_path), "comsol_source": "install_scan"}, "summary": {}}  # 构造发现结果 / Build discovery result
+        config = {"comsol": {"comsol_command_path": str(stale_path)}}  # 构造旧路径配置 / Build stale-path config
+        runtime_config, applied, _runtime_discovery = config_with_runtime_discovery(config, discovery)  # 运行补全 / Run completion
+        assert_equal(runtime_config["comsol"]["comsol_command_path"], str(comsol_path), "stale COMSOL replacement")  # 检查替换 / Check replacement
+        assert_equal(applied, {"comsol_command_path": "install_scan"}, "stale COMSOL applied source")  # 检查来源 / Check applied source
+
+
 def test_running_process_priority() -> None:  # 测试运行进程优先于安装目录 / Test running process priority over installs
     with TemporaryDirectory() as tmp:  # 创建临时目录 / Create temporary directory
         root = Path(tmp)  # 转换路径对象 / Convert to path object
@@ -120,8 +145,10 @@ def main() -> None:  # 主入口 / Main entry point
     test_macos_fixture()  # 运行 macOS 样例 / Run macOS fixture
     test_linux_fixture()  # 运行 Linux 样例 / Run Linux fixture
     test_windows_fixture()  # 运行 Windows 样例 / Run Windows fixture
+    test_mphserver_process_canonicalizes_to_gui_command()  # 运行 mphserver 规范化样例 / Run mphserver canonicalization fixture
     test_install_fixture()  # 运行安装路径样例 / Run install path fixture
     test_runtime_config_fill_from_install()  # 运行配置补全样例 / Run config completion fixture
+    test_runtime_config_replaces_stale_comsol_path()  # 运行旧路径替换样例 / Run stale-path replacement fixture
     test_running_process_priority()  # 运行优先级样例 / Run priority fixture
     test_process_output_decoding()  # 运行解码样例 / Run decoding fixture
     print("Discovery fixture checks passed. / 自动发现样例检查通过。")  # 打印成功信息 / Print success message

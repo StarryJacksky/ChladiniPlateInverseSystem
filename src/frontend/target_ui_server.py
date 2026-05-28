@@ -294,6 +294,63 @@ def select_best_candidate_mph_file(candidate_id: str) -> dict:
     return chosen
 
 
+def _usable_command_path(command: str) -> str:
+    import shutil
+    command = str(command or "").strip()
+    if not command:
+        return ""
+    resolved = shutil.which(command)
+    if resolved:
+        return resolved
+    expanded = Path(command).expanduser()
+    if expanded.exists():
+        return str(expanded)
+    return ""
+
+
+def resolve_comsol_open_command(config: dict) -> tuple[str, dict]:
+    from src.comsol.discovery import config_with_runtime_discovery
+
+    original_command = str(config.get("comsol", {}).get("comsol_command_path", "")).strip()
+    runtime_config, applied, discovery = config_with_runtime_discovery(config)
+    suggestions = discovery.get("suggestions", {}) if isinstance(discovery, dict) else {}
+    installs = discovery.get("install_candidates", {}) if isinstance(discovery, dict) else {}
+    candidates = [
+        str(runtime_config.get("comsol", {}).get("comsol_command_path", "")).strip(),
+        original_command,
+        str(suggestions.get("comsol_command_path", "")).strip(),
+        "comsol",
+    ]
+    candidates.extend(str(path).strip() for path in installs.get("comsol", []) or [])
+    seen = set()
+    checked = []
+    for candidate in candidates:
+        if not candidate:
+            continue
+        key = candidate.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        checked.append(candidate)
+        usable = _usable_command_path(candidate)
+        if usable:
+            source = "configured"
+            if applied.get("comsol_command_path") and candidate == str(runtime_config.get("comsol", {}).get("comsol_command_path", "")).strip():
+                source = str(applied.get("comsol_command_path"))
+            elif candidate == str(suggestions.get("comsol_command_path", "")).strip():
+                source = str(suggestions.get("comsol_source") or "auto_discovery")
+            elif candidate == "comsol":
+                source = "PATH"
+            return usable, {"applied": applied, "source": source, "checked": checked}
+    configured = original_command or "(empty)"
+    raise FileNotFoundError(
+        f"COMSOL command not found: {configured}. Auto-discovery also found no usable COMSOL command. "
+        "Click Discover, then Apply/Save, or set comsol.comsol_command_path to the real COMSOL executable. / "
+        f"未找到 COMSOL 命令：{configured}。自动发现也没有找到可用 COMSOL。"
+        "请点击 Discover 后应用/保存，或把 comsol.comsol_command_path 设置为真实 COMSOL 可执行文件。"
+    )
+
+
 def open_mph_in_comsol(config: dict, mph_path: str) -> dict:  # 用 COMSOL 打开 .mph / Launch COMSOL with .mph
     """Spawn COMSOL Multiphysics to open a saved .mph; returns spawn metadata."""
     project = project_root()  # 项目根 / Project root
@@ -309,23 +366,9 @@ def open_mph_in_comsol(config: dict, mph_path: str) -> dict:  # 用 COMSOL 打�
     import subprocess  # 子进程 / Subprocess
     import platform  # 平台 / Platform
     system = platform.system()  # 平台名 / Platform name
-    comsol_command = str(config.get("comsol", {}).get("comsol_command_path", "")).strip()  # 命令行入口 / CLI entry
+    comsol_command, command_meta = resolve_comsol_open_command(config)  # 命令行入口 / CLI entry
     # 统一用 `comsol -open <file>`：根据 `comsol --help` 这是把 mph 加载进 Desktop GUI 的官方写法 / Per `comsol --help` this is the official desktop-open flag
     # 之前 `open -a "COMSOL Multiphysics.app" file` 只会启动空 GUI，COMSOL.app 不接受 LSItemContentTypes 文档参数 / `open -a` route doesn't pass docs to COMSOL.app
-    if not comsol_command:  # macOS 上兜底找 /Applications/COMSOL*/Multiphysics/bin/comsol / macOS fallback search
-        if system == "Darwin":  # / macOS
-            for candidate in [
-                Path("/Applications/COMSOL64/Multiphysics/bin/comsol"),
-                Path("/Applications/COMSOL63/Multiphysics/bin/comsol"),
-                Path("/Applications/COMSOL62/Multiphysics/bin/comsol"),
-            ]:  # / Candidates
-                if candidate.exists():  # / Exists
-                    comsol_command = str(candidate)  # / Adopt
-                    break  # / Stop
-    if not comsol_command:  # 仍无 / Still missing
-        raise RuntimeError("comsol.comsol_command_path is empty and no COMSOL was auto-detected. / 未配置 comsol_command_path 且无法自动发现 COMSOL。")  # / Bail
-    if not Path(comsol_command).exists():  # 路径无效 / Bad path
-        raise FileNotFoundError(f"COMSOL command not found: {comsol_command} / 未找到 COMSOL 命令：{comsol_command}")  # / Bail
     # 每次 spawn 用一份独立的 prefsdir/configuration，强制 COMSOL 当新实例处理；
     # 否则同一份 prefs 下后续启动会复用已开窗口（替换当前模型），用户已开的实例会丢失上下文。
     # Each spawn gets isolated prefsdir/configuration to force COMSOL to start as a fresh GUI instance;
@@ -352,6 +395,7 @@ def open_mph_in_comsol(config: dict, mph_path: str) -> dict:  # 用 COMSOL 打�
     return {  # 返回元数据 / Metadata
         "pid": proc.pid,  # 进程 PID / Spawned pid
         "command": cmd,  # 实际命令 / Actual command
+        "command_discovery": command_meta,  # 路径发现信息 / Command discovery metadata
         "mph_path": str(resolved),  # 实际路径 / Actual path
         "started_at": datetime.now().isoformat(timespec="seconds"),  # 启动时间 / Start time
     }

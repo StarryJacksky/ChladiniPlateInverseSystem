@@ -198,6 +198,10 @@ def canonical_executable_path(kind: str, executable: str) -> str:  # Canonicaliz
         cli_text = f"{app_root}/bin/matlab"
         cli_path = Path(cli_text)
         return str(cli_path) if cli_path.exists() else cli_text
+    if kind == "comsol" and path.name.lower() in {"comsolmphserver", "comsolmphserver.exe"}:
+        cli_name = "comsol.exe" if os.name == "nt" else "comsol"
+        cli_path = path.with_name(cli_name)
+        return str(cli_path) if cli_path.exists() else text
     if kind == "comsol" and path.name.lower() in {"comsollauncher", "comsollauncher.exe", "comsolui.exe"}:
         bin_dir = path.parents[1] if "comsollauncher" in path.name.lower() and len(path.parents) > 1 else path.parent
         cli_name = "comsol.exe" if os.name == "nt" else "comsol"
