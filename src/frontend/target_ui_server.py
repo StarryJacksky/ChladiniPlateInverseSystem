@@ -819,14 +819,83 @@ def load_production_runs(include_diagnostics: bool = False) -> list[dict]:  # �
     return rows  # 返回 / Return
 
 
+def _resolve_prod_eig_dirs(config: dict, candidate_id: str) -> tuple[Path, Path, Path]:  # 找到 eigfreq 根、数据子目录、预览目录 / Resolve prod eigfreq paths
+    base = Path(config["paths"]["comsol_exports_dir"]) / f"prod_eig_{candidate_id}"  # 生产 eigfreq 根目录 / Production eigfreq root
+    # 真实数据落在 base/eigenfrequency/（modal calibration runner 决定的），如果直接 base 下也有就兼容 /
+    # Mode CSVs live in base/eigenfrequency/ (per modal calibration runner). Fall back to base if data is at the root.
+    data_dir = base / "eigenfrequency" if (base / "eigenfrequency").exists() else base
+    previews_dir = data_dir / "previews"  # COMSOL Image2D / Python 备选都进这个目录 / Both native + Python previews go here
+    return base, data_dir, previews_dir
+
+
+def _render_split_csv_preview(xy_csv: Path, mode_csv: Path, output: Path, image_size: int) -> None:  # 把 (mode_xy.csv, mode_NNN.csv) 渲染为热力图 / Render split-CSV mode pair to heatmap PNG
+    import numpy as np  # 延迟导入 / Lazy import
+    import matplotlib  # 延迟导入 / Lazy import
+    matplotlib.use("Agg")  # 无头后端 / Headless backend
+    import matplotlib.pyplot as plt  # 延迟导入 / Lazy import
+    from src.comsol.import_results import interpolate_to_grid  # 复用插值 / Reuse interpolation helper
+
+    xy = np.loadtxt(xy_csv, delimiter=",", skiprows=1)  # 读取节点 (x,y) / Load (x,y)
+    mode = np.loadtxt(mode_csv, delimiter=",", skiprows=1)  # 读取 (w_real, w_imag) / Load (w_real, w_imag)
+    if mode.ndim == 1:  # 单列保险 / Defensive
+        mode = mode.reshape(-1, 2)  # 重塑 / Reshape
+    x = xy[:, 0]; y = xy[:, 1]  # 拆 / Split
+    w = np.hypot(mode[:, 0], mode[:, 1])  # |shell.w| / Amplitude
+    W = interpolate_to_grid(x, y, w, image_size)  # 插值到像素网格 / Interpolate to pixel grid
+    output.parent.mkdir(parents=True, exist_ok=True)  # 建目录 / Build dir
+    fig, ax = plt.subplots(figsize=(4.5, 4.5), dpi=140)  # 图与轴 / Figure + axis
+    im = ax.imshow(W, origin="lower", cmap="turbo", interpolation="bilinear")  # 类 COMSOL 热力图 / COMSOL-like heatmap
+    ax.set_xticks([]); ax.set_yticks([])  # 去刻度 / Strip ticks
+    ax.set_title(mode_csv.stem, fontsize=9)  # 标题 / Title
+    fig.colorbar(im, ax=ax, fraction=0.045, pad=0.03, label="|shell.w|")  # 色棒 / Colour bar
+    fig.tight_layout()  # 紧凑 / Tight
+    fig.savefig(output, bbox_inches="tight")  # 保存 / Save
+    plt.close(fig)  # 关闭 / Close
+
+
+def _ensure_python_mode_previews(config: dict, data_dir: Path, previews_dir: Path) -> None:  # 缺 native PNG 时用 Python 渲染兜底 / Python fallback when native PNGs missing
+    try:  # 容错 / Tolerate
+        if not data_dir.exists():  # 数据缺失 / Data missing
+            return  # / Skip
+        if previews_dir.exists() and any(previews_dir.glob("mode_*.png")):  # 已有 / Already populated
+            return  # / Skip
+        image_size = int(config["nodal_extraction"]["image_size"])  # 读取参数 / Read params
+        xy_csv = data_dir / "mode_xy.csv"  # 节点坐标 / Coordinate file
+        if xy_csv.exists():  # 新版（split-CSV）schema / New split-CSV schema (eigenfrequency runner)
+            previews_dir.mkdir(parents=True, exist_ok=True)  # 建目录 / Build dir
+            for mode_csv in sorted(data_dir.glob("mode_[0-9]*.csv")):  # 遍历 / Iterate
+                # mode_NNN.csv -> mode_NN.png（两位补零便于和 COMSOL native 对齐）/
+                # mode_NNN.csv -> mode_NN.png to align numbering with COMSOL native exports
+                try:  # 单模态失败不阻断 / Single failure must not block
+                    num_str = mode_csv.stem.split("_")[-1]  # 编号串 / Number suffix
+                    num = int(num_str)  # 编号 / Number
+                    out = previews_dir / f"mode_{num:03d}.png"  # 3 位文件名 / 3-digit filename marks Python fallback
+                    if out.exists() and out.stat().st_mtime >= mode_csv.stat().st_mtime:  # 已存在 / Already up to date
+                        continue  # / Skip
+                    _render_split_csv_preview(xy_csv, mode_csv, out, image_size)  # 渲染 / Render
+                except Exception:  # 单模态失败 / Single-mode failure
+                    continue  # / Continue
+            return  # 完成 / Done
+        # 兜底：旧版单 CSV（x,y,w） schema 走原来的 render_export_previews / Legacy single-CSV schema
+        from src.visualisation.plot_modes import render_export_previews  # 延迟导入 / Lazy import
+        epsilon_ratio = float(config["nodal_extraction"]["epsilon_ratio"])  # 节点阈值 / Epsilon
+        center_radius_px = int(image_size * float(config["project"]["center_clamp_radius_mm"]) / float(config["project"]["plate_length_mm"])) if config["nodal_extraction"].get("remove_center_region", True) else 0  # 中心夹持 / Centre clamp
+        render_export_previews(data_dir, image_size, epsilon_ratio, limit=None, center_radius_px=center_radius_px)  # 渲染所有模态 / Render all modes
+    except Exception:  # 渲染失败不阻断 / Render failure must not block
+        pass  # / Continue
+
+
 def _list_production_comsol_modes(config: dict, candidate_id: str) -> list[dict]:  # 列出生产候选的 COMSOL 模态预览 / List COMSOL mode previews for a production candidate
-    eig_dir = Path(config["paths"]["comsol_exports_dir"]) / f"prod_eig_{candidate_id}"  # 生产 eigfreq 目录 / Production eigfreq directory
-    previews_dir = eig_dir / "previews"  # 预览目录 / Previews directory
-    if not previews_dir.exists():  # 无预览 / No previews
+    base, data_dir, previews_dir = _resolve_prod_eig_dirs(config, candidate_id)  # 解析路径 / Resolve paths
+    # 没有 native PNG 时尝试用 Python 兜底渲染（这样老的 prod_eig 也能在 UI 看到图）/
+    # Without native PNGs, fall back to Python renderer so legacy runs still preview.
+    if not previews_dir.exists() or not any(previews_dir.glob("mode_*.png")):  # 缺预览 / Missing previews
+        _ensure_python_mode_previews(config, data_dir, previews_dir)  # 兜底 / Fallback
+    if not previews_dir.exists():  # 仍然没有 / Still missing
         return []  # 返回空 / Return empty
     rows: list[dict] = []  # 收集行 / Collect rows
     # 读取频率表帮助标注 / Read frequency table for labelling
-    freqs_path = eig_dir / "eigenfrequencies.csv"  # 频率 CSV / Frequencies CSV
+    freqs_path = data_dir / "eigenfrequencies.csv"  # 频率 CSV / Frequencies CSV
     freq_for_mode: dict[int, float] = {}  # 模态频率映射 / Mode→freq map
     if freqs_path.exists():  # 文件存在 / Exists
         try:  # 容错 / Tolerate
@@ -838,6 +907,8 @@ def _list_production_comsol_modes(config: dict, candidate_id: str) -> list[dict]
                 freq_for_mode[int(row[0])] = float(row[1])  # 填表 / Fill table
         except Exception:  # 解析失败 / Parse failure
             pass  # / Skip
+    # native (mode_NN.png, 2-digit) 与 fallback (mode_NNN.png, 3-digit) 都接受 /
+    # Accept both COMSOL-native (2-digit) and Python fallback (3-digit) filenames.
     for path in sorted(previews_dir.glob("mode_*.png")):  # 遍历模态预览 / Iterate mode previews
         match = re.match(r"^mode_(\d+)\.png$", path.name)  # 匹配编号 / Match number
         if not match:  # 不匹配 / Skip non-matching
@@ -848,6 +919,7 @@ def _list_production_comsol_modes(config: dict, candidate_id: str) -> list[dict]
             "frequency_hz": freq_for_mode.get(mode_num),
             "name": path.name,
             "url": f"/assets/production/{candidate_id}/{path.name}",
+            "source": "comsol_native" if len(match.group(1)) == 2 else "python_fallback",
         })
     return rows  # 返回 / Return
 
@@ -921,7 +993,8 @@ def resolve_production_asset(config: dict, candidate_id: str, asset_name: str) -
     base_dirs = [  # 候选目录列表，按优先级 / Candidate directories by priority
         project_root() / "reports" / "production" / valid_id / "previews",  # production 预览 / Production previews
         Path(config["paths"]["candidates_dir"]) / valid_id,  # 候选目录（厚度图） / Candidate dir (thickness)
-        Path(config["paths"]["comsol_exports_dir"]) / f"prod_eig_{valid_id}" / "previews",  # COMSOL 模态 / COMSOL modes
+        Path(config["paths"]["comsol_exports_dir"]) / f"prod_eig_{valid_id}" / "eigenfrequency" / "previews",  # COMSOL 模态（嵌套版）/ COMSOL modes (nested)
+        Path(config["paths"]["comsol_exports_dir"]) / f"prod_eig_{valid_id}" / "previews",  # COMSOL 模态（旧布局兜底）/ COMSOL modes (legacy fallback)
     ]
     for base_dir in base_dirs:  # 顺序查找 / Sequential lookup
         candidate = base_dir / asset_name  # 候选路径 / Candidate path

@@ -137,6 +137,51 @@ for k = 1:n_extract
 end
 
 fprintf(eig_log, 'mode_extraction_done=%d\n', n_extract);
+
+% Render native COMSOL PNG previews (Image2D export of an Amplitude surface plot).
+% Frontend prefers these when present; Python fallback renders grayscale + nodal overlay
+% from mode_XXX.csv when they are missing.
+preview_dir = fullfile(export_dir, 'previews');
+if ~exist(preview_dir, 'dir'); mkdir(preview_dir); end
+try
+    fprintf(eig_log, 'native_previews=start n=%d\n', n_extract);
+    pg_tag = 'pg_mosaic_eig_native';
+    surf_tag = 'surf_mosaic_eig_native';
+    img_tag = 'img_mosaic_eig_native';
+    try; model.result.remove(pg_tag); catch; end
+    try; model.result.export.remove(img_tag); catch; end
+    pg = model.result.create(pg_tag, 'PlotGroup2D');
+    pg.set('data', dataset_tag);
+    try; pg.set('titletype', 'none'); catch; end
+    surf = pg.create(surf_tag, 'Surface');
+    surf.set('expr', 'abs(shell.w)');
+    try; surf.set('descr', 'Sand prediction |shell.w|'); catch; end
+    try; surf.set('colortable', 'RainbowLight'); catch; end
+    try; surf.set('resolution', 'normal'); catch; end
+    try; surf.set('smooth', 'internal'); catch; end
+    img = model.result.export.create(img_tag, 'Image2D');
+    img.set('plotgroup', pg_tag);
+    try; img.set('size', '600,600'); catch; end
+    try; img.set('antialias', 'on'); catch; end
+    try; img.set('background', 'current'); catch; end
+    try; img.set('printlegend', 'on'); catch; end
+    for k = 1:n_extract
+        try
+            % Eigenfrequency dataset: select mode via solnum / looplevel (both tolerated).
+            try; pg.set('solnum', k); catch; end
+            try; pg.set('looplevel', k); catch; end
+            png_path = fullfile(preview_dir, sprintf('mode_%02d.png', k));
+            img.set('filename', png_path);
+            img.run;
+        catch err
+            fprintf(eig_log, 'native_preview_failed_mode=%d msg=%s\n', k, err.message);
+        end
+    end
+    fprintf(eig_log, 'native_previews=done\n');
+catch err
+    fprintf(eig_log, 'native_preview_setup_failed=%s\n', err.message);
+end
+
 mphsave(model, fullfile(export_dir, 'last_eigenfrequency_model.mph'), 'copy', 'on');
 fclose(eig_log);
 end

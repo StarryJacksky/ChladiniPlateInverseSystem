@@ -198,6 +198,60 @@
     }
     button.flash { animation: import-tool-flash 380ms ease-out; } /* 样式设置 / Style setting */
 
+    /* topbar 内嵌的小型 toggle（Smooth / Fill shapes），与 .topbar button 协调 /
+       Inline toggle controls embedded in the topbar (Smooth / Fill shapes). */
+    .topbar label.toggle {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 0 10px; height: 34px; border-radius: 6px;
+      border: 1px solid rgba(251, 250, 247, 0.18);
+      color: rgba(251, 250, 247, 0.88);
+      font-size: 12px; cursor: pointer; user-select: none; white-space: nowrap;
+    }
+    .topbar label.toggle input[type="checkbox"] {
+      width: 14px; height: 14px; margin: 0; accent-color: var(--accent); cursor: pointer;
+    }
+    .topbar label.toggle:hover { background: rgba(251, 250, 247, 0.10); }
+
+    /* shape-tool 模式下画布显示十字光标 + stage 一条纤细的紫色虚线，告诉用户"不是画笔了" /
+       Visible cue when a shape tool is active so the canvas no longer feels like brush. */
+    #stage.shape-mode .stage-content { outline: 2px dashed rgba(170, 110, 255, 0.55); outline-offset: -2px; }
+    #stage.shape-mode canvas { cursor: crosshair; }
+    /* 多点工具（polyline / curve）中已落点提示 /
+       Pending-points hint while polyline / curve is collecting anchors. */
+    .multi-hint {
+      position: absolute; top: 8px; left: 12px;
+      padding: 4px 10px; border-radius: 12px;
+      background: rgba(170, 110, 255, 0.85); color: #fff;
+      font-size: 12px; pointer-events: none; z-index: 5;
+    }
+
+    /* Stretch 交互面板：浮在画布右上角 /
+       Stretch interactive panel pinned to the top-right of the stage. */
+    .stretch-panel {
+      position: absolute; top: 10px; right: 10px; z-index: 6;
+      display: flex; flex-direction: column; gap: 6px;
+      background: rgba(24, 24, 28, 0.92); color: #fff;
+      padding: 10px 12px; border-radius: 8px;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+      font-size: 12px; min-width: 220px;
+    }
+    .stretch-panel .stretch-row { display: flex; align-items: center; justify-content: space-between; }
+    .stretch-panel .stretch-hint { font-size: 11px; opacity: 0.65; }
+    .stretch-panel .stretch-slider { display: flex; flex-direction: column; gap: 2px; }
+    .stretch-panel .stretch-slider span { font-size: 11px; opacity: 0.7; align-self: flex-end; }
+    .stretch-panel input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .stretch-panel .stretch-actions { gap: 6px; }
+    .stretch-panel .stretch-actions button {
+      flex: 1; height: 28px; padding: 0 10px; border-radius: 5px;
+      background: rgba(255, 255, 255, 0.10); color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.22); font-size: 12px; cursor: pointer;
+    }
+    .stretch-panel .stretch-actions button:hover { background: rgba(255, 255, 255, 0.18); }
+    .stretch-panel .stretch-actions button.primary { background: var(--accent); border-color: var(--accent); }
+    .stretch-panel .stretch-actions button.primary:hover { background: var(--accent); filter: brightness(1.1); }
+    /* stretch 模式下高亮 stage / Highlight stage when in stretch transform mode */
+    #stage.stretch-mode .stage-content { outline: 2px solid rgba(231, 165, 38, 0.65); outline-offset: -2px; }
+
     .topbar button.active { /* 样式设置 / Style setting */
       background: #fffdf8; /* 样式设置 / Style setting */
       color: var(--ink); /* 样式设置 / Style setting */
@@ -1893,12 +1947,22 @@
       </div> <!-- 页面结构 / Page structure -->
       <div class="toolbar" aria-label="drawing toolbar"> <!-- 页面结构 / Page structure -->
         <div class="group" role="group" aria-label="tools"> <!-- 页面结构 / Page structure -->
-          <button id="brushTool" class="active" type="button" title="Brush" aria-label="Brush">Brush</button> <!-- 页面结构 / Page structure -->
-          <button id="eraserTool" type="button" title="Eraser" aria-label="Eraser">Erase</button> <!-- 页面结构 / Page structure -->
+          <button id="brushTool" class="active" type="button" title="Brush (B) — freehand stroke" aria-label="Brush">Brush</button> <!-- 页面结构 / Page structure -->
+          <button id="eraserTool" type="button" title="Eraser (E) — freehand erase" aria-label="Eraser">Erase</button> <!-- 页面结构 / Page structure -->
+        </div> <!-- 页面结构 / Page structure -->
+        <div class="group" role="group" aria-label="shape tools" title="Shape & curve tools — Esc to cancel, double-click / Enter to commit polyline & curve"> <!-- 页面结构 / Page structure -->
+          <button id="lineTool" type="button" title="Line (L) — click start, drag, release" aria-label="Line">Line</button> <!-- 页面结构 / Page structure -->
+          <button id="rectTool" type="button" title="Rectangle (R) — drag a rect, Shift = square" aria-label="Rectangle">Rect</button> <!-- 页面结构 / Page structure -->
+          <button id="ellipseTool" type="button" title="Ellipse (O) — drag an ellipse, Shift = circle" aria-label="Ellipse">Ellipse</button> <!-- 页面结构 / Page structure -->
+          <button id="polylineTool" type="button" title="Polyline (P) — click points, double-click / Enter to commit" aria-label="Polyline">Poly</button> <!-- 页面结构 / Page structure -->
+          <button id="curveTool" type="button" title="Smooth curve (C) — click anchor points, Enter for Catmull-Rom spline" aria-label="Smooth curve">Curve</button> <!-- 页面结构 / Page structure -->
+          <button id="fillTool" type="button" title="Bucket fill (F) — click a region to flood-fill" aria-label="Fill">Fill</button> <!-- 页面结构 / Page structure -->
         </div> <!-- 页面结构 / Page structure -->
         <div class="group" role="group" aria-label="brush width"> <!-- 页面结构 / Page structure -->
           <label class="slider" for="widthRange">Width <span id="widthLabel">12</span></label> <!-- 页面结构 / Page structure -->
           <input id="widthRange" type="range" min="2" max="40" value="12" aria-label="Stroke width"> <!-- 页面结构 / Page structure -->
+          <label class="toggle" title="Catmull-Rom smoothing for freehand brush (subtler corners)">Smooth <input id="smoothBrushToggle" type="checkbox"></label> <!-- 页面结构 / Page structure -->
+          <label class="toggle" title="Fill closed shapes (Rect / Ellipse / Polyline / Curve) instead of outlining">Fill shapes <input id="fillShapesToggle" type="checkbox"></label> <!-- 页面结构 / Page structure -->
         </div> <!-- 页面结构 / Page structure -->
         <div class="group" role="group" aria-label="target mode"> <!-- 页面结构 / Page structure -->
           <button id="chladniMode" type="button" title="Chladni target" aria-label="Chladni target">Chladni</button> <!-- 页面结构 / Page structure -->
@@ -1957,6 +2021,13 @@
             <button id="zoomInButton" type="button" title="Zoom in (wheel up)" aria-label="zoom in">+</button> <!-- 页面结构 / Page structure -->
           </div> <!-- 页面结构 / Page structure -->
           <div class="stage-pan-hint" id="stagePanHint" hidden>Drag with middle-mouse or hold Space to pan · scroll to zoom · double-click 100% to reset</div> <!-- 页面结构 / Page structure -->
+          <div class="stretch-panel" id="stretchPanel" hidden> <!-- 页面结构 / Page structure -->
+            <div class="stretch-row"><strong>Stretch</strong><span class="stretch-hint">Drag canvas corners or slide</span></div> <!-- 页面结构 / Page structure -->
+            <label class="stretch-slider">Uniform <span id="stretchUniformValue">100%</span><input id="stretchUniform" type="range" min="20" max="200" value="100"></label> <!-- 页面结构 / Page structure -->
+            <label class="stretch-slider">Width <span id="stretchScaleXValue">100%</span><input id="stretchScaleX" type="range" min="20" max="200" value="100"></label> <!-- 页面结构 / Page structure -->
+            <label class="stretch-slider">Height <span id="stretchScaleYValue">100%</span><input id="stretchScaleY" type="range" min="20" max="200" value="100"></label> <!-- 页面结构 / Page structure -->
+            <div class="stretch-row stretch-actions"><button id="stretchReset" type="button" title="Reset to fill canvas">Reset</button><button id="stretchDone" type="button" class="primary" title="Commit and close">Done</button></div> <!-- 页面结构 / Page structure -->
+          </div> <!-- 页面结构 / Page structure -->
         </div> <!-- 页面结构 / Page structure -->
       </div> <!-- 页面结构 / Page structure -->
 
@@ -2652,15 +2723,46 @@
     // 前端逻辑 / Frontend logic
     function selectTool(nextTool) {
       tool = nextTool;
-      // 切到画笔 / 橡皮时如果还在 crop 模式，自动退出 / Exit crop mode when user picks brush/eraser
+      // 选了画工具时如果 Stretch 面板还开着，自动 Done（提交当前拉伸结果），
+      // 这样后面在画布上画的内容不会被滑块拖动重绘冲掉 /
+      // If the Stretch panel is open and the user picks a drawing tool, commit
+      // the current stretch so subsequent strokes are not wiped by slider drags.
+      if (stretchActive) {
+        try { closeStretchPanel(true); } catch (_) {}
+      }
+      // 切到任何工具时如果还在 crop 模式，自动退出 / Exit crop mode when user picks a different tool
       if (cropMode) {
         cropMode = false;
         cropRect = null;
         try { drawOverlay(); } catch (_) {}
         try { updateImportModeButtons(); } catch (_) {}
       }
-      brushTool.classList.toggle("active", tool === "brush");
-      eraserTool.classList.toggle("active", tool === "eraser");
+      // 切到画笔 / 橡皮时取消进行中的多点工具 / Cancel pending poly/curve points when leaving them
+      if ((tool === "brush" || tool === "eraser") && polyPoints.length) cancelMultiPoint();
+      if (tool !== "polyline" && tool !== "curve") {
+        polyPoints = []; polyHover = null;
+        try { clearOverlay(); setMultiHint(""); } catch (_) {}
+      }
+      // 取消正在拖的形状 / Drop any in-progress drag shape
+      if (dragShape) { dragShape = null; try { clearOverlay(); } catch (_) {} }
+      // 同步所有工具按钮的 active 状态 / Sync active class across all tool buttons
+      const toolButtons = {
+        brush: brushTool, eraser: eraserTool,
+        line: document.getElementById("lineTool"),
+        rect: document.getElementById("rectTool"),
+        ellipse: document.getElementById("ellipseTool"),
+        polyline: document.getElementById("polylineTool"),
+        curve: document.getElementById("curveTool"),
+        fill: document.getElementById("fillTool"),
+      };
+      Object.entries(toolButtons).forEach(([key, btn]) => {
+        if (btn) btn.classList.toggle("active", tool === key);
+      });
+      // shape-mode 视觉 / shape-mode visual cue on stage
+      const stageEl = document.getElementById("stage");
+      const isShape = SHAPE_TOOLS.has(tool);
+      if (stageEl) stageEl.classList.toggle("shape-mode", isShape);
+      try { canvas.style.cursor = isShape ? "crosshair" : ""; } catch (_) {}
     }
 
     // 前端逻辑 / Frontend logic
@@ -2835,6 +2937,434 @@
       pushHistory();
     }
 
+    // === Stretch 交互子系统 / Stretch interactive subsystem ===
+    // 触发：第一次点 Stretch 仍然一键铺满 + 弹出面板让用户继续微调 /
+    // First Stretch click still fills the canvas; the panel lets the user fine-tune afterwards.
+    let stretchActive = false;
+    let stretchAnchorSrc = null;  // 进入面板时画布的快照（已铺满）/ Canvas snapshot when panel opens (already filled)
+    let stretchAnchorImg = null;  // 解码后的 Image 对象，做实时缩放预览 / Decoded Image for live preview
+    let stretchScaleX = 1.0;
+    let stretchScaleY = 1.0;
+    let stretchHandleDrag = null;  // { corner: "nw"|"ne"|"sw"|"se", startX, startY, baseX, baseY }
+    function clampScale(v) { return Math.max(0.1, Math.min(3.0, v)); }
+    function rerenderStretchPreview() {
+      if (!stretchActive || !stretchAnchorImg) return;
+      // 以画布中心为锚点，按 X/Y scale 缩放贴回 / Centred resampling using current X/Y scales
+      fillWhite();
+      const w = canvas.width * stretchScaleX;
+      const h = canvas.height * stretchScaleY;
+      const x = (canvas.width - w) / 2;
+      const y = (canvas.height - h) / 2;
+      ctx.drawImage(stretchAnchorImg, x, y, w, h);
+      drawStretchHandlesOverlay();
+    }
+    function drawStretchHandlesOverlay() {
+      clearOverlay();
+      if (!stretchActive) return;
+      const w = canvas.width * stretchScaleX;
+      const h = canvas.height * stretchScaleY;
+      const x = (canvas.width - w) / 2;
+      const y = (canvas.height - h) / 2;
+      overlayCtx.save();
+      overlayCtx.setLineDash([5, 4]);
+      overlayCtx.strokeStyle = "rgba(231, 165, 38, 0.9)";
+      overlayCtx.lineWidth = 2;
+      overlayCtx.strokeRect(x, y, w, h);
+      overlayCtx.setLineDash([]);
+      overlayCtx.fillStyle = "rgba(231, 165, 38, 0.95)";
+      overlayCtx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+      const hs = 8;  // 句柄半边长 / Half-size of handle marker
+      const corners = [["nw", x, y], ["ne", x + w, y], ["sw", x, y + h], ["se", x + w, y + h]];
+      for (const [, hx, hy] of corners) {
+        overlayCtx.fillRect(hx - hs, hy - hs, hs * 2, hs * 2);
+        overlayCtx.strokeRect(hx - hs, hy - hs, hs * 2, hs * 2);
+      }
+      overlayCtx.restore();
+    }
+    function hitTestStretchHandle(px, py) {
+      const w = canvas.width * stretchScaleX;
+      const h = canvas.height * stretchScaleY;
+      const x = (canvas.width - w) / 2;
+      const y = (canvas.height - h) / 2;
+      const hs = 14;  // 命中半边（稍宽，方便抓）/ Hit half-size (loose)
+      const candidates = [["nw", x, y], ["ne", x + w, y], ["sw", x, y + h], ["se", x + w, y + h]];
+      for (const [corner, hx, hy] of candidates) {
+        if (Math.abs(px - hx) <= hs && Math.abs(py - hy) <= hs) return corner;
+      }
+      return null;
+    }
+    function syncStretchSliders() {
+      const sx = document.getElementById("stretchScaleX");
+      const sy = document.getElementById("stretchScaleY");
+      const su = document.getElementById("stretchUniform");
+      if (sx) { sx.value = Math.round(stretchScaleX * 100); document.getElementById("stretchScaleXValue").textContent = `${sx.value}%`; }
+      if (sy) { sy.value = Math.round(stretchScaleY * 100); document.getElementById("stretchScaleYValue").textContent = `${sy.value}%`; }
+      // uniform 显示 X、Y 平均（仅在两者相等时同步）/ Uniform pill mirrors X/Y average; not coupled when they differ
+      if (su) {
+        const u = Math.round(((stretchScaleX + stretchScaleY) / 2) * 100);
+        su.value = u; document.getElementById("stretchUniformValue").textContent = `${u}%`;
+      }
+    }
+    function openStretchPanel() {
+      // 在 currentImportSrc 已经被填满铺满之后调用，把当前画布快照作为锚 /
+      // Called *after* Cover/Fit/Stretch one-shot fill; snapshots the filled canvas as anchor.
+      try { stretchAnchorSrc = canvas.toDataURL("image/png"); } catch (_) { stretchAnchorSrc = null; }
+      if (!stretchAnchorSrc) {
+        setStatus("Could not snapshot canvas for stretch panel", "warn");
+        return;
+      }
+      const img = new Image();
+      img.onload = () => {
+        stretchAnchorImg = img;
+        stretchActive = true;
+        stretchScaleX = 1.0; stretchScaleY = 1.0;
+        const panel = document.getElementById("stretchPanel");
+        if (panel) panel.hidden = false;
+        const stageEl = document.getElementById("stage");
+        if (stageEl) stageEl.classList.add("stretch-mode");
+        syncStretchSliders();
+        drawStretchHandlesOverlay();
+        setStatus("Stretch — drag corners or slide; Done to commit, Reset to refill", "good");
+      };
+      img.src = stretchAnchorSrc;
+    }
+    function closeStretchPanel(commit) {
+      if (!stretchActive) return;
+      stretchActive = false;
+      const panel = document.getElementById("stretchPanel");
+      if (panel) panel.hidden = true;
+      const stageEl = document.getElementById("stage");
+      if (stageEl) stageEl.classList.remove("stretch-mode");
+      clearOverlay();
+      if (commit) {
+        pushHistory();
+        setStatus("Stretch committed", "good");
+      } else {
+        // 取消：回到锚（"铺满"那个版本）/ Cancel: restore anchor (the original 'fill' result)
+        if (stretchAnchorImg) {
+          fillWhite();
+          ctx.drawImage(stretchAnchorImg, 0, 0);
+          setStatus("Stretch reset", "good");
+        }
+      }
+      stretchAnchorImg = null;
+      stretchAnchorSrc = null;
+      stretchHandleDrag = null;
+    }
+    function stretchHandleDragStart(p) {
+      if (!stretchActive) return null;
+      const corner = hitTestStretchHandle(p.x, p.y);
+      if (!corner) return null;
+      stretchHandleDrag = { corner, baseScaleX: stretchScaleX, baseScaleY: stretchScaleY };
+      return corner;
+    }
+    function stretchHandleDragMove(p) {
+      if (!stretchActive || !stretchHandleDrag) return;
+      const { corner } = stretchHandleDrag;
+      // 把"指针到画布中心的距离"映射为新的半幅（half-width / half-height）/
+      // Map pointer distance from canvas centre to a new half-width / half-height.
+      const cx = canvas.width / 2, cy = canvas.height / 2;
+      const halfW = Math.max(8, Math.abs(p.x - cx));
+      const halfH = Math.max(8, Math.abs(p.y - cy));
+      // corner 决定影响哪一/两个方向；对称从中心扩展 /
+      // Corner determines which axes are affected; expansion is symmetric about centre.
+      stretchScaleX = clampScale((halfW * 2) / canvas.width);
+      stretchScaleY = clampScale((halfH * 2) / canvas.height);
+      syncStretchSliders();
+      rerenderStretchPreview();
+    }
+    function stretchHandleDragEnd() { stretchHandleDrag = null; }
+
+    // === Shape / curve drawing subsystem / 形状与曲线绘制子系统 ===
+    // 受支持的工具集合，selectTool() 用 / Supported tools, used by selectTool()
+    const SHAPE_TOOLS = new Set(["line", "rect", "ellipse", "polyline", "curve", "fill"]);
+    // 正在拖出的 single-drag shape（line/rect/ellipse）/ Single-drag shape in progress
+    let dragShape = null;  // { kind, x0, y0, x1, y1, shiftKey }
+    // 多点工具的已落点（polyline/curve）/ Anchor points for multi-click tools
+    let polyPoints = [];
+    let polyHover = null;  // 鼠标当前位置（预览用）/ Mouse position (for preview line to next point)
+    let smoothBrushPath = null;  // smooth brush 累积的点（Catmull-Rom）/ Smooth-brush path buffer
+    let multiHintEl = null;      // 顶部"3 points · double-click to commit"提示气泡 / Status pill in canvas
+
+    function ensureMultiHint() {
+      if (!multiHintEl) {
+        multiHintEl = document.createElement("div");
+        multiHintEl.className = "multi-hint";
+        multiHintEl.hidden = true;
+        const sc = document.getElementById("stageContent");
+        if (sc) sc.appendChild(multiHintEl);
+      }
+      return multiHintEl;
+    }
+    function setMultiHint(text) {
+      const el = ensureMultiHint();
+      if (!text) { el.hidden = true; return; }
+      el.textContent = text;
+      el.hidden = false;
+    }
+
+    function clearOverlay() {
+      if (overlayCtx) overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    }
+
+    function shapeStrokeStyle() {
+      return tool === "eraser" ? "#ffffff" : "#000000";
+    }
+    function configureCtxForShape() {
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.lineWidth = Number(widthRange.value);
+      ctx.strokeStyle = shapeStrokeStyle();
+      ctx.fillStyle = shapeStrokeStyle();
+      ctx.globalCompositeOperation = "source-over";
+    }
+    function configureOverlayForPreview() {
+      overlayCtx.save();
+      overlayCtx.lineCap = "round";
+      overlayCtx.lineJoin = "round";
+      overlayCtx.lineWidth = Math.max(1, Number(widthRange.value));
+      overlayCtx.strokeStyle = "rgba(170, 110, 255, 0.85)";
+      overlayCtx.fillStyle = "rgba(170, 110, 255, 0.18)";
+      overlayCtx.setLineDash([6, 4]);
+    }
+    // 给画好的形状画完整边界（可选填充） / Stroke or fill a closed shape
+    function strokeOrFill(closedShape) {
+      const fillShapes = document.getElementById("fillShapesToggle");
+      if (fillShapes && fillShapes.checked && closedShape) ctx.fill();
+      else ctx.stroke();
+    }
+
+    // ----- Line / Rect / Ellipse 拖拽预览 -----
+    function drawShapePreview() {
+      if (!dragShape) return;
+      clearOverlay();
+      configureOverlayForPreview();
+      const { kind, x0, y0 } = dragShape;
+      let { x1, y1 } = dragShape;
+      if (dragShape.shiftKey) {
+        if (kind === "line") {  // Shift = 45° snap
+          const dx = x1 - x0, dy = y1 - y0;
+          const angle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+          const len = Math.hypot(dx, dy);
+          x1 = x0 + Math.cos(angle) * len;
+          y1 = y0 + Math.sin(angle) * len;
+        } else if (kind === "rect" || kind === "ellipse") {  // Shift = 正方形 / 圆形 / square / circle
+          const side = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+          x1 = x0 + Math.sign(x1 - x0 || 1) * side;
+          y1 = y0 + Math.sign(y1 - y0 || 1) * side;
+        }
+      }
+      overlayCtx.beginPath();
+      if (kind === "line") {
+        overlayCtx.moveTo(x0, y0); overlayCtx.lineTo(x1, y1);
+        overlayCtx.stroke();
+      } else if (kind === "rect") {
+        overlayCtx.rect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+        overlayCtx.stroke();
+        overlayCtx.fill();
+      } else if (kind === "ellipse") {
+        const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+        const rx = Math.abs(x1 - x0) / 2, ry = Math.abs(y1 - y0) / 2;
+        overlayCtx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        overlayCtx.stroke();
+        overlayCtx.fill();
+      }
+      overlayCtx.restore();
+    }
+    function commitDragShape() {
+      if (!dragShape) return;
+      const { kind, x0, y0 } = dragShape;
+      let { x1, y1 } = dragShape;
+      if (dragShape.shiftKey) {
+        if (kind === "line") {
+          const dx = x1 - x0, dy = y1 - y0;
+          const angle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
+          const len = Math.hypot(dx, dy);
+          x1 = x0 + Math.cos(angle) * len;
+          y1 = y0 + Math.sin(angle) * len;
+        } else if (kind === "rect" || kind === "ellipse") {
+          const side = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+          x1 = x0 + Math.sign(x1 - x0 || 1) * side;
+          y1 = y0 + Math.sign(y1 - y0 || 1) * side;
+        }
+      }
+      configureCtxForShape();
+      ctx.beginPath();
+      if (kind === "line") {
+        ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
+        ctx.stroke();  // 直线无 "fill" 概念 / Line has no fill concept
+      } else if (kind === "rect") {
+        ctx.rect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
+        strokeOrFill(true);
+      } else if (kind === "ellipse") {
+        const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+        const rx = Math.abs(x1 - x0) / 2, ry = Math.abs(y1 - y0) / 2;
+        if (rx > 0 && ry > 0) {
+          ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+          strokeOrFill(true);
+        }
+      }
+      dragShape = null;
+      clearOverlay();
+      pushHistory();
+    }
+
+    // ----- Polyline 多点点击 -----
+    function drawPolylinePreview() {
+      clearOverlay();
+      if (polyPoints.length === 0) return;
+      configureOverlayForPreview();
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(polyPoints[0].x, polyPoints[0].y);
+      for (let i = 1; i < polyPoints.length; i += 1) overlayCtx.lineTo(polyPoints[i].x, polyPoints[i].y);
+      if (polyHover) overlayCtx.lineTo(polyHover.x, polyHover.y);
+      overlayCtx.stroke();
+      // 已落点的小圆点 / Dots at committed anchors
+      overlayCtx.setLineDash([]);
+      overlayCtx.fillStyle = "rgba(170, 110, 255, 0.95)";
+      for (const p of polyPoints) {
+        overlayCtx.beginPath();
+        overlayCtx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        overlayCtx.fill();
+      }
+      overlayCtx.restore();
+      setMultiHint(`${polyPoints.length} point${polyPoints.length === 1 ? "" : "s"} · double-click / Enter to commit · Esc to cancel`);
+    }
+    function commitPolyline() {
+      if (polyPoints.length < 2) { cancelMultiPoint(); return; }
+      configureCtxForShape();
+      ctx.beginPath();
+      ctx.moveTo(polyPoints[0].x, polyPoints[0].y);
+      for (let i = 1; i < polyPoints.length; i += 1) ctx.lineTo(polyPoints[i].x, polyPoints[i].y);
+      strokeOrFill(polyPoints.length >= 3);  // 3 点以上才能 fill / Fill only when at least a triangle
+      polyPoints = []; polyHover = null;
+      clearOverlay(); setMultiHint("");
+      pushHistory();
+    }
+
+    // ----- Curve (Catmull-Rom 通过 polyPoints 全部 anchor) -----
+    function catmullRomBezier(c, p0, p1, p2, p3, tension = 0.5) {
+      // Catmull-Rom -> cubic Bezier control points / 转 cubic Bezier
+      const cp1x = p1.x + (p2.x - p0.x) * (tension / 3);
+      const cp1y = p1.y + (p2.y - p0.y) * (tension / 3);
+      const cp2x = p2.x - (p3.x - p1.x) * (tension / 3);
+      const cp2y = p2.y - (p3.y - p1.y) * (tension / 3);
+      c.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+    }
+    function tracePolyAsCurve(c, points) {
+      if (points.length < 2) return;
+      c.beginPath();
+      c.moveTo(points[0].x, points[0].y);
+      if (points.length === 2) { c.lineTo(points[1].x, points[1].y); return; }
+      // 复制首尾 anchor 让端点平滑 / Duplicate endpoints so the ends behave nicely
+      const pts = [points[0], ...points, points[points.length - 1]];
+      for (let i = 1; i < pts.length - 2; i += 1) {
+        catmullRomBezier(c, pts[i - 1], pts[i], pts[i + 1], pts[i + 2]);
+      }
+    }
+    function drawCurvePreview() {
+      clearOverlay();
+      if (polyPoints.length === 0) return;
+      configureOverlayForPreview();
+      const path = polyHover ? [...polyPoints, polyHover] : [...polyPoints];
+      tracePolyAsCurve(overlayCtx, path);
+      overlayCtx.stroke();
+      overlayCtx.setLineDash([]);
+      overlayCtx.fillStyle = "rgba(170, 110, 255, 0.95)";
+      for (const p of polyPoints) {
+        overlayCtx.beginPath();
+        overlayCtx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        overlayCtx.fill();
+      }
+      overlayCtx.restore();
+      setMultiHint(`${polyPoints.length} anchor${polyPoints.length === 1 ? "" : "s"} · double-click / Enter to commit smooth curve · Esc to cancel`);
+    }
+    function commitCurve() {
+      if (polyPoints.length < 2) { cancelMultiPoint(); return; }
+      configureCtxForShape();
+      tracePolyAsCurve(ctx, polyPoints);
+      strokeOrFill(polyPoints.length >= 3);
+      polyPoints = []; polyHover = null;
+      clearOverlay(); setMultiHint("");
+      pushHistory();
+    }
+    function cancelMultiPoint() {
+      polyPoints = []; polyHover = null;
+      clearOverlay(); setMultiHint("");
+    }
+
+    // ----- Smooth brush (Catmull-Rom 重绘历史) -----
+    function continueSmoothBrush(point) {
+      if (!smoothBrushPath) return;
+      smoothBrushPath.push(point);
+      const n = smoothBrushPath.length;
+      // 重绘最近几段，避免历史无限增长 / Redraw the trailing segment
+      configureCtxForShape();
+      if (n < 3) {
+        ctx.beginPath();
+        ctx.moveTo(smoothBrushPath[n - 2].x, smoothBrushPath[n - 2].y);
+        ctx.lineTo(point.x, point.y);
+        ctx.stroke();
+        return;
+      }
+      const p0 = smoothBrushPath[n - 4] || smoothBrushPath[n - 3];
+      const p1 = smoothBrushPath[n - 3];
+      const p2 = smoothBrushPath[n - 2];
+      const p3 = smoothBrushPath[n - 1];
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      catmullRomBezier(ctx, p0, p1, p2, p3);
+      ctx.stroke();
+    }
+    function beginSmoothBrush(point) {
+      smoothBrushPath = [point];
+      configureCtxForShape();
+      ctx.beginPath();
+      ctx.moveTo(point.x, point.y);
+      ctx.lineTo(point.x + 0.01, point.y + 0.01);
+      ctx.stroke();
+    }
+    function endSmoothBrush() {
+      smoothBrushPath = null;
+    }
+
+    // ----- Bucket fill (4-邻泛洪) -----
+    function bucketFill(seedX, seedY) {
+      const w = canvas.width, h = canvas.height;
+      const sx = Math.max(0, Math.min(w - 1, Math.round(seedX)));
+      const sy = Math.max(0, Math.min(h - 1, Math.round(seedY)));
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const d = imgData.data;
+      const idx = (x, y) => (y * w + x) * 4;
+      const seed = idx(sx, sy);
+      const sr = d[seed], sg = d[seed + 1], sb = d[seed + 2];
+      // 目标颜色：brush=黑 / eraser=白 / Target colour = brush black or eraser white
+      const target = tool === "eraser" ? [255, 255, 255] : [0, 0, 0];
+      if (Math.abs(sr - target[0]) + Math.abs(sg - target[1]) + Math.abs(sb - target[2]) <= 6) {
+        setStatus("Bucket fill skipped — region already that colour", "warn");
+        return;
+      }
+      const tol = 24;  // 容差 / Tolerance
+      const match = (i) => Math.abs(d[i] - sr) <= tol && Math.abs(d[i + 1] - sg) <= tol && Math.abs(d[i + 2] - sb) <= tol;
+      // BFS / 广度优先 4-连通
+      const stack = [[sx, sy]];
+      const visited = new Uint8Array(w * h);
+      while (stack.length) {
+        const [x, y] = stack.pop();
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        const lin = y * w + x;
+        if (visited[lin]) continue;
+        const i = lin * 4;
+        if (!match(i)) continue;
+        visited[lin] = 1;
+        d[i] = target[0]; d[i + 1] = target[1]; d[i + 2] = target[2]; d[i + 3] = 255;
+        stack.push([x + 1, y]); stack.push([x - 1, y]);
+        stack.push([x, y + 1]); stack.push([x, y - 1]);
+      }
+      ctx.putImageData(imgData, 0, 0);
+      pushHistory();
+    }
+
     function updateImportModeButtons() {
       // 5 个按钮一直可用：没有 currentImportSrc 时点击会以"当前画布"为源做快照 /
       // All five buttons are always usable; when there is no remembered import,
@@ -2931,6 +3461,9 @@
           currentImportMode = mode;
           updateImportModeButtons();
           pushHistory();
+          if (typeof opts.onComplete === "function") {
+            try { opts.onComplete(); } catch (_) {}
+          }
         };
         if (usedSrc !== src) {
           const trimmed = new Image();
@@ -4427,10 +4960,16 @@
       if (Array.isArray(detail.comsol_modes) && detail.comsol_modes.length) {
         // 前端逻辑 / Frontend logic
         const modeCards = detail.comsol_modes.slice(0, 12).map((m) => `<div><div class="status">mode ${escapeText(String(m.mode))}${m.frequency_hz ? " · " + fmtNumber(m.frequency_hz, 1) + " Hz" : ""}</div>${imgBlock(m.url, "mode " + m.mode, "COMSOL mode " + m.mode)}</div>`).join("");
+        // 区分 COMSOL native 还是 Python 兜底渲染 / Tell COMSOL native apart from Python fallback
+        const sources = new Set(detail.comsol_modes.map((m) => m.source || "unknown"));
+        let sourceHint = "";
+        if (sources.has("comsol_native") && !sources.has("python_fallback")) sourceHint = " · native COMSOL render";
+        else if (sources.has("python_fallback") && !sources.has("comsol_native")) sourceHint = " · Python fallback (grayscale + nodal)";
+        else if (sources.size > 1) sourceHint = " · mixed sources";
         // 前端逻辑 / Frontend logic
         sections.push(`
           <!-- 模板内容 / Template content --><section class="candidate-section">
-            <!-- 模板内容 / Template content --><h3>COMSOL Eigenmodes (top ${Math.min(12, detail.comsol_modes.length)} of ${detail.comsol_modes.length})</h3>
+            <!-- 模板内容 / Template content --><h3>COMSOL Eigenmodes (top ${Math.min(12, detail.comsol_modes.length)} of ${detail.comsol_modes.length})<span class="status" style="margin-left:8px;font-weight:400;font-size:11px;opacity:0.75">${escapeText(sourceHint)}</span></h3>
             <!-- 模板内容 / Template content --><div class="comparison-grid">${modeCards}</div>
           <!-- 模板内容 / Template content --></section>
         <!-- 模板内容 / Template content -->`);
@@ -6308,6 +6847,26 @@
 
     // 前端逻辑 / Frontend logic
     brushTool.addEventListener("click", () => selectTool("brush"));
+    // 新增形状 / 曲线 / 填充工具按钮 / Wire up shape, curve, and fill tool buttons
+    ["lineTool", "rectTool", "ellipseTool", "polylineTool", "curveTool", "fillTool"].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      const key = id.replace("Tool", "");
+      btn.addEventListener("click", () => selectTool(key));
+    });
+    // 工具键盘快捷键：B/E/L/R/O/P/C/F / Keyboard shortcuts for tools
+    document.addEventListener("keydown", (event) => {
+      const tgt = event.target;
+      const tag = (tgt && tgt.tagName) || "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (tgt && tgt.isContentEditable)) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const map = { b: "brush", e: "eraser", l: "line", r: "rect", o: "ellipse", p: "polyline", c: "curve", f: "fill" };
+      const next = map[event.key.toLowerCase()];
+      if (next) {
+        event.preventDefault();
+        selectTool(next);
+      }
+    });
     // 前端逻辑 / Frontend logic
     eraserTool.addEventListener("click", () => selectTool("eraser"));
     // 前端逻辑 / Frontend logic
@@ -6395,21 +6954,22 @@
       }
     }
 
-    function reapplyImportMode(mode) {
+    function reapplyImportMode(mode, opts = {}) {
       // Cover/Fit/Stretch 是"对已导入图的重摆"——没有源 + 画布空白时给明确提示，
       // 不要偷偷拿空画布当源，那样按钮看起来"点了没反应"。/
       // Cover/Fit/Stretch are post-import placement modes. If no source AND the
       // canvas is blank, surface a clear status instead of silently no-op.
       if (!currentImportSrc && canvasIsBlankish()) {
         setStatus("Cover / Fit / Stretch reposition an imported image. Click Import (or draw something) first.", "warn");
-        return;
+        return false;
       }
       if (!ensureImportSource()) {
         setStatus("Canvas snapshot failed — try Import or draw something first", "warn");
-        return;
+        return false;
       }
       // 切换 mode 时跳过 trim（已经 trim 过了）和 polarity（用户已确认）/ Skip trim & auto-polarity when switching mode
-      loadImageToCanvas(currentImportSrc, mode, { skipTrim: true });
+      loadImageToCanvas(currentImportSrc, mode, { skipTrim: true, onComplete: opts.onComplete });
+      return true;
     }
     // 一次性动作按钮：闪一下证明点击生效（避免画布上看不出变化时用户以为按钮坏了）/
     // Flash the button briefly so the user sees the click registered even when
@@ -6422,7 +6982,12 @@
     }
     if (importToolButtons.cover) importToolButtons.cover.addEventListener("click", () => { reapplyImportMode("cover"); flashButton(importToolButtons.cover); });
     if (importToolButtons.fit) importToolButtons.fit.addEventListener("click", () => { reapplyImportMode("fit"); flashButton(importToolButtons.fit); });
-    if (importToolButtons.stretch) importToolButtons.stretch.addEventListener("click", () => { reapplyImportMode("stretch"); flashButton(importToolButtons.stretch); });
+    if (importToolButtons.stretch) importToolButtons.stretch.addEventListener("click", () => {
+      flashButton(importToolButtons.stretch);
+      // 第一下：仍然一键铺满画布；完成后弹出交互面板让用户继续微调 /
+      // First click still fills canvas; once finished, open the interactive panel for fine-tuning.
+      reapplyImportMode("stretch", { onComplete: openStretchPanel });
+    });
     if (importToolButtons.crop) importToolButtons.crop.addEventListener("click", () => {
       if (!ensureImportSource()) {
         setStatus("Canvas snapshot failed", "warn");
@@ -6447,6 +7012,44 @@
       setStatus("Polarity flipped", "good");
     });
     updateImportModeButtons();
+
+    // === Stretch 面板事件 / Stretch panel events ===
+    const stretchUniformEl = document.getElementById("stretchUniform");
+    const stretchScaleXEl = document.getElementById("stretchScaleX");
+    const stretchScaleYEl = document.getElementById("stretchScaleY");
+    const stretchResetEl = document.getElementById("stretchReset");
+    const stretchDoneEl = document.getElementById("stretchDone");
+    function onStretchUniformInput() {
+      const v = clampScale(Number(stretchUniformEl.value) / 100);
+      stretchScaleX = v; stretchScaleY = v;
+      syncStretchSliders();
+      rerenderStretchPreview();
+    }
+    function onStretchScaleXInput() {
+      stretchScaleX = clampScale(Number(stretchScaleXEl.value) / 100);
+      document.getElementById("stretchScaleXValue").textContent = `${stretchScaleXEl.value}%`;
+      // 让 uniform pill 显示 X/Y 平均 / Update uniform pill (decoupled when X != Y)
+      const u = Math.round(((stretchScaleX + stretchScaleY) / 2) * 100);
+      stretchUniformEl.value = u; document.getElementById("stretchUniformValue").textContent = `${u}%`;
+      rerenderStretchPreview();
+    }
+    function onStretchScaleYInput() {
+      stretchScaleY = clampScale(Number(stretchScaleYEl.value) / 100);
+      document.getElementById("stretchScaleYValue").textContent = `${stretchScaleYEl.value}%`;
+      const u = Math.round(((stretchScaleX + stretchScaleY) / 2) * 100);
+      stretchUniformEl.value = u; document.getElementById("stretchUniformValue").textContent = `${u}%`;
+      rerenderStretchPreview();
+    }
+    if (stretchUniformEl) stretchUniformEl.addEventListener("input", onStretchUniformInput);
+    if (stretchScaleXEl) stretchScaleXEl.addEventListener("input", onStretchScaleXInput);
+    if (stretchScaleYEl) stretchScaleYEl.addEventListener("input", onStretchScaleYInput);
+    if (stretchResetEl) stretchResetEl.addEventListener("click", () => {
+      stretchScaleX = 1.0; stretchScaleY = 1.0;
+      syncStretchSliders();
+      rerenderStretchPreview();
+      setStatus("Stretch reset to fill canvas", "good");
+    });
+    if (stretchDoneEl) stretchDoneEl.addEventListener("click", () => closeStretchPanel(true));
     // 前端逻辑 / Frontend logic
     materialPresetSelect.addEventListener("change", () => applyMaterialPreset(materialPresetSelect.value));
     // 前端逻辑 / Frontend logic
@@ -6984,21 +7587,58 @@
       tmp.src = currentImportSrc;
     }
 
+    // === Canvas pointer dispatch / 画布指针事件分发 ===
+    // 根据当前 tool 选择对应的开始/移动/结束流程；crop 模式优先级最高 /
+    // Pointer events are dispatched by active tool; crop mode takes priority.
     canvas.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       canvas.setPointerCapture(event.pointerId);
+      const p = canvasPoint(event);
+      // Stretch handle 优先：在 stretch 模式下抓住角的话直接进入 resize / Highest priority: stretch handle hit
+      if (stretchActive && stretchHandleDragStart(p)) {
+        return;
+      }
       if (cropMode) {
         cropDragging = true;
-        cropDragStart = canvasPoint(event);
-        cropRect = { x: cropDragStart.x, y: cropDragStart.y, w: 0, h: 0 };
+        cropDragStart = p;
+        cropRect = { x: p.x, y: p.y, w: 0, h: 0 };
         drawCropOverlay();
+        return;
+      }
+      if (tool === "fill") {
+        bucketFill(p.x, p.y);
+        return;
+      }
+      if (tool === "line" || tool === "rect" || tool === "ellipse") {
+        dragShape = { kind: tool, x0: p.x, y0: p.y, x1: p.x, y1: p.y, shiftKey: event.shiftKey };
+        drawShapePreview();
+        return;
+      }
+      if (tool === "polyline" || tool === "curve") {
+        polyPoints.push(p);
+        polyHover = p;
+        (tool === "polyline" ? drawPolylinePreview : drawCurvePreview)();
+        return;
+      }
+      if (tool === "brush" && document.getElementById("smoothBrushToggle")?.checked) {
+        drawing = true;
+        beginSmoothBrush(p);
         return;
       }
       beginStroke(event);
     });
     canvas.addEventListener("pointermove", (event) => {
+      const p = canvasPoint(event);
+      if (stretchActive && stretchHandleDrag) {
+        stretchHandleDragMove(p);
+        return;
+      }
+      if (stretchActive) {
+        // 即使没拖，也根据是否悬停在角上换光标 / Update cursor when hovering over a handle (no drag)
+        const c = hitTestStretchHandle(p.x, p.y);
+        canvas.style.cursor = c ? (c === "nw" || c === "se" ? "nwse-resize" : "nesw-resize") : "default";
+      }
       if (cropMode && cropDragging) {
-        const p = canvasPoint(event);
         const x0 = cropDragStart.x, y0 = cropDragStart.y;
         const side = Math.max(Math.abs(p.x - x0), Math.abs(p.y - y0));  // 强制正方形 ROI / Square ROI
         const sx = Math.sign(p.x - x0) || 1;
@@ -7006,7 +7646,6 @@
         let x = sx > 0 ? x0 : x0 - side;
         let y = sy > 0 ? y0 : y0 - side;
         let w = side, h = side;
-        // clamp to canvas
         x = Math.max(0, Math.min(canvas.width - 1, x));
         y = Math.max(0, Math.min(canvas.height - 1, y));
         w = Math.min(w, canvas.width - x);
@@ -7015,9 +7654,28 @@
         drawCropOverlay();
         return;
       }
+      if (dragShape) {
+        dragShape.x1 = p.x; dragShape.y1 = p.y;
+        dragShape.shiftKey = event.shiftKey;
+        drawShapePreview();
+        return;
+      }
+      if ((tool === "polyline" || tool === "curve") && polyPoints.length) {
+        polyHover = p;
+        (tool === "polyline" ? drawPolylinePreview : drawCurvePreview)();
+        return;
+      }
+      if (drawing && tool === "brush" && smoothBrushPath) {
+        continueSmoothBrush(p);
+        return;
+      }
       continueStroke(event);
     });
     canvas.addEventListener("pointerup", (event) => {
+      if (stretchHandleDrag) {
+        stretchHandleDragEnd();
+        return;
+      }
       if (cropMode && cropDragging) {
         cropDragging = false;
         if (cropRect && (cropRect.w < 8 || cropRect.h < 8)) {
@@ -7027,14 +7685,56 @@
         updateImportModeButtons();
         return;
       }
-      endStroke(event);
-    });
-    canvas.addEventListener("pointercancel", (event) => {
-      if (cropMode && cropDragging) {
-        cropDragging = false;
+      if (dragShape) {
+        commitDragShape();
+        return;
+      }
+      if (tool === "polyline" || tool === "curve") {
+        // 单击不提交，等 dblclick / Enter / Single click does not commit — wait for dblclick / Enter
+        return;
+      }
+      if (drawing && smoothBrushPath) {
+        drawing = false; endSmoothBrush(); pushHistory();
         return;
       }
       endStroke(event);
+    });
+    canvas.addEventListener("pointercancel", () => {
+      if (stretchHandleDrag) { stretchHandleDragEnd(); return; }
+      if (cropMode && cropDragging) { cropDragging = false; return; }
+      if (dragShape) { dragShape = null; clearOverlay(); return; }
+      if (smoothBrushPath) { drawing = false; endSmoothBrush(); }
+      endStroke();
+    });
+    // 双击提交 polyline / curve / Double-click commits multi-point tools
+    canvas.addEventListener("dblclick", (event) => {
+      if (tool === "polyline" && polyPoints.length) {
+        event.preventDefault();
+        commitPolyline();
+      } else if (tool === "curve" && polyPoints.length) {
+        event.preventDefault();
+        commitCurve();
+      }
+    });
+    // Enter 提交、Esc / Backspace 取消（focus 在 body 时）/ Keyboard shortcuts for multi-point tools
+    document.addEventListener("keydown", (event) => {
+      const tgt = event.target;
+      const tag = (tgt && tgt.tagName) || "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (tgt && tgt.isContentEditable)) return;
+      if ((event.key === "Enter") && (tool === "polyline" || tool === "curve") && polyPoints.length) {
+        event.preventDefault();
+        tool === "polyline" ? commitPolyline() : commitCurve();
+        return;
+      }
+      if (event.key === "Escape") {
+        if (polyPoints.length) { cancelMultiPoint(); return; }
+        if (dragShape) { dragShape = null; clearOverlay(); return; }
+      }
+      if ((event.key === "Backspace") && (tool === "polyline" || tool === "curve") && polyPoints.length) {
+        event.preventDefault();
+        polyPoints.pop();
+        (tool === "polyline" ? drawPolylinePreview : drawCurvePreview)();
+      }
     });
     // 前端逻辑 / Frontend logic
     stage.addEventListener("contextmenu", (event) => event.preventDefault());
