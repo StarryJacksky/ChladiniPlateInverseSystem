@@ -1889,6 +1889,14 @@
           <input id="importInput" type="file" accept="image/png,image/jpeg,image/webp"> <!-- 页面结构 / Page structure -->
           <button id="saveButton" class="primary" type="button" title="Save target">Save</button> <!-- 页面结构 / Page structure -->
         </div> <!-- 页面结构 / Page structure -->
+        <div class="group" id="importToolsGroup" role="group" aria-label="import placement" title="Adjust placement of imported image"> <!-- 页面结构 / Page structure -->
+          <button id="importModeCover" type="button" title="Fill canvas (crop overflow)" aria-label="Cover" disabled>Cover</button> <!-- 页面结构 / Page structure -->
+          <button id="importModeFit" type="button" title="Fit aspect ratio (white bars)" aria-label="Fit" disabled>Fit</button> <!-- 页面结构 / Page structure -->
+          <button id="importModeStretch" type="button" title="Stretch to canvas (distort)" aria-label="Stretch" disabled>Stretch</button> <!-- 页面结构 / Page structure -->
+          <button id="importCropButton" type="button" title="Drag a square ROI then Apply" aria-label="Crop ROI" disabled>Crop</button> <!-- 页面结构 / Page structure -->
+          <button id="importCropApply" type="button" title="Apply ROI crop" aria-label="Apply crop" hidden>Apply</button> <!-- 页面结构 / Page structure -->
+          <button id="importInvertButton" type="button" title="Flip black / white (polarity)" aria-label="Invert" disabled>Invert</button> <!-- 页面结构 / Page structure -->
+        </div> <!-- 页面结构 / Page structure -->
       </div> <!-- 页面结构 / Page structure -->
     </header> <!-- 页面结构 / Page structure -->
 
@@ -2701,54 +2709,191 @@
     // 前端逻辑 / Frontend logic
     }
 
+    // === 图片导入子系统 / Image import subsystem ===
+    // 当前导入的原始 src（auto-trim 后），用来在切换 mode 时重绘 / Source after auto-trim, reused when mode changes.
+    let currentImportSrc = null;
+    let currentImportMode = "cover";  // 默认 cover：避免"只占一部分"的留白 / Default cover so the image fills the canvas
+    let cropMode = false;             // 是否处于 ROI 选区模式 / Whether ROI-crop selection is active
+    let cropRect = null;              // 选区矩形（canvas 坐标） / Selected ROI rect in canvas coords
+    let cropDragging = false;
+    let cropDragStart = null;
+
+    // 自动去掉图像外圈纯白/纯黑边框（clean diagram 经常自带 padding） /
+    // Auto-trim near-uniform borders around the imported image
+    function autoTrimImageDataURL(image) {
+      const tmp = document.createElement("canvas");
+      tmp.width = image.naturalWidth;
+      tmp.height = image.naturalHeight;
+      const tctx = tmp.getContext("2d");
+      tctx.drawImage(image, 0, 0);
+      let data;
+      try {
+        data = tctx.getImageData(0, 0, tmp.width, tmp.height);
+      } catch (_) {
+        // 跨域图像会触发 SecurityError；放弃 trim / Fail silently on tainted canvases
+        return image.src;
+      }
+      const w = tmp.width, h = tmp.height;
+      // 边缘像素的中位亮度当作"背景色"，离它最近的像素都视为边框 /
+      // Use median luminance of a 1-px frame as background; only trim pixels close to it
+      const sample = [];
+      for (let x = 0; x < w; x += Math.max(1, (w / 64) | 0)) {
+        sample.push(luma(data, x, 0));
+        sample.push(luma(data, x, h - 1));
+      }
+      for (let y = 0; y < h; y += Math.max(1, (h / 64) | 0)) {
+        sample.push(luma(data, 0, y));
+        sample.push(luma(data, w - 1, y));
+      }
+      sample.sort((a, b) => a - b);
+      const bg = sample[(sample.length / 2) | 0];
+      const tol = 18;  // 容差，避免 JPEG 噪声把内容也削掉 / Tolerance so JPEG noise doesn't bite content
+      const isBg = (x, y) => Math.abs(luma(data, x, y) - bg) <= tol;
+      let top = 0, bot = h - 1, left = 0, right = w - 1;
+      while (top < bot && rowAllBg(data, w, top, isBg)) top += 1;
+      while (bot > top && rowAllBg(data, w, bot, isBg)) bot -= 1;
+      while (left < right && colAllBg(data, h, w, left, isBg)) left += 1;
+      while (right > left && colAllBg(data, h, w, right, isBg)) right -= 1;
+      const cropped = bot - top + 1;
+      const croppedW = right - left + 1;
+      // 总是落到 data URL（避免 blob: URL 被 revoke 后切换 mode 失效）/
+      // Always materialise into a data URL so blob: URLs (revoked after 1s
+      // by loadExistingTarget) don't kill later mode-switches.
+      const out = document.createElement("canvas");
+      out.width = croppedW;
+      out.height = cropped;
+      out.getContext("2d").drawImage(image, left, top, croppedW, cropped, 0, 0, croppedW, cropped);
+      return out.toDataURL("image/png");
+    }
+    function luma(data, x, y) {
+      const i = (y * data.width + x) * 4;
+      return 0.299 * data.data[i] + 0.587 * data.data[i + 1] + 0.114 * data.data[i + 2];
+    }
+    function rowAllBg(data, w, y, isBg) {
+      for (let x = 0; x < w; x += 1) if (!isBg(x, y)) return false;
+      return true;
+    }
+    function colAllBg(data, h, w, x, isBg) {
+      for (let y = 0; y < h; y += 1) if (!isBg(x, y)) return false;
+      return true;
+    }
+
+    // 估算前景占比（深色像素），nodal lines 通常是少数派；过半就视作极性反了 /
+    // Estimate dark-pixel fraction; nodal lines are usually the minority class
+    function darkPixelFraction() {
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let dark = 0;
+      const step = 4 * 4;  // 抽样每 4 像素一次 / Sample every 4 pixels
+      const total = img.data.length / step;
+      for (let i = 0; i < img.data.length; i += step) {
+        const v = 0.299 * img.data[i] + 0.587 * img.data[i + 1] + 0.114 * img.data[i + 2];
+        if (v < 128) dark += 1;
+      }
+      return total > 0 ? dark / total : 0;
+    }
+
+    // 翻转黑白 / Flip black <-> white
+    function invertCanvas() {
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = img.data;
+      for (let i = 0; i < d.length; i += 4) {
+        d[i] = 255 - d[i];
+        d[i + 1] = 255 - d[i + 1];
+        d[i + 2] = 255 - d[i + 2];
+      }
+      ctx.putImageData(img, 0, 0);
+      pushHistory();
+    }
+
+    function updateImportModeButtons() {
+      const hasImport = !!currentImportSrc;
+      ["importModeCover", "importModeFit", "importModeStretch",
+       "importCropButton", "importInvertButton"].forEach((id) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = !hasImport;
+      });
+      const map = { cover: "importModeCover", fit: "importModeFit", stretch: "importModeStretch" };
+      Object.entries(map).forEach(([m, id]) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.classList.toggle("active", m === currentImportMode);
+      });
+      const cropBtn = document.getElementById("importCropButton");
+      if (cropBtn) {
+        cropBtn.classList.toggle("active", cropMode);
+        cropBtn.textContent = cropMode ? "Cancel" : "Crop";
+      }
+      const apply = document.getElementById("importCropApply");
+      if (apply) apply.hidden = !(cropMode && cropRect);
+    }
+
     // 前端逻辑 / Frontend logic
-    function loadImageToCanvas(src) {
-      // 前端逻辑 / Frontend logic
+    function loadImageToCanvas(src, mode = currentImportMode, opts = {}) {
       const image = new Image();
-      // 前端逻辑 / Frontend logic
       image.onload = () => {
-        // 前端逻辑 / Frontend logic
-        fillWhite();
-        // 前端逻辑 / Frontend logic
-        const scale = Math.min(canvas.width / image.width, canvas.height / image.height);
-        // 前端逻辑 / Frontend logic
-        const width = image.width * scale;
-        // 前端逻辑 / Frontend logic
-        const height = image.height * scale;
-        // 前端逻辑 / Frontend logic
-        const x = (canvas.width - width) / 2;
-        // 前端逻辑 / Frontend logic
-        const y = (canvas.height - height) / 2;
-        // 前端逻辑 / Frontend logic
-        ctx.drawImage(image, x, y, width, height);
-        // 前端逻辑 / Frontend logic
-        pushHistory();
-        // 前端逻辑 / Frontend logic
-        setStatus("Target loaded", "good");
-      // 前端逻辑 / Frontend logic
+        // 首次加载（非 mode-switch、非 crop-apply）跑一次 trim + cache /
+        // First load: trim and cache. mode-switch / crop-apply pass already-prepared src.
+        let usedSrc = src;
+        if (!opts.skipTrim) {
+          try { usedSrc = autoTrimImageDataURL(image); } catch (_) { usedSrc = src; }
+        }
+        const doDraw = (img) => {
+          fillWhite();
+          if (mode === "stretch") {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          } else {
+            const scale = mode === "cover"
+              ? Math.max(canvas.width / img.width, canvas.height / img.height)
+              : Math.min(canvas.width / img.width, canvas.height / img.height);
+            const w = img.width * scale;
+            const h = img.height * scale;
+            const x = (canvas.width - w) / 2;
+            const y = (canvas.height - h) / 2;
+            ctx.drawImage(img, x, y, w, h);
+          }
+          // 自动 polarity 检测：占比 > 55% 才翻转，避免把节线少的图也乱翻 /
+          // Auto-polarity: invert only when dark pixels clearly dominate
+          if (opts.autoPolarity) {
+            const f = darkPixelFraction();
+            if (f > 0.55) {
+              const inv = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              for (let i = 0; i < inv.data.length; i += 4) {
+                inv.data[i] = 255 - inv.data[i];
+                inv.data[i + 1] = 255 - inv.data[i + 1];
+                inv.data[i + 2] = 255 - inv.data[i + 2];
+              }
+              ctx.putImageData(inv, 0, 0);
+              setStatus("Target loaded · auto-inverted (foreground was the majority)", "good");
+            } else {
+              setStatus("Target loaded", "good");
+            }
+          } else {
+            setStatus(`Target loaded (${mode})`, "good");
+          }
+          currentImportSrc = usedSrc;
+          currentImportMode = mode;
+          updateImportModeButtons();
+          pushHistory();
+        };
+        if (usedSrc !== src) {
+          const trimmed = new Image();
+          trimmed.onload = () => doDraw(trimmed);
+          trimmed.src = usedSrc;
+        } else {
+          doDraw(image);
+        }
       };
-      // 前端逻辑 / Frontend logic
       image.src = src;
-    // 前端逻辑 / Frontend logic
     }
 
     // 前端逻辑 / Frontend logic
     function handleImageFile(file) {
-      // 前端逻辑 / Frontend logic
       if (!file || !file.type.startsWith("image/")) {
-        // 前端逻辑 / Frontend logic
         setStatus("Image file expected", "warn");
-        // 前端逻辑 / Frontend logic
         return;
-      // 前端逻辑 / Frontend logic
       }
-      // 前端逻辑 / Frontend logic
       const reader = new FileReader();
-      // 前端逻辑 / Frontend logic
-      reader.onload = () => loadImageToCanvas(reader.result);
-      // 前端逻辑 / Frontend logic
+      reader.onload = () => loadImageToCanvas(reader.result, "cover", { autoPolarity: true });
       reader.readAsDataURL(file);
-    // 前端逻辑 / Frontend logic
     }
 
     // 前端逻辑 / Frontend logic
@@ -6163,12 +6308,46 @@
     });
     // 前端逻辑 / Frontend logic
     importInput.addEventListener("change", () => {
-      // 前端逻辑 / Frontend logic
       handleImageFile(importInput.files[0]);
-      // 前端逻辑 / Frontend logic
       importInput.value = "";
-    // 前端逻辑 / Frontend logic
     });
+    // === 导入工具按钮 / Import tool buttons ===
+    const importToolButtons = {
+      cover: document.getElementById("importModeCover"),
+      fit: document.getElementById("importModeFit"),
+      stretch: document.getElementById("importModeStretch"),
+      crop: document.getElementById("importCropButton"),
+      apply: document.getElementById("importCropApply"),
+      invert: document.getElementById("importInvertButton"),
+    };
+    function reapplyImportMode(mode) {
+      if (!currentImportSrc) return;
+      // 切换 mode 时跳过 trim（已经 trim 过了）和 polarity（用户已确认）/ Skip trim & auto-polarity when switching mode
+      loadImageToCanvas(currentImportSrc, mode, { skipTrim: true });
+    }
+    if (importToolButtons.cover) importToolButtons.cover.addEventListener("click", () => reapplyImportMode("cover"));
+    if (importToolButtons.fit) importToolButtons.fit.addEventListener("click", () => reapplyImportMode("fit"));
+    if (importToolButtons.stretch) importToolButtons.stretch.addEventListener("click", () => reapplyImportMode("stretch"));
+    if (importToolButtons.crop) importToolButtons.crop.addEventListener("click", () => {
+      if (!currentImportSrc) return;
+      cropMode = !cropMode;
+      if (!cropMode) {
+        cropRect = null;
+        drawOverlay();
+      } else {
+        setStatus("Crop mode · drag a square ROI, then click Apply", "good");
+      }
+      updateImportModeButtons();
+    });
+    if (importToolButtons.apply) importToolButtons.apply.addEventListener("click", () => {
+      applyCropToImage();
+      updateImportModeButtons();
+    });
+    if (importToolButtons.invert) importToolButtons.invert.addEventListener("click", () => {
+      invertCanvas();
+      setStatus("Polarity flipped", "good");
+    });
+    updateImportModeButtons();
     // 前端逻辑 / Frontend logic
     materialPresetSelect.addEventListener("change", () => applyMaterialPreset(materialPresetSelect.value));
     // 前端逻辑 / Frontend logic
@@ -6670,21 +6849,94 @@
       });
     }
     // 前端逻辑 / Frontend logic
+    // 在画布上画 ROI 选区，并在 overlay 上预览 / Draw ROI rect, preview on overlay
+    function drawCropOverlay() {
+      drawOverlay();  // 先重画网格/clamp 圈 / Re-draw base overlay first
+      if (!cropRect) return;
+      overlayCtx.save();
+      overlayCtx.strokeStyle = "rgba(38, 132, 255, 0.95)";
+      overlayCtx.fillStyle = "rgba(38, 132, 255, 0.12)";
+      overlayCtx.lineWidth = 2;
+      overlayCtx.setLineDash([6, 4]);
+      overlayCtx.strokeRect(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+      overlayCtx.fillRect(cropRect.x, cropRect.y, cropRect.w, cropRect.h);
+      overlayCtx.restore();
+    }
+
+    function applyCropToImage() {
+      if (!cropRect || !currentImportSrc) return;
+      const tmp = new Image();
+      tmp.onload = () => {
+        const sx = (cropRect.x / canvas.width) * tmp.width;
+        const sy = (cropRect.y / canvas.height) * tmp.height;
+        const sw = (cropRect.w / canvas.width) * tmp.width;
+        const sh = (cropRect.h / canvas.height) * tmp.height;
+        const cv = document.createElement("canvas");
+        cv.width = Math.max(1, Math.round(sw));
+        cv.height = Math.max(1, Math.round(sh));
+        cv.getContext("2d").drawImage(tmp, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
+        const newSrc = cv.toDataURL("image/png");
+        cropMode = false;
+        cropRect = null;
+        drawOverlay();
+        // 重新走完整流程（含 auto-trim + auto-polarity 关）/ Re-run full load on the cropped src
+        loadImageToCanvas(newSrc, currentImportMode, { skipTrim: true });
+      };
+      tmp.src = currentImportSrc;
+    }
+
     canvas.addEventListener("pointerdown", (event) => {
-      // 前端逻辑 / Frontend logic
       event.preventDefault();
-      // 前端逻辑 / Frontend logic
       canvas.setPointerCapture(event.pointerId);
-      // 前端逻辑 / Frontend logic
+      if (cropMode) {
+        cropDragging = true;
+        cropDragStart = canvasPoint(event);
+        cropRect = { x: cropDragStart.x, y: cropDragStart.y, w: 0, h: 0 };
+        drawCropOverlay();
+        return;
+      }
       beginStroke(event);
-    // 前端逻辑 / Frontend logic
     });
-    // 前端逻辑 / Frontend logic
-    canvas.addEventListener("pointermove", continueStroke);
-    // 前端逻辑 / Frontend logic
-    canvas.addEventListener("pointerup", endStroke);
-    // 前端逻辑 / Frontend logic
-    canvas.addEventListener("pointercancel", endStroke);
+    canvas.addEventListener("pointermove", (event) => {
+      if (cropMode && cropDragging) {
+        const p = canvasPoint(event);
+        const x0 = cropDragStart.x, y0 = cropDragStart.y;
+        const side = Math.max(Math.abs(p.x - x0), Math.abs(p.y - y0));  // 强制正方形 ROI / Square ROI
+        const sx = Math.sign(p.x - x0) || 1;
+        const sy = Math.sign(p.y - y0) || 1;
+        let x = sx > 0 ? x0 : x0 - side;
+        let y = sy > 0 ? y0 : y0 - side;
+        let w = side, h = side;
+        // clamp to canvas
+        x = Math.max(0, Math.min(canvas.width - 1, x));
+        y = Math.max(0, Math.min(canvas.height - 1, y));
+        w = Math.min(w, canvas.width - x);
+        h = Math.min(h, canvas.height - y);
+        cropRect = { x, y, w, h };
+        drawCropOverlay();
+        return;
+      }
+      continueStroke(event);
+    });
+    canvas.addEventListener("pointerup", (event) => {
+      if (cropMode && cropDragging) {
+        cropDragging = false;
+        if (cropRect && (cropRect.w < 8 || cropRect.h < 8)) {
+          cropRect = null;
+          drawCropOverlay();
+        }
+        updateImportModeButtons();
+        return;
+      }
+      endStroke(event);
+    });
+    canvas.addEventListener("pointercancel", (event) => {
+      if (cropMode && cropDragging) {
+        cropDragging = false;
+        return;
+      }
+      endStroke(event);
+    });
     // 前端逻辑 / Frontend logic
     stage.addEventListener("contextmenu", (event) => event.preventDefault());
 
