@@ -62,7 +62,8 @@ def build_argument_parser() -> argparse.ArgumentParser:  # 解析器 / Parser
     parser.add_argument("--learning-rate-weight", type=float, default=0.10, help="Weight logits LR. / 权重学习率。")  # / Weight LR
     parser.add_argument("--enrichment-weight", type=float, default=1.0, help="Enrichment weight. / 富集权重。")  # / Enr
     parser.add_argument("--contrast-weight", type=float, default=1.0, help="Contrast weight. / 对比权重。")  # / Ct
-    parser.add_argument("--recall-weight", type=float, default=0.5, help="Recall weight. / Recall 权重。")  # / Rc
+    parser.add_argument("--recall-weight", type=float, default=1.5, help="Recall weight (default raised from 0.5 to 1.5 for thin/4-fold targets). / Recall 权重，2026-05 默认提到 1.5")  # / Rc
+    parser.add_argument("--weight-entropy-weight", type=float, default=0.10, help="Coefficient for -λ·H(softmax(weights)); prevents W10 weight collapse to a single freq (effective_count → 1). Set 0 to disable. / 权重熵正则，防 K 个频率坍缩到 1 个")  # / WE
     parser.add_argument("--sigma-rel", type=float, default=0.05, help="Gaussian sigma. / 高斯 σ。")  # / σ
     parser.add_argument("--recall-percentile-frac", type=float, default=0.20, help="Recall percentile. / Recall 分位。")  # / Pct
     parser.add_argument("--smoothness-weight", type=float, default=4.0, help="H smoothness weight. / H 平滑罚权重。")  # / Sm
@@ -137,6 +138,7 @@ def main(argv: list[str] | None = None) -> int:  # 主 / Main
         enrichment_weight=float(args.enrichment_weight),
         contrast_weight=float(args.contrast_weight),
         recall_weight=float(args.recall_weight),
+        weight_entropy_weight=float(args.weight_entropy_weight),
         sigma_rel=float(args.sigma_rel),
         recall_percentile_frac=float(args.recall_percentile_frac),
         sinkhorn_weight=float(args.sinkhorn_weight),

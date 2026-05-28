@@ -74,7 +74,21 @@ class W10AnisotropyConfig:  # W10 配置 / W10 config
     initial_frequencies_hz: list[float] | None = None  # 频率初值 / Init freqs
     enrichment_weight: float = 1.0  # 富集权重 / Enrichment
     contrast_weight: float = 1.0  # 对比权重 / Contrast
-    recall_weight: float = 0.5  # recall 权重 / Recall
+    # recall_weight bumped 0.5 → 1.5 (2026-05) — for thin / sparse / 4-fold
+    # symmetric targets, low recall was the dominant failure mode: high
+    # enrichment + 30% recall = "right pattern, only 1/3 of outline covered".
+    # Higher recall pressure forces the optimiser to spread powder across
+    # more of the target outline, even at the cost of some enrichment. /
+    # recall 加权从 0.5 提到 1.5：细线/4 重对称 target 的主要短板是 recall 太低
+    recall_weight: float = 1.5  # recall 权重 / Recall
+    # Weight entropy regulariser (2026-05). Without it, W10 routinely
+    # collapses to a single dominant frequency (effective_count ≈ 1 of K=6),
+    # losing the multi-frequency composite capability that's the whole
+    # point of the algorithm. Adds  -λ · H(softmax(weights))  to the loss;
+    # since H is maximised when weights are uniform, this pulls toward
+    # effective_count → K when nothing else differentiates the freqs. /
+    # 权重熵正则：防 weights 坍缩到单一频率（effective_count → 1）
+    weight_entropy_weight: float = 0.10  # 权重熵正则强度 / Entropy regularizer
     sigma_rel: float = 0.05  # 高斯 σ / Gaussian σ
     # Sigma annealing: start with a broader Gaussian powder window and linearly
     # shrink to ``sigma_rel`` over the first ``sigma_anneal_steps`` steps. The
@@ -281,6 +295,16 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
         smoothness = neighbour_smoothness_penalty(H_clamped, max_neighbour_diff_mm)  # H 邻平滑 / H smoothness
         theta_smooth = _theta_smoothness_penalty(theta_design)  # θ 邻平滑 / θ smoothness
         freq_sep = frequency_separation_penalty(frequencies_hz, float(opt_config.freq_separation_min_hz)) if step >= int(opt_config.freeze_freq_first_steps) else frequencies_hz.new_tensor(0.0)  # 间隔 / Separation
+        # Weight-entropy regulariser. H(w) = -Σ w log(w + 1e-12), max at
+        # uniform distribution (H = log K). Subtracting it from the loss
+        # pulls weights toward uniform when nothing else discriminates the
+        # frequencies, preventing collapse to a single dominant mode. Only
+        # active after freq/weights unfreeze. /
+        # 权重熵正则：仅在 freq/weight 解冻后启用；H 在均匀时最大
+        if step >= int(opt_config.freeze_freq_first_steps) and float(opt_config.weight_entropy_weight) > 0.0:
+            weight_entropy = -(weights * torch.log(weights + 1.0e-12)).sum()  # 熵 / Entropy
+        else:
+            weight_entropy = weights.new_tensor(0.0)  # 冻结期间不算 / Skip while frozen
 
         loss = (
             recog_loss
@@ -288,6 +312,7 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
             + float(opt_config.theta_smoothness_weight) * theta_smooth
             + float(opt_config.freq_separation_weight) * freq_sep
             + float(opt_config.sinkhorn_weight) * sinkhorn_part
+            - float(opt_config.weight_entropy_weight) * weight_entropy  # 减熵 = 鼓励均匀 / Subtract entropy = encourage uniform
         )  # 总损失 / Total loss
 
         loss.backward()  # 反传 / Backprop

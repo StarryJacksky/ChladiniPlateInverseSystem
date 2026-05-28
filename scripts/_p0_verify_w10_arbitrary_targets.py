@@ -92,7 +92,7 @@ def save_target(name: str, arr: np.ndarray) -> Path:
     return npy_path
 
 
-def run_w10(target_path: Path, candidate_id: str, *, baseline: bool, num_steps: int = 200) -> dict:
+def run_w10(target_path: Path, candidate_id: str, *, baseline: str, num_steps: int = 200) -> dict:
     """Run W10 surrogate-only and return its summary dict."""
     cmd = [
         sys.executable, str(PROJECT_ROOT / "scripts" / "run_w10_anisotropy.py"),
@@ -107,17 +107,29 @@ def run_w10(target_path: Path, candidate_id: str, *, baseline: bool, num_steps: 
         "--f-min-hz", "120.0",
         "--f-max-hz", "1200.0",
     ]
-    if baseline:
-        # Baseline: explicitly disable annealing + dilation (matches pre-P0 behaviour)
-        # sigma_anneal_start=None => not passed
-        cmd.extend(["--target-dilation-px", "0"])
-    else:
-        # P0 fix: sigma 0.20 -> 0.05 over 100 steps, dilate 2 px
+    if baseline == "raw":
+        # Pure baseline: no P0, no B+C
+        cmd.extend(["--target-dilation-px", "0", "--recall-weight", "0.5", "--weight-entropy-weight", "0.0"])
+    elif baseline == "p0":
+        # P0 only: sigma anneal + dilation, old recall, no entropy
         cmd.extend([
             "--sigma-anneal-start", "0.20",
             "--sigma-anneal-steps", "100",
             "--target-dilation-px", "2",
+            "--recall-weight", "0.5",
+            "--weight-entropy-weight", "0.0",
         ])
+    elif baseline == "p0_bc":
+        # P0 + B (entropy 0.10) + C (recall 1.5)
+        cmd.extend([
+            "--sigma-anneal-start", "0.20",
+            "--sigma-anneal-steps", "100",
+            "--target-dilation-px", "2",
+            "--recall-weight", "1.5",
+            "--weight-entropy-weight", "0.10",
+        ])
+    else:
+        raise ValueError(f"unknown baseline={baseline}")
     env = os.environ.copy()
     env["OMP_NUM_THREADS"] = "1"
     env["MKL_NUM_THREADS"] = "1"
@@ -158,35 +170,39 @@ def main() -> int:
         area_frac = float(arr.sum()) / float(arr.size)
         print(f"  pixels={int(arr.sum())} / {arr.size}  area_frac={area_frac:.2%}")
 
-        print(f"  [baseline] running...")
-        b = run_w10(target_path, candidate_id=f"_p0v_{name}_baseline", baseline=True, num_steps=200)
-        print(f"  [baseline] enrichment={b.get('enrichment', 0):.3e}  recall={b.get('recall', 0):.3f}  elapsed={b.get('elapsed_s', 0):.1f}s")
+        print(f"  [P0]    running...")
+        p = run_w10(target_path, candidate_id=f"_p0v_{name}_p0", baseline="p0", num_steps=200)
+        print(f"  [P0]    enr={p.get('enrichment', 0):.3e}  recall={p.get('recall', 0):.3f}  eff_count={p.get('effective_count', 0):.2f}  elapsed={p.get('elapsed_s', 0):.1f}s")
 
-        print(f"  [P0 fix]   running...")
-        p = run_w10(target_path, candidate_id=f"_p0v_{name}_p0fix", baseline=False, num_steps=200)
-        print(f"  [P0 fix]   enrichment={p.get('enrichment', 0):.3e}  recall={p.get('recall', 0):.3f}  elapsed={p.get('elapsed_s', 0):.1f}s")
+        print(f"  [P0+BC] running...")
+        bc = run_w10(target_path, candidate_id=f"_p0v_{name}_p0bc", baseline="p0_bc", num_steps=200)
+        print(f"  [P0+BC] enr={bc.get('enrichment', 0):.3e}  recall={bc.get('recall', 0):.3f}  eff_count={bc.get('effective_count', 0):.2f}  elapsed={bc.get('elapsed_s', 0):.1f}s")
 
         results[name] = {
             "area_frac": area_frac,
-            "baseline": b,
-            "p0_fix": p,
-            "uplift_x": (float(p.get("enrichment", 0)) / max(float(b.get("enrichment", 0)), 1e-40)) if not b.get("failed") and not p.get("failed") else None,
+            "p0": p,
+            "p0_bc": bc,
         }
 
     out_json = OUTPUT_DIR / "p0_verify_results.json"
     out_json.write_text(json.dumps(results, indent=2))
     print(f"\nSaved: {out_json}")
 
-    print("\n" + "=" * 78)
-    print(f"{'Target':<16} {'AreaFrac':>9} {'BaselineEnr':>14} {'P0EnrEnr':>14} {'Uplift':>10}")
-    print("=" * 78)
+    print("\n" + "=" * 94)
+    print(f"{'Target':<16} {'AreaFrac':>9} | {'P0 enr':>8} {'P0 rec':>8} {'P0 effC':>8} | {'BC enr':>8} {'BC rec':>8} {'BC effC':>8}")
+    print("=" * 94)
     for name, r in results.items():
-        b_enr = r["baseline"].get("enrichment", 0) if not r["baseline"].get("failed") else float("nan")
-        p_enr = r["p0_fix"].get("enrichment", 0) if not r["p0_fix"].get("failed") else float("nan")
-        uplift = r["uplift_x"]
-        uplift_str = f"{uplift:.2e}x" if uplift is not None else "n/a"
-        print(f"{name:<16} {r['area_frac']:>8.2%} {b_enr:>14.3e} {p_enr:>14.3e} {uplift_str:>10}")
-    print("=" * 78)
+        p, bc = r["p0"], r["p0_bc"]
+        if p.get("failed"):
+            p_enr = p_rec = p_ec = float("nan")
+        else:
+            p_enr, p_rec, p_ec = p["enrichment"], p["recall"], p["effective_count"]
+        if bc.get("failed"):
+            bc_enr = bc_rec = bc_ec = float("nan")
+        else:
+            bc_enr, bc_rec, bc_ec = bc["enrichment"], bc["recall"], bc["effective_count"]
+        print(f"{name:<16} {r['area_frac']:>8.2%} | {p_enr:>8.2f} {p_rec:>8.3f} {p_ec:>8.2f} | {bc_enr:>8.2f} {bc_rec:>8.3f} {bc_ec:>8.2f}")
+    print("=" * 94)
     return 0
 
 
