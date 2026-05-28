@@ -3535,11 +3535,22 @@
         // 前端逻辑 / Frontend logic
         }
         // 前端逻辑 / Frontend logic
-        resultsList.innerHTML = emptyState("No legacy ranking", "Production-pipeline runs are listed in the Production Runs panel above — click a row to inspect.");
-        // 不要把 candidateDetail 抹掉，否则会盖掉刚加载的 production detail / Do not wipe candidateDetail; preserve any production detail already loaded
+        // Results list 也用 production runs 喂数据，避免视觉上"空" / Mirror production runs into the Results list so the panel never looks empty
+        renderResultsListFromProductionRuns(latestProductionRuns);
+        // Candidate 详情：没有手动选中时，自动加载最强的那次 production run / Auto-load the strongest production run when nothing is selected
         if (!activeCandidateId) {
           // 前端逻辑 / Frontend logic
-          candidateDetail.innerHTML = emptyState("No candidate selected", "Click a row in Production Runs to inspect that run's metrics, target / achieved Chladni images, thickness field, and (when COMSOL ran) eigenmode previews.");
+          const auto = pickBestProductionRun(latestProductionRuns);
+          // 前端逻辑 / Frontend logic
+          if (auto && auto.candidate_id) {
+            // 前端逻辑 / Frontend logic
+            loadProductionRunDetail(auto.candidate_id, false);
+          // 前端逻辑 / Frontend logic
+          } else {
+            // 前端逻辑 / Frontend logic
+            candidateDetail.innerHTML = emptyState("No candidate selected", "Click a row in Production Runs / Results to inspect that run's metrics, target / achieved Chladni images, thickness field, and (when COMSOL ran) eigenmode previews.");
+          // 前端逻辑 / Frontend logic
+          }
         // 前端逻辑 / Frontend logic
         }
         // 前端逻辑 / Frontend logic
@@ -3784,6 +3795,77 @@
     }
 
     // 渲染生产 pipeline 运行列表 / Render the production-pipeline run list (compact 2-col rows)
+    // 选出 phase2 > phase1 > surrogate 最强的那次 production run / Pick the strongest production run by enrichment
+    function pickBestProductionRun(rows) {
+      // 前端逻辑 / Frontend logic
+      if (!rows || !rows.length) { return null; }
+      // 前端逻辑 / Frontend logic
+      const scoreOf = (r) => Number(r.phase2_best_enrichment ?? r.phase1_broad_enrich ?? r.surrogate_enrichment ?? 0);
+      // 前端逻辑 / Frontend logic
+      return [...rows].sort((a, b) => scoreOf(b) - scoreOf(a))[0];
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 把 production runs 渲染到主 Results list（legacy GA 数据为空时使用） / Render production runs into the main Results list when legacy GA ranking is empty
+    function renderResultsListFromProductionRuns(rows) {
+      // 前端逻辑 / Frontend logic
+      if (!rows || !rows.length) {
+        // 前端逻辑 / Frontend logic
+        resultSummary.textContent = "0 runs";
+        // 前端逻辑 / Frontend logic
+        resultsList.innerHTML = emptyState("No runs yet", "Hit Run on the Run tab. Completed production-pipeline runs will list here with their headline enrichment metric.");
+        // 前端逻辑 / Frontend logic
+        return;
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      resultSummary.textContent = `${rows.length} production run${rows.length === 1 ? "" : "s"}`;
+      // 前端逻辑 / Frontend logic
+      const fmt = (v, d = 2) => (v === null || v === undefined || Number.isNaN(Number(v))) ? "–" : Number(v).toFixed(d);
+      // 前端逻辑 / Frontend logic
+      const scoreOf = (r) => Number(r.phase2_best_enrichment ?? r.phase1_broad_enrich ?? r.surrogate_enrichment ?? 0);
+      // 前端逻辑 / Frontend logic
+      const sorted = [...rows].sort((a, b) => scoreOf(b) - scoreOf(a));
+      // 前端逻辑 / Frontend logic
+      resultsList.innerHTML = sorted.slice(0, 10).map((row, index) => {
+        // 前端逻辑 / Frontend logic
+        const head = row.phase2_best_enrichment ?? row.phase1_broad_enrich ?? row.surrogate_enrichment;
+        // 前端逻辑 / Frontend logic
+        const label = row.phase2_best_enrichment != null
+          // 前端逻辑 / Frontend logic
+          ? "phase 2"
+          // 前端逻辑 / Frontend logic
+          : (row.phase1_broad_enrich != null ? "phase 1" : "surrogate");
+        // 前端逻辑 / Frontend logic
+        const cid = escapeText(row.candidate_id || "");
+        // 前端逻辑 / Frontend logic
+        const meta = [];
+        // 前端逻辑 / Frontend logic
+        meta.push(`stage ${escapeText(row.stage_reached || "?")}`);
+        // 前端逻辑 / Frontend logic
+        if (row.phase1_broad_recall != null) { meta.push(`p1 rec ${fmt(row.phase1_broad_recall)}`); }
+        // 前端逻辑 / Frontend logic
+        if (row.surrogate_enrichment != null) { meta.push(`surr ${fmt(row.surrogate_enrichment)}×`); }
+        // 前端逻辑 / Frontend logic
+        meta.push(escapeText(row.modified_at || ""));
+        // 用 data-production-id 让 click handler 路由到 production detail / Tag with data-production-id so the click handler routes to production detail
+        return `
+          <!-- 模板内容 / Template content --><button class="result-row" type="button" data-production-id="${cid}" data-candidate-id="${cid}" title="${cid}">
+            <!-- 模板内容 / Template content --><div class="result-row-main">
+              <!-- 模板内容 / Template content --><strong class="result-row-title">${index + 1}. ${cid}</strong>
+              <!-- 模板内容 / Template content --><span class="result-row-meta">${meta.join(" · ")}</span>
+            <!-- 模板内容 / Template content --></div>
+            <!-- 模板内容 / Template content --><div class="result-row-side">
+              <!-- 模板内容 / Template content --><strong>${fmt(head)}×</strong>
+              <!-- 模板内容 / Template content -->${label} enr
+            <!-- 模板内容 / Template content --></div>
+          <!-- 模板内容 / Template content --></button>
+        <!-- 模板内容 / Template content -->`;
+      // 前端逻辑 / Frontend logic
+      }).join("");
+    // 前端逻辑 / Frontend logic
+    }
+
     function renderProductionRuns(rows) {
       // 前端逻辑 / Frontend logic
       if (!productionRunsList || !productionRunsSummary) {
@@ -3896,6 +3978,14 @@
         renderProductionRuns(latestProductionRuns);
         // 前端逻辑 / Frontend logic
         renderRankingRows();
+        // legacy history 为空时，靠 production-runs 兜底显示 / Refresh history so the production-run fallback kicks in when legacy GA history is empty
+        if (!latestGenerationHistory || !latestGenerationHistory.length) {
+          // 前端逻辑 / Frontend logic
+          renderHistoryTrend(latestGenerationHistory || []);
+          // 前端逻辑 / Frontend logic
+          renderHistory(latestGenerationHistory || []);
+        // 前端逻辑 / Frontend logic
+        }
       // 前端逻辑 / Frontend logic
       } catch (error) {
         // 静默失败 / Silent failure
@@ -4192,14 +4282,111 @@
     // 前端逻辑 / Frontend logic
     }
 
+    // History trend：legacy GA 数据为空时，用 production-runs 按时间顺序画一条 enrichment 趋势 / Render a chronological enrichment trend from production runs when legacy GA history is empty
+    function renderHistoryTrendFromProductionRuns(rows) {
+      // 前端逻辑 / Frontend logic
+      if (!rows || !rows.length) {
+        // 前端逻辑 / Frontend logic
+        historyTrend.textContent = "No trend yet";
+        // 前端逻辑 / Frontend logic
+        return;
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      const scoreOf = (r) => Number(r.phase2_best_enrichment ?? r.phase1_broad_enrich ?? r.surrogate_enrichment ?? 0);
+      // 前端逻辑 / Frontend logic
+      const sorted = [...rows].sort((a, b) => new Date(a.modified_at || 0).getTime() - new Date(b.modified_at || 0).getTime());
+      // 前端逻辑 / Frontend logic
+      const recent = sorted.slice(-8);
+      // 前端逻辑 / Frontend logic
+      const peak = Math.max(...sorted.map(scoreOf), 1);
+      // 前端逻辑 / Frontend logic
+      const bestRun = [...sorted].sort((a, b) => scoreOf(b) - scoreOf(a))[0];
+      // 前端逻辑 / Frontend logic
+      const rowMarkup = recent.map((r, i) => {
+        // 前端逻辑 / Frontend logic
+        const v = scoreOf(r);
+        // 前端逻辑 / Frontend logic
+        const width = Math.max(2, Math.round((v / peak) * 100));
+        // 前端逻辑 / Frontend logic
+        const cid = escapeText(r.candidate_id || "");
+        // 前端逻辑 / Frontend logic
+        return `
+          <!-- 模板内容 / Template content --><button class="trend-row" type="button" data-production-id="${cid}" data-candidate-id="${cid}" title="${cid}">
+            <!-- 模板内容 / Template content --><strong>R${recent.length - i}</strong>
+            <!-- 模板内容 / Template content --><span class="trend-track"><span class="trend-fill" style="width:${width}%"></span></span>
+            <!-- 模板内容 / Template content --><span>${v.toFixed(2)}× · ${cid}</span>
+          <!-- 模板内容 / Template content --></button>
+        <!-- 模板内容 / Template content -->`;
+      // 前端逻辑 / Frontend logic
+      }).join("");
+      // 前端逻辑 / Frontend logic
+      historyTrend.innerHTML = `
+        <!-- 模板内容 / Template content --><div class="trend-head"><span>Production-run enrichment trend</span><span>best ${escapeText(bestRun.candidate_id || "")} · ${scoreOf(bestRun).toFixed(2)}×</span></div>
+        <!-- 模板内容 / Template content -->${rowMarkup}
+      <!-- 模板内容 / Template content -->`;
+    // 前端逻辑 / Frontend logic
+    }
+
+    // History list：legacy GA 数据为空时，列出 production runs / List production runs when legacy GA history is empty
+    function renderHistoryFromProductionRuns(rows) {
+      // 前端逻辑 / Frontend logic
+      if (!rows || !rows.length) {
+        // 前端逻辑 / Frontend logic
+        historyList.textContent = "No history yet";
+        // 前端逻辑 / Frontend logic
+        historySummary.textContent = "0 runs";
+        // 前端逻辑 / Frontend logic
+        return;
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      historySummary.textContent = `${rows.length} production run${rows.length === 1 ? "" : "s"}`;
+      // 前端逻辑 / Frontend logic
+      const fmt = (v, d = 2) => (v === null || v === undefined || Number.isNaN(Number(v))) ? "–" : Number(v).toFixed(d);
+      // 前端逻辑 / Frontend logic
+      const sorted = [...rows].sort((a, b) => new Date(b.modified_at || 0).getTime() - new Date(a.modified_at || 0).getTime());
+      // 前端逻辑 / Frontend logic
+      historyList.innerHTML = sorted.slice(0, 10).map((r) => {
+        // 前端逻辑 / Frontend logic
+        const head = r.phase2_best_enrichment ?? r.phase1_broad_enrich ?? r.surrogate_enrichment;
+        // 前端逻辑 / Frontend logic
+        const label = r.phase2_best_enrichment != null
+          // 前端逻辑 / Frontend logic
+          ? "phase 2"
+          // 前端逻辑 / Frontend logic
+          : (r.phase1_broad_enrich != null ? "phase 1" : "surrogate");
+        // 前端逻辑 / Frontend logic
+        const cid = escapeText(r.candidate_id || "");
+        // 前端逻辑 / Frontend logic
+        return `
+          <!-- 模板内容 / Template content --><button class="history-row" type="button" data-production-id="${cid}" data-candidate-id="${cid}">
+            <!-- 模板内容 / Template content --><strong>${cid}</strong>
+            <!-- 模板内容 / Template content --><span>stage ${escapeText(r.stage_reached || "?")} · sr ${fmt(r.stiffness_ratio, 2)} · ${escapeText(r.modified_at || "")}</span>
+            <!-- 模板内容 / Template content --><span>${label} enr ${fmt(head)}× · surrogate ${fmt(r.surrogate_enrichment)}×${r.phase1_broad_recall !== null && r.phase1_broad_recall !== undefined ? " · p1 rec " + fmt(r.phase1_broad_recall) : ""}</span>
+          <!-- 模板内容 / Template content --></button>
+        <!-- 模板内容 / Template content -->`;
+      // 前端逻辑 / Frontend logic
+      }).join("");
+    // 前端逻辑 / Frontend logic
+    }
+
     // 前端逻辑 / Frontend logic
     function renderHistoryTrend(historyRows) {
       // 前端逻辑 / Frontend logic
       const scoredRows = historyRows.filter((row) => row.best_candidate).sort((a, b) => Number(a.generation || 0) - Number(b.generation || 0));
       // 前端逻辑 / Frontend logic
       if (!scoredRows.length) {
+        // legacy 空 → 用 production runs 兜底 / Legacy empty → fall back to production runs
+        if (latestProductionRuns && latestProductionRuns.length) {
+          // 前端逻辑 / Frontend logic
+          renderHistoryTrendFromProductionRuns(latestProductionRuns);
         // 前端逻辑 / Frontend logic
-        historyTrend.textContent = "No scored trend yet";
+        } else {
+          // 前端逻辑 / Frontend logic
+          historyTrend.textContent = "No scored trend yet";
+        // 前端逻辑 / Frontend logic
+        }
         // 前端逻辑 / Frontend logic
         return;
       // 前端逻辑 / Frontend logic
@@ -4237,15 +4424,25 @@
       // 前端逻辑 / Frontend logic
       const filteredRows = filterGenerationHistory(historyRows);
       // 前端逻辑 / Frontend logic
-      updateHistorySummary(historyRows, filteredRows);
-      // 前端逻辑 / Frontend logic
       if (!historyRows.length) {
+        // legacy GA 数据为空 → 显示 production-runs 列表 / Legacy GA history empty → render production-runs list instead
+        if (latestProductionRuns && latestProductionRuns.length) {
+          // 前端逻辑 / Frontend logic
+          renderHistoryFromProductionRuns(latestProductionRuns);
         // 前端逻辑 / Frontend logic
-        historyList.textContent = "No history yet";
+        } else {
+          // 前端逻辑 / Frontend logic
+          updateHistorySummary(historyRows, filteredRows);
+          // 前端逻辑 / Frontend logic
+          historyList.textContent = "No history yet";
+        // 前端逻辑 / Frontend logic
+        }
         // 前端逻辑 / Frontend logic
         return;
       // 前端逻辑 / Frontend logic
       }
+      // 前端逻辑 / Frontend logic
+      updateHistorySummary(historyRows, filteredRows);
       // 前端逻辑 / Frontend logic
       if (!filteredRows.length) {
         // 前端逻辑 / Frontend logic
@@ -5945,6 +6142,18 @@
     tabButtons.forEach((button) => button.addEventListener("click", () => selectSidebarTab(button.dataset.tabTarget)));
     // 前端逻辑 / Frontend logic
     resultsList.addEventListener("click", (event) => {
+      // 优先路由 production runs 到 detail loader / Route production rows to the production detail loader first
+      const prod = event.target.closest("[data-production-id]");
+      // 前端逻辑 / Frontend logic
+      if (prod && prod.dataset.productionId) {
+        // 前端逻辑 / Frontend logic
+        event.preventDefault();
+        // 前端逻辑 / Frontend logic
+        loadProductionRunDetail(prod.dataset.productionId);
+        // 前端逻辑 / Frontend logic
+        return;
+      // 前端逻辑 / Frontend logic
+      }
       // 前端逻辑 / Frontend logic
       const button = event.target.closest("[data-candidate-id]");
       // 前端逻辑 / Frontend logic
@@ -5987,6 +6196,18 @@
     });
     // 前端逻辑 / Frontend logic
     historyList.addEventListener("click", (event) => {
+      // 优先路由 production runs / Route production rows first
+      const prod = event.target.closest("[data-production-id]");
+      // 前端逻辑 / Frontend logic
+      if (prod && prod.dataset.productionId) {
+        // 前端逻辑 / Frontend logic
+        event.preventDefault();
+        // 前端逻辑 / Frontend logic
+        loadProductionRunDetail(prod.dataset.productionId);
+        // 前端逻辑 / Frontend logic
+        return;
+      // 前端逻辑 / Frontend logic
+      }
       // 前端逻辑 / Frontend logic
       const button = event.target.closest("[data-candidate-id]");
       // 前端逻辑 / Frontend logic
@@ -6005,6 +6226,18 @@
     });
     // 前端逻辑 / Frontend logic
     historyTrend.addEventListener("click", (event) => {
+      // 优先路由 production runs / Route production rows first
+      const prod = event.target.closest("[data-production-id]");
+      // 前端逻辑 / Frontend logic
+      if (prod && prod.dataset.productionId) {
+        // 前端逻辑 / Frontend logic
+        event.preventDefault();
+        // 前端逻辑 / Frontend logic
+        loadProductionRunDetail(prod.dataset.productionId);
+        // 前端逻辑 / Frontend logic
+        return;
+      // 前端逻辑 / Frontend logic
+      }
       // 前端逻辑 / Frontend logic
       const button = event.target.closest("[data-candidate-id]");
       // 前端逻辑 / Frontend logic
