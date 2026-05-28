@@ -25,6 +25,8 @@ from src.target.preprocess_target import preprocess_target  # 导入目标预处
 
 
 CANDIDATE_ID_RE = re.compile(r"^candidate_\d{3}_\d{4}$")  # 定义候选编号格式 / Define candidate-id format
+PRODUCTION_CANDIDATE_RE = re.compile(r"^[A-Za-z0-9_\-]{1,80}$")  # 生产候选编号格式（更宽松） / Looser production candidate-id format
+PRODUCTION_ASSET_RE = re.compile(r"^[A-Za-z0-9_\-]+\.(?:png|svg)$")  # 资源文件名格式 / Asset filename format
 
 
 MATERIAL_LIMITS = {  # 定义前端材料参数范围 / Define frontend material parameter ranges
@@ -653,6 +655,102 @@ def load_production_runs() -> list[dict]:  # 列出所有生产 pipeline 完成�
     return rows  # 返回 / Return
 
 
+def _list_production_comsol_modes(config: dict, candidate_id: str) -> list[dict]:  # 列出生产候选的 COMSOL 模态预览 / List COMSOL mode previews for a production candidate
+    eig_dir = Path(config["paths"]["comsol_exports_dir"]) / f"prod_eig_{candidate_id}"  # 生产 eigfreq 目录 / Production eigfreq directory
+    previews_dir = eig_dir / "previews"  # 预览目录 / Previews directory
+    if not previews_dir.exists():  # 无预览 / No previews
+        return []  # 返回空 / Return empty
+    rows: list[dict] = []  # 收集行 / Collect rows
+    # 读取频率表帮助标注 / Read frequency table for labelling
+    freqs_path = eig_dir / "eigenfrequencies.csv"  # 频率 CSV / Frequencies CSV
+    freq_for_mode: dict[int, float] = {}  # 模态频率映射 / Mode→freq map
+    if freqs_path.exists():  # 文件存在 / Exists
+        try:  # 容错 / Tolerate
+            import numpy as np  # 延迟导入 / Lazy import
+            arr = np.loadtxt(freqs_path, delimiter=",", skiprows=1)  # 加载 / Load
+            if arr.ndim == 1:  # 一维 / 1D
+                arr = arr.reshape(-1, 2)  # 重塑 / Reshape
+            for row in arr:  # 遍历 / Iterate
+                freq_for_mode[int(row[0])] = float(row[1])  # 填表 / Fill table
+        except Exception:  # 解析失败 / Parse failure
+            pass  # / Skip
+    for path in sorted(previews_dir.glob("mode_*.png")):  # 遍历模态预览 / Iterate mode previews
+        match = re.match(r"^mode_(\d+)\.png$", path.name)  # 匹配编号 / Match number
+        if not match:  # 不匹配 / Skip non-matching
+            continue  # / Continue
+        mode_num = int(match.group(1))  # 模态编号 / Mode number
+        rows.append({  # 一条 / Single row
+            "mode": mode_num,
+            "frequency_hz": freq_for_mode.get(mode_num),
+            "name": path.name,
+            "url": f"/assets/production/{candidate_id}/{path.name}",
+        })
+    return rows  # 返回 / Return
+
+
+def load_production_run_detail(config: dict, candidate_id: str) -> dict:  # 读取生产 pipeline 候选详情 / Load production-run detail
+    from src.visualisation.plot_amplitude import render_production_pngs  # 延迟导入 / Lazy import
+    from src.visualisation.plot_thickness import render_candidate_preview  # 延迟导入 / Lazy import
+    valid_id = validate_production_candidate_id(candidate_id)  # 校验编号 / Validate id
+    base = project_root() / "reports" / "production" / valid_id  # 生产输出目录 / Production output dir
+    summary_path = base / "production_summary.json"  # 摘要路径 / Summary path
+    if not summary_path.exists():  # 不存在 / Missing
+        raise FileNotFoundError(f"Production run not found: {valid_id}. / 生产运行不存在：{valid_id}。")  # 抛出 / Raise
+
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))  # 解析 / Parse
+    digest = _summarise_production_run(summary, base, summary_path)  # 压缩 / Distil
+
+    rendered = render_production_pngs(base)  # 渲染 .npy → .png / Render arrays
+    previews = {name: f"/assets/production/{valid_id}/{name}" for name in rendered.keys()}  # 预览 URL / Preview URLs
+
+    candidate_dir = Path(config["paths"]["candidates_dir"]) / valid_id  # 候选目录 / Candidate directory
+    thickness_url = ""  # 厚度预览 URL / Thickness preview URL
+    if (candidate_dir / "H.csv").exists():  # 有厚度矩阵 / Has thickness matrix
+        thickness_png = candidate_dir / "preview_thickness.png"  # 厚度 PNG / Thickness PNG
+        if output_needs_refresh(thickness_png, [candidate_dir / "H.csv"]):  # 过期检测 / Stale check
+            try:  # 容错 / Tolerate
+                render_candidate_preview(candidate_dir)  # 渲染 / Render
+            except Exception:  # 渲染失败 / Render failure
+                pass  # / Continue
+        if thickness_png.exists():  # 存在 / Exists
+            thickness_url = f"/assets/production/{valid_id}/preview_thickness.png"  # URL / URL
+
+    comsol_modes = _list_production_comsol_modes(config, valid_id)  # COMSOL 模态预览 / COMSOL mode previews
+
+    return {  # 详情字典 / Detail dict
+        "candidate_id": valid_id,
+        "summary": summary,
+        "digest": digest,
+        "previews": previews,
+        "thickness_preview": thickness_url,
+        "comsol_modes": comsol_modes,
+        "summary_path": str(summary_path),
+        "output_dir": str(base),
+    }
+
+
+def resolve_production_asset(config: dict, candidate_id: str, asset_name: str) -> Path | None:  # 解析生产候选的资源路径 / Resolve a production candidate's asset path
+    if not PRODUCTION_ASSET_RE.match(asset_name or ""):  # 名称校验 / Name validation
+        return None  # 不合法 / Invalid
+    try:  # 编号校验 / Id validation
+        valid_id = validate_production_candidate_id(candidate_id)  # 校验 / Validate
+    except ValueError:  # 失败 / Invalid
+        return None  # / None
+    base_dirs = [  # 候选目录列表，按优先级 / Candidate directories by priority
+        project_root() / "reports" / "production" / valid_id / "previews",  # production 预览 / Production previews
+        Path(config["paths"]["candidates_dir"]) / valid_id,  # 候选目录（厚度图） / Candidate dir (thickness)
+        Path(config["paths"]["comsol_exports_dir"]) / f"prod_eig_{valid_id}" / "previews",  # COMSOL 模态 / COMSOL modes
+    ]
+    for base_dir in base_dirs:  # 顺序查找 / Sequential lookup
+        candidate = base_dir / asset_name  # 候选路径 / Candidate path
+        try:  # 容错 / Tolerate
+            if candidate.is_file():  # 存在且为文件 / Exists and is file
+                return candidate  # 返回 / Return
+        except OSError:  # 文件系统错误 / Filesystem error
+            continue  # / Continue
+    return None  # 未找到 / Not found
+
+
 def candidate_generation(candidate_path: Path, metadata: dict) -> int:  # 读取候选代数 / Read candidate generation
     if metadata.get("generation") is not None:  # 检查元数据是否包含代数 / Check whether metadata has generation
         return int(metadata["generation"])  # 返回元数据代数 / Return metadata generation
@@ -912,6 +1010,12 @@ def delete_artifact_cleanup_files(config: dict, confirm: bool) -> dict:  # 删�
 def validate_candidate_id(candidate_id: str) -> str:  # 校验候选编号 / Validate candidate id
     if not CANDIDATE_ID_RE.match(candidate_id):  # 检查候选编号格式 / Check candidate-id format
         raise ValueError("Invalid candidate id. / 候选编号格式无效。")  # 抛出格式错误 / Raise format error
+    return candidate_id  # 返回候选编号 / Return candidate id
+
+
+def validate_production_candidate_id(candidate_id: str) -> str:  # 校验生产 pipeline 候选编号 / Validate production candidate id
+    if not candidate_id or not PRODUCTION_CANDIDATE_RE.match(candidate_id):  # 检查格式 / Check format
+        raise ValueError("Invalid production candidate id. / 生产候选编号格式无效。")  # 抛出格式错误 / Raise format error
     return candidate_id  # 返回候选编号 / Return candidate id
 
 
@@ -1371,6 +1475,17 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 except Exception as exc:  # 处理异常 / Handle exception
                     self.send_json({"error": str(exc), "runs": []}, HTTPStatus.INTERNAL_SERVER_ERROR)  # / 500
                 return  # 结束请求 / Finish request
+            if route == "/api/production-run-detail":  # 单个生产运行的详情 / Single production-run detail
+                try:  # 容错 / Tolerate
+                    candidate_id = query.get("id", [""])[0]  # 读取编号 / Read id
+                    self.send_json(load_production_run_detail(config, candidate_id))  # 返回详情 / Return detail
+                except FileNotFoundError as exc:  # 不存在 / Missing
+                    self.send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)  # 404 / 404
+                except ValueError as exc:  # 编号无效 / Invalid id
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                except Exception as exc:  # 其他错误 / Other errors
+                    self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束请求 / Finish request
             if route == "/api/logs":  # 判断是否请求运行日志 / Check run-log request
                 self.send_json(load_log_tails(config))  # 返回日志尾部 / Return log tails
                 return  # 结束请求 / Finish request
@@ -1448,6 +1563,15 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                     return  # 结束请求 / Finish request
                 self.send_file(Path(config["paths"]["candidates_dir"]) / candidate_id / asset_name, "image/png")  # 返回厚度预览 / Return thickness preview
                 return  # 结束请求 / Finish request
+            if route.startswith("/assets/production/"):  # 判断是否请求生产候选资源 / Check production-candidate asset request
+                parts = route.split("/")  # 拆分 / Split
+                if len(parts) == 5:  # /assets/production/<id>/<name> / Path shape check
+                    asset_path = resolve_production_asset(config, parts[3], parts[4])  # 解析 / Resolve
+                    if asset_path is not None:  # 命中 / Hit
+                        self.send_file(asset_path, "image/png")  # 返回 PNG / Return PNG
+                        return  # 结束 / Finish
+                self.send_json({"error": "Asset not found. / 资源不存在。"}, HTTPStatus.NOT_FOUND)  # 404 / 404
+                return  # 结束 / Finish
             if route.startswith("/assets/export/"):  # 判断是否请求导出资源 / Check export asset request
                 parts = route.split("/")  # 拆分路径 / Split path
                 candidate_id = validate_candidate_id(parts[3]) if len(parts) == 6 else ""  # 读取候选编号 / Read candidate id

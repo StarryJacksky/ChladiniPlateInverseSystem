@@ -3524,12 +3524,24 @@
       updateStudioStrip();
       // 前端逻辑 / Frontend logic
       if (!latestRanking.length) {
+        // legacy GA ranking 空。若有生产运行就用它喂 Result Overview，否则给提示。 / No legacy GA ranking; fall back to production runs if any
+        if (latestProductionRuns && latestProductionRuns.length) {
+          // 前端逻辑 / Frontend logic
+          renderProductionResultOverview(latestProductionRuns);
         // 前端逻辑 / Frontend logic
-        resultOverview.innerHTML = emptyState("No ranking yet", "Run a workflow or score exported COMSOL modes to populate results.");
+        } else {
+          // 前端逻辑 / Frontend logic
+          resultOverview.innerHTML = emptyState("No runs yet", "Hit Run on the Run tab. Completed runs will appear here and in the Production Runs panel above.");
         // 前端逻辑 / Frontend logic
-        resultsList.innerHTML = emptyState("No candidates", "Ranking data is empty.");
+        }
         // 前端逻辑 / Frontend logic
-        candidateDetail.innerHTML = emptyState("No candidate selected", "Select a ranked candidate or a history entry to inspect details.");
+        resultsList.innerHTML = emptyState("No legacy ranking", "Production-pipeline runs are listed in the Production Runs panel above — click a row to inspect.");
+        // 不要把 candidateDetail 抹掉，否则会盖掉刚加载的 production detail / Do not wipe candidateDetail; preserve any production detail already loaded
+        if (!activeCandidateId) {
+          // 前端逻辑 / Frontend logic
+          candidateDetail.innerHTML = emptyState("No candidate selected", "Click a row in Production Runs to inspect that run's metrics, target / achieved Chladni images, thickness field, and (when COMSOL ran) eigenmode previews.");
+        // 前端逻辑 / Frontend logic
+        }
         // 前端逻辑 / Frontend logic
         return;
       // 前端逻辑 / Frontend logic
@@ -3771,7 +3783,7 @@
     // 前端逻辑 / Frontend logic
     }
 
-    // 渲染生产 pipeline 运行列表 / Render the production-pipeline run list
+    // 渲染生产 pipeline 运行列表 / Render the production-pipeline run list (compact 2-col rows)
     function renderProductionRuns(rows) {
       // 前端逻辑 / Frontend logic
       if (!productionRunsList || !productionRunsSummary) {
@@ -3793,60 +3805,76 @@
       const fmt = (v, digits = 2) => (v === null || v === undefined || Number.isNaN(Number(v))) ? "–" : Number(v).toFixed(digits);
       // 前端逻辑 / Frontend logic
       productionRunsList.innerHTML = rows.map((row) => {
+        // 主指标：优先 phase2 > phase1 > surrogate / Highlight metric: phase2 > phase1 > surrogate
+        let headlineValue = row.surrogate_enrichment;
         // 前端逻辑 / Frontend logic
-        const cells = [];
-        // 顶部行：候选 + 阶段 + 材料 / Top row: candidate + stage + material
-        cells.push(`<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:baseline"><strong>${escapeText(row.candidate_id || "")}</strong><span class="status">stage: ${escapeText(row.stage_reached || "?")}</span><span class="status">sr=${fmt(row.stiffness_ratio, 2)}, shear=${fmt(row.shear_ratio, 2)}</span><span class="status">${escapeText(row.modified_at || "")}</span></div>`);
-        // surrogate 指标 / Surrogate metrics
+        let headlineLabel = "surrogate";
+        // 前端逻辑 / Frontend logic
+        if (row.phase1_broad_enrich !== null && row.phase1_broad_enrich !== undefined) {
+          // 前端逻辑 / Frontend logic
+          headlineValue = row.phase1_broad_enrich;
+          // 前端逻辑 / Frontend logic
+          headlineLabel = "phase 1";
+        // 前端逻辑 / Frontend logic
+        }
+        // 前端逻辑 / Frontend logic
+        if (row.phase2_best_enrichment !== null && row.phase2_best_enrichment !== undefined) {
+          // 前端逻辑 / Frontend logic
+          headlineValue = row.phase2_best_enrichment;
+          // 前端逻辑 / Frontend logic
+          headlineLabel = "phase 2";
+        // 前端逻辑 / Frontend logic
+        }
+        // 第二行 meta：阶段 · 材料 · 时间 / Secondary meta: stage · material · time
+        const metaBits = [];
+        // 前端逻辑 / Frontend logic
+        metaBits.push(`stage ${escapeText(row.stage_reached || "?")}`);
+        // 前端逻辑 / Frontend logic
+        metaBits.push(`sr ${fmt(row.stiffness_ratio, 2)} · shear ${fmt(row.shear_ratio, 2)}`);
+        // 前端逻辑 / Frontend logic
         if (row.surrogate_enrichment !== null && row.surrogate_enrichment !== undefined) {
           // 前端逻辑 / Frontend logic
-          cells.push(`<div>Surrogate (W10): enrich=<strong>${fmt(row.surrogate_enrichment)}×</strong>, recall=${fmt(row.surrogate_recall)}, contrast=${fmt(row.surrogate_contrast)}×</div>`);
+          metaBits.push(`surr enr ${fmt(row.surrogate_enrichment)}× · rec ${fmt(row.surrogate_recall)}`);
         // 前端逻辑 / Frontend logic
         }
-        // Phase 1 最佳合成 / Phase 1 best composite
+        // 前端逻辑 / Frontend logic
         if (row.phase1_method) {
           // 前端逻辑 / Frontend logic
-          const subset = (row.phase1_best_subset || []).join(" + ");
-          // 前端逻辑 / Frontend logic
-          cells.push(`<div>Phase 1 best: <strong>${escapeText(row.phase1_method)}</strong>(${escapeText(subset)}) — broad enr=<strong>${fmt(row.phase1_broad_enrich)}×</strong> rec=${fmt(row.phase1_broad_recall)} · tight enr=${fmt(row.phase1_tight_enrich)}× rec=${fmt(row.phase1_tight_recall)}</div>`);
-          // 驱动频率列表 / Drive frequency list
-          if (Array.isArray(row.phase1_drive_freqs) && row.phase1_drive_freqs.length) {
-            // 前端逻辑 / Frontend logic
-            cells.push(`<div class="status">drive freqs: ${row.phase1_drive_freqs.map((f) => Number(f).toFixed(1)).join(", ")} Hz</div>`);
-          // 前端逻辑 / Frontend logic
-          }
+          metaBits.push(`p1 ${escapeText(row.phase1_method)} broad ${fmt(row.phase1_broad_enrich)}× rec ${fmt(row.phase1_broad_recall)}`);
         // 前端逻辑 / Frontend logic
         }
-        // Phase 2 改善 / Phase 2 improvement
+        // 前端逻辑 / Frontend logic
         if (row.phase2_best_enrichment !== null && row.phase2_best_enrichment !== undefined) {
           // 前端逻辑 / Frontend logic
           const sign = (row.phase2_improvement_pct ?? 0) >= 0 ? "+" : "";
           // 前端逻辑 / Frontend logic
-          cells.push(`<div>Phase 2: best iter <strong>${escapeText(String(row.phase2_best_iter ?? "?"))}</strong> → <strong>${fmt(row.phase2_best_enrichment)}×</strong> (${sign}${fmt(row.phase2_improvement_pct, 1)}%)</div>`);
+          metaBits.push(`p2 best iter ${escapeText(String(row.phase2_best_iter ?? "?"))} (${sign}${fmt(row.phase2_improvement_pct, 1)}%)`);
         // 前端逻辑 / Frontend logic
         }
-        // 计时 / Wallclock
-        const wcParts = [];
+        // 时间戳 / Timestamp
+        metaBits.push(escapeText(row.modified_at || ""));
         // 前端逻辑 / Frontend logic
-        if (row.wallclock_surrogate_s) { wcParts.push(`surrogate ${fmt(row.wallclock_surrogate_s, 0)} s`); }
-        // 前端逻辑 / Frontend logic
-        if (row.wallclock_phase1_s) { wcParts.push(`phase1 ${fmt(row.wallclock_phase1_s, 0)} s`); }
-        // 前端逻辑 / Frontend logic
-        if (wcParts.length) { cells.push(`<div class="status">wallclock: ${wcParts.join(" · ")}</div>`); }
-        // 操作按钮 / Action buttons
         const cid = escapeText(row.candidate_id || "");
-        // 前端逻辑 / Frontend logic
-        const summaryUrl = row.summary_path ? `/api/file?path=${encodeURIComponent(row.summary_path)}` : "";
-        // 前端逻辑 / Frontend logic
-        const actionButtons = [`<button type="button" data-action="open-mph" data-candidate-id="${cid}">Open .mph in COMSOL</button>`];
-        // 前端逻辑 / Frontend logic
-        cells.push(`<div class="sweep-actions" style="margin-top:4px">${actionButtons.join("")}</div>`);
-        // 拼一张卡 / Compose one card
-        return `<div class="result-row">${cells.join("")}</div>`;
+        // 渲染规范的 .result-row（按钮，2 列网格） / Render canonical .result-row (button, 2-col grid)
+        return `
+          <!-- 模板内容 / Template content --><button class="result-row" type="button" data-production-id="${cid}" data-candidate-id="${cid}" title="${cid}">
+            <!-- 模板内容 / Template content --><div class="result-row-main">
+              <!-- 模板内容 / Template content --><strong class="result-row-title">${cid}</strong>
+              <!-- 模板内容 / Template content --><span class="result-row-meta">${metaBits.join(" · ")}</span>
+            <!-- 模板内容 / Template content --></div>
+            <!-- 模板内容 / Template content --><div class="result-row-side">
+              <!-- 模板内容 / Template content --><strong>${fmt(headlineValue)}×</strong>
+              <!-- 模板内容 / Template content -->${escapeText(headlineLabel)} enr
+            <!-- 模板内容 / Template content --></div>
+          <!-- 模板内容 / Template content --></button>
+        <!-- 模板内容 / Template content -->`;
       // 前端逻辑 / Frontend logic
       }).join("");
     // 前端逻辑 / Frontend logic
     }
+
+    // 缓存最新一次生产运行列表 / Cache the most recent production run list
+    let latestProductionRuns = [];
 
     // 加载生产 pipeline 运行列表 / Fetch the production-pipeline run list
     async function loadProductionRuns() {
@@ -3863,10 +3891,260 @@
         // 前端逻辑 / Frontend logic
         const result = await response.json();
         // 前端逻辑 / Frontend logic
-        renderProductionRuns(result.runs || []);
+        latestProductionRuns = result.runs || [];
+        // 前端逻辑 / Frontend logic
+        renderProductionRuns(latestProductionRuns);
+        // 前端逻辑 / Frontend logic
+        renderRankingRows();
       // 前端逻辑 / Frontend logic
       } catch (error) {
         // 静默失败 / Silent failure
+      // 前端逻辑 / Frontend logic
+      }
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 把 0 / null / undefined 安全渲染 / Safe-format numeric metric
+    function fmtNumber(v, digits = 2) {
+      // 前端逻辑 / Frontend logic
+      if (v === null || v === undefined || Number.isNaN(Number(v))) { return "–"; }
+      // 前端逻辑 / Frontend logic
+      return Number(v).toFixed(digits);
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 渲染单个生产候选的详情（带图片） / Render a single production-run detail (with images)
+    function renderProductionRunDetail(detail) {
+      // 前端逻辑 / Frontend logic
+      const previews = detail.previews || {};
+      // 前端逻辑 / Frontend logic
+      const digest = detail.digest || {};
+      // 前端逻辑 / Frontend logic
+      const cid = escapeText(detail.candidate_id || "");
+      // 头部摘要 / Header summary
+      const headerBits = [];
+      // 前端逻辑 / Frontend logic
+      headerBits.push(`stage <strong>${escapeText(digest.stage_reached || "?")}</strong>`);
+      // 前端逻辑 / Frontend logic
+      headerBits.push(`sr ${fmtNumber(digest.stiffness_ratio, 2)} · shear ${fmtNumber(digest.shear_ratio, 2)}`);
+      // 前端逻辑 / Frontend logic
+      if (digest.modified_at) { headerBits.push(escapeText(digest.modified_at)); }
+      // 指标卡 / Metric cards
+      const metricCards = [];
+      // 前端逻辑 / Frontend logic
+      if (digest.surrogate_enrichment !== null && digest.surrogate_enrichment !== undefined) {
+        // 前端逻辑 / Frontend logic
+        metricCards.push(`<div class="metric-card"><strong>${fmtNumber(digest.surrogate_enrichment)}×</strong><span>Surrogate enr</span></div>`);
+        // 前端逻辑 / Frontend logic
+        metricCards.push(`<div class="metric-card"><strong>${fmtNumber(digest.surrogate_recall)}</strong><span>Surrogate recall</span></div>`);
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (digest.phase1_broad_enrich !== null && digest.phase1_broad_enrich !== undefined) {
+        // 前端逻辑 / Frontend logic
+        metricCards.push(`<div class="metric-card"><strong>${fmtNumber(digest.phase1_broad_enrich)}×</strong><span>Phase 1 enr</span></div>`);
+        // 前端逻辑 / Frontend logic
+        metricCards.push(`<div class="metric-card"><strong>${fmtNumber(digest.phase1_broad_recall)}</strong><span>Phase 1 recall</span></div>`);
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (digest.phase2_best_enrichment !== null && digest.phase2_best_enrichment !== undefined) {
+        // 前端逻辑 / Frontend logic
+        metricCards.push(`<div class="metric-card"><strong>${fmtNumber(digest.phase2_best_enrichment)}×</strong><span>Phase 2 enr</span></div>`);
+        // 前端逻辑 / Frontend logic
+        const sign = (digest.phase2_improvement_pct ?? 0) >= 0 ? "+" : "";
+        // 前端逻辑 / Frontend logic
+        metricCards.push(`<div class="metric-card"><strong>${sign}${fmtNumber(digest.phase2_improvement_pct, 1)}%</strong><span>P2 improvement</span></div>`);
+      // 前端逻辑 / Frontend logic
+      }
+      // 图片块构造器 / Image block helper
+      const imgBlock = (url, alt, title) => url
+        // 前端逻辑 / Frontend logic
+        ? `<img class="image-inspect" src="${url}?t=${Date.now()}" alt="${escapeText(alt)}" data-image-src="${url}?t=${Date.now()}" data-image-title="${escapeText(title)}">`
+        // 前端逻辑 / Frontend logic
+        : `<div class="status">${escapeText(alt)} not available — re-run with COMSOL enabled to generate this artefact.</div>`;
+      // Phase 1 / Phase 2 / Thickness / Target / COMSOL 段 / Sections
+      const sections = [];
+      // 前端逻辑 / Frontend logic
+      sections.push(`
+        <!-- 模板内容 / Template content --><section class="candidate-section">
+          <!-- 模板内容 / Template content --><h3>Target (resized to scoring grid)</h3>
+          <!-- 模板内容 / Template content -->${imgBlock(previews["target.png"], "target", "Target binary")}
+        <!-- 模板内容 / Template content --></section>
+      <!-- 模板内容 / Template content -->`);
+      // 前端逻辑 / Frontend logic
+      if (previews["phase1_powder_broad.png"] || previews["phase1_amp.png"]) {
+        // 前端逻辑 / Frontend logic
+        sections.push(`
+          <!-- 模板内容 / Template content --><section class="candidate-section">
+            <!-- 模板内容 / Template content --><h3>Phase 1 best composite</h3>
+            <!-- 模板内容 / Template content --><div class="comparison-grid">
+              <!-- 模板内容 / Template content --><div><div class="status">Powder density (broad σ=0.05)</div>${imgBlock(previews["phase1_powder_broad.png"], "phase1 powder broad", "Phase 1 powder broad")}</div>
+              <!-- 模板内容 / Template content --><div><div class="status">Powder density (sharp σ=0.025)</div>${imgBlock(previews["phase1_powder_sharp.png"], "phase1 powder sharp", "Phase 1 powder sharp")}</div>
+              <!-- 模板内容 / Template content --><div><div class="status">Raw amplitude (inverted → bright = nodal)</div>${imgBlock(previews["phase1_amp.png"], "phase1 amplitude", "Phase 1 amplitude")}</div>
+            <!-- 模板内容 / Template content --></div>
+          <!-- 模板内容 / Template content --></section>
+        <!-- 模板内容 / Template content -->`);
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (previews["phase2_powder_broad.png"] || previews["phase2_amp.png"]) {
+        // 前端逻辑 / Frontend logic
+        sections.push(`
+          <!-- 模板内容 / Template content --><section class="candidate-section">
+            <!-- 模板内容 / Template content --><h3>Phase 2 best composite (trust-region refinement)</h3>
+            <!-- 模板内容 / Template content --><div class="comparison-grid">
+              <!-- 模板内容 / Template content --><div><div class="status">Powder density (broad)</div>${imgBlock(previews["phase2_powder_broad.png"], "phase2 powder broad", "Phase 2 powder broad")}</div>
+              <!-- 模板内容 / Template content --><div><div class="status">Powder density (sharp)</div>${imgBlock(previews["phase2_powder_sharp.png"], "phase2 powder sharp", "Phase 2 powder sharp")}</div>
+              <!-- 模板内容 / Template content --><div><div class="status">Raw amplitude (inverted)</div>${imgBlock(previews["phase2_amp.png"], "phase2 amplitude", "Phase 2 amplitude")}</div>
+            <!-- 模板内容 / Template content --></div>
+          <!-- 模板内容 / Template content --></section>
+        <!-- 模板内容 / Template content -->`);
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (detail.thickness_preview) {
+        // 前端逻辑 / Frontend logic
+        sections.push(`
+          <!-- 模板内容 / Template content --><section class="candidate-section">
+            <!-- 模板内容 / Template content --><h3>Thickness Field (H matrix)</h3>
+            <!-- 模板内容 / Template content -->${imgBlock(detail.thickness_preview, "thickness", "Thickness field")}
+          <!-- 模板内容 / Template content --></section>
+        <!-- 模板内容 / Template content -->`);
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (Array.isArray(detail.comsol_modes) && detail.comsol_modes.length) {
+        // 前端逻辑 / Frontend logic
+        const modeCards = detail.comsol_modes.slice(0, 12).map((m) => `<div><div class="status">mode ${escapeText(String(m.mode))}${m.frequency_hz ? " · " + fmtNumber(m.frequency_hz, 1) + " Hz" : ""}</div>${imgBlock(m.url, "mode " + m.mode, "COMSOL mode " + m.mode)}</div>`).join("");
+        // 前端逻辑 / Frontend logic
+        sections.push(`
+          <!-- 模板内容 / Template content --><section class="candidate-section">
+            <!-- 模板内容 / Template content --><h3>COMSOL Eigenmodes (top ${Math.min(12, detail.comsol_modes.length)} of ${detail.comsol_modes.length})</h3>
+            <!-- 模板内容 / Template content --><div class="comparison-grid">${modeCards}</div>
+          <!-- 模板内容 / Template content --></section>
+        <!-- 模板内容 / Template content -->`);
+      // 前端逻辑 / Frontend logic
+      }
+      // Phase 1 驱动频率列表 / Phase 1 drive frequencies
+      const driveFreqsBlock = (Array.isArray(digest.phase1_drive_freqs) && digest.phase1_drive_freqs.length)
+        // 前端逻辑 / Frontend logic
+        ? `<div class="status">Phase 1 drive freqs: ${digest.phase1_drive_freqs.map((f) => Number(f).toFixed(1)).join(", ")} Hz</div>`
+        // 前端逻辑 / Frontend logic
+        : "";
+      // 最佳合成子集 / Best composite subset
+      const compositeBlock = (Array.isArray(digest.phase1_best_subset) && digest.phase1_best_subset.length)
+        // 前端逻辑 / Frontend logic
+        ? `<div class="status">Best composite: <strong>${escapeText(digest.phase1_method || "?")}</strong>(${digest.phase1_best_subset.join(" + ")} Hz)</div>`
+        // 前端逻辑 / Frontend logic
+        : "";
+      // 计时 / Wallclock
+      const wcBits = [];
+      // 前端逻辑 / Frontend logic
+      if (digest.wallclock_surrogate_s) { wcBits.push(`surrogate ${fmtNumber(digest.wallclock_surrogate_s, 0)} s`); }
+      // 前端逻辑 / Frontend logic
+      if (digest.wallclock_phase1_s) { wcBits.push(`phase1 ${fmtNumber(digest.wallclock_phase1_s, 0)} s`); }
+      // 前端逻辑 / Frontend logic
+      const wallclockBlock = wcBits.length ? `<div class="status">wallclock: ${wcBits.join(" · ")}</div>` : "";
+
+      candidateDetail.innerHTML = `
+        <!-- 模板内容 / Template content --><div class="candidate-head">
+          <!-- 模板内容 / Template content --><div class="candidate-id">
+            <!-- 模板内容 / Template content --><div class="detail-title">${cid}</div>
+            <!-- 模板内容 / Template content --><span>${headerBits.join(" · ")}</span>
+          <!-- 模板内容 / Template content --></div>
+          <!-- 模板内容 / Template content --><div class="candidate-actions">
+            <!-- 模板内容 / Template content --><button class="download-link" type="button" data-action="open-in-comsol" data-candidate-id="${encodeURIComponent(detail.candidate_id)}">Open .mph in COMSOL</button>
+          <!-- 模板内容 / Template content --></div>
+          <!-- 模板内容 / Template content --><div id="comsolOpenStatus" class="status" hidden></div>
+        <!-- 模板内容 / Template content --></div>
+        <!-- 模板内容 / Template content -->${metricCards.length ? `<div class="metric-grid">${metricCards.join("")}</div>` : ""}
+        <!-- 模板内容 / Template content -->${compositeBlock}
+        <!-- 模板内容 / Template content -->${driveFreqsBlock}
+        <!-- 模板内容 / Template content -->${wallclockBlock}
+        <!-- 模板内容 / Template content -->${sections.join("")}
+      <!-- 模板内容 / Template content -->`;
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 在 Result Overview 显示生产运行的 hero 卡 / Render a production-run hero card into Result Overview
+    function renderProductionResultOverview(rows) {
+      // 前端逻辑 / Frontend logic
+      if (!rows || !rows.length) {
+        // 前端逻辑 / Frontend logic
+        resultOverview.innerHTML = emptyState("No runs yet", "Hit Run on the Run tab.");
+        // 前端逻辑 / Frontend logic
+        return;
+      // 前端逻辑 / Frontend logic
+      }
+      // 选 phase2 > phase1 > surrogate 最大值的那次 / Pick the run with the strongest available enrichment
+      const scoreOf = (r) => Number(r.phase2_best_enrichment ?? r.phase1_broad_enrich ?? r.surrogate_enrichment ?? 0);
+      // 前端逻辑 / Frontend logic
+      const best = [...rows].sort((a, b) => scoreOf(b) - scoreOf(a))[0];
+      // 前端逻辑 / Frontend logic
+      const headlineValue = best.phase2_best_enrichment ?? best.phase1_broad_enrich ?? best.surrogate_enrichment;
+      // 前端逻辑 / Frontend logic
+      const headlineLabel = best.phase2_best_enrichment != null
+        // 前端逻辑 / Frontend logic
+        ? "Phase 2 enrichment"
+        // 前端逻辑 / Frontend logic
+        : (best.phase1_broad_enrich != null ? "Phase 1 broad enrichment" : "Surrogate enrichment");
+      // 前端逻辑 / Frontend logic
+      const cards = [];
+      // 前端逻辑 / Frontend logic
+      cards.push(`<div class="metric-card"><strong>${fmtNumber(headlineValue)}×</strong><span>${escapeText(headlineLabel)}</span></div>`);
+      // 前端逻辑 / Frontend logic
+      if (best.phase1_broad_recall != null) { cards.push(`<div class="metric-card"><strong>${fmtNumber(best.phase1_broad_recall)}</strong><span>Phase 1 recall</span></div>`); }
+      // 前端逻辑 / Frontend logic
+      if (best.surrogate_enrichment != null) { cards.push(`<div class="metric-card"><strong>${fmtNumber(best.surrogate_enrichment)}×</strong><span>Surrogate enr</span></div>`); }
+      // 前端逻辑 / Frontend logic
+      if (best.phase2_improvement_pct != null) {
+        // 前端逻辑 / Frontend logic
+        const sign = (best.phase2_improvement_pct ?? 0) >= 0 ? "+" : "";
+        // 前端逻辑 / Frontend logic
+        cards.push(`<div class="metric-card"><strong>${sign}${fmtNumber(best.phase2_improvement_pct, 1)}%</strong><span>P2 improvement</span></div>`);
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      cards.push(`<div class="metric-card"><strong>${fmtNumber(best.stiffness_ratio, 2)}</strong><span>Stiffness ratio</span></div>`);
+      // 前端逻辑 / Frontend logic
+      resultOverview.innerHTML = `
+        <!-- 模板内容 / Template content --><div class="result-hero">
+          <!-- 模板内容 / Template content --><strong>${escapeText(best.candidate_id || "")}</strong>
+          <!-- 模板内容 / Template content --><span>Best production run · stage ${escapeText(best.stage_reached || "?")} · ${escapeText(best.modified_at || "")}</span>
+        <!-- 模板内容 / Template content --></div>
+        <!-- 模板内容 / Template content --><div class="metric-grid">${cards.join("")}</div>
+        <!-- 模板内容 / Template content --><div class="result-note">${rows.length} production run${rows.length === 1 ? "" : "s"} total — full list (with images, thickness field, COMSOL eigenmodes) is in the Production Runs panel above. Click any row to inspect.</div>
+      <!-- 模板内容 / Template content -->`;
+    // 前端逻辑 / Frontend logic
+    }
+
+    // 拉取并渲染生产候选详情 / Fetch + render production-candidate detail
+    async function loadProductionRunDetail(candidateId, switchTab = true) {
+      // 前端逻辑 / Frontend logic
+      if (switchTab) { selectSidebarTab("results"); }
+      // 前端逻辑 / Frontend logic
+      activeCandidateId = candidateId;
+      // 前端逻辑 / Frontend logic
+      candidateDetail.textContent = "Loading production run...";
+      // 前端逻辑 / Frontend logic
+      try {
+        // 前端逻辑 / Frontend logic
+        const response = await fetch(`/api/production-run-detail?id=${encodeURIComponent(candidateId)}&t=${Date.now()}`);
+        // 前端逻辑 / Frontend logic
+        const detail = await response.json();
+        // 前端逻辑 / Frontend logic
+        if (!response.ok) {
+          // 前端逻辑 / Frontend logic
+          throw new Error(detail.error || "Production-run detail unavailable");
+        // 前端逻辑 / Frontend logic
+        }
+        // 前端逻辑 / Frontend logic
+        renderProductionRunDetail(detail);
+      // 前端逻辑 / Frontend logic
+      } catch (error) {
+        // 前端逻辑 / Frontend logic
+        candidateDetail.textContent = error.message;
       // 前端逻辑 / Frontend logic
       }
     // 前端逻辑 / Frontend logic
@@ -5677,18 +5955,18 @@
       }
     // 前端逻辑 / Frontend logic
     });
-    // Production Runs 操作 / Production runs click handler
+    // Production Runs 点击 → 打开候选详情 / Production-runs click → open candidate detail
     if (productionRunsList) {
       // 前端逻辑 / Frontend logic
       productionRunsList.addEventListener("click", (event) => {
         // 前端逻辑 / Frontend logic
-        const btn = event.target.closest("[data-action='open-mph']");
+        const row = event.target.closest("[data-production-id]");
         // 前端逻辑 / Frontend logic
-        if (btn && btn.dataset.candidateId) {
+        if (row && row.dataset.productionId) {
           // 前端逻辑 / Frontend logic
           event.preventDefault();
           // 前端逻辑 / Frontend logic
-          openCandidateInComsol(btn.dataset.candidateId);
+          loadProductionRunDetail(row.dataset.productionId);
         // 前端逻辑 / Frontend logic
         }
       // 前端逻辑 / Frontend logic
