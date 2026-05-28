@@ -3539,6 +3539,22 @@
     // 前端逻辑 / Frontend logic
     function renderRankingRows() {
       // 前端逻辑 / Frontend logic
+      const productionRows = latestProductionRuns || [];
+      // Production runs are the primary Results view for this app; legacy rankings are only a fallback.
+      if (productionRows.length) {
+        renderProductionResultOverview(productionRows);
+        renderResultsListFromProductionRuns(productionRows);
+        const activeIsProductionRun = activeCandidateId && productionRows.some((row) => row.candidate_id === activeCandidateId);
+        if (!activeIsProductionRun) {
+          const auto = pickBestProductionRun(productionRows);
+          if (auto && auto.candidate_id) {
+            loadProductionRunDetail(auto.candidate_id, false);
+          }
+        }
+        updateStudioStrip();
+        return;
+      }
+      // 前端逻辑 / Frontend logic
       const rows = filteredRankingRows();
       // 前端逻辑 / Frontend logic
       resultSummary.textContent = `${rows.length}/${latestRanking.length} candidates`;
@@ -3981,7 +3997,7 @@
     let latestProductionRuns = [];
 
     // 加载生产 pipeline 运行列表 / Fetch the production-pipeline run list
-    async function loadProductionRuns() {
+    async function loadProductionRuns(options = {}) {
       // 前端逻辑 / Frontend logic
       try {
         // 前端逻辑 / Frontend logic
@@ -3996,10 +4012,23 @@
         const result = await response.json();
         // 前端逻辑 / Frontend logic
         latestProductionRuns = result.runs || [];
+        const requestedCandidateId = String(options.selectCandidateId || "").trim();
+        const requestedExists = requestedCandidateId && latestProductionRuns.some((row) => row.candidate_id === requestedCandidateId);
+        if (requestedExists) {
+          activeCandidateId = requestedCandidateId;
+        }
         // 前端逻辑 / Frontend logic
         renderProductionRuns(latestProductionRuns);
         // 前端逻辑 / Frontend logic
         renderRankingRows();
+        if (requestedExists) {
+          await loadProductionRunDetail(requestedCandidateId, Boolean(options.switchTab));
+        } else if (options.selectBest && latestProductionRuns.length) {
+          const auto = pickBestProductionRun(latestProductionRuns);
+          if (auto && auto.candidate_id) {
+            await loadProductionRunDetail(auto.candidate_id, Boolean(options.switchTab));
+          }
+        }
         // legacy history 为空时，靠 production-runs 兜底显示 / Refresh history so the production-run fallback kicks in when legacy GA history is empty
         if (!latestGenerationHistory || !latestGenerationHistory.length) {
           // 前端逻辑 / Frontend logic
@@ -4463,6 +4492,11 @@
     // 前端逻辑 / Frontend logic
     function renderHistoryTrend(historyRows) {
       // 前端逻辑 / Frontend logic
+      if (latestProductionRuns && latestProductionRuns.length) {
+        renderHistoryTrendFromProductionRuns(latestProductionRuns);
+        return;
+      }
+      // 前端逻辑 / Frontend logic
       const scoredRows = historyRows.filter((row) => row.best_candidate).sort((a, b) => Number(a.generation || 0) - Number(b.generation || 0));
       // 前端逻辑 / Frontend logic
       if (!scoredRows.length) {
@@ -4510,6 +4544,11 @@
 
     // 前端逻辑 / Frontend logic
     function renderHistory(historyRows) {
+      // 前端逻辑 / Frontend logic
+      if (latestProductionRuns && latestProductionRuns.length) {
+        renderHistoryFromProductionRuns(latestProductionRuns);
+        return;
+      }
       // 前端逻辑 / Frontend logic
       const filteredRows = filterGenerationHistory(historyRows);
       // 前端逻辑 / Frontend logic
@@ -4920,7 +4959,8 @@
         // 前端逻辑 / Frontend logic
         renderProductionResult(state);
         // 前端逻辑 / Frontend logic
-        await loadProductionRuns();
+        const completedCandidateId = state.result && state.result.candidate_id ? state.result.candidate_id : "";
+        await loadProductionRuns({ selectCandidateId: completedCandidateId, switchTab: state.stage === "done" });
         // 前端逻辑 / Frontend logic
         await loadRanking();
         // 前端逻辑 / Frontend logic

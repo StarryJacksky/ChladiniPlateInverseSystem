@@ -736,7 +736,13 @@ def _summarise_production_run(data: dict, run_dir: Path, summary_path: Path) -> 
     }
 
 
-def load_production_runs() -> list[dict]:  # 列出所有生产 pipeline 完成的运行 / List every completed production-pipeline run
+def _is_diagnostic_production_run(row: dict) -> bool:
+    candidate_id = str(row.get("candidate_id") or "").lower()
+    output_dir = str(row.get("output_dir") or "").lower()
+    return "smoke" in candidate_id or "smoke" in output_dir
+
+
+def load_production_runs(include_diagnostics: bool = False) -> list[dict]:  # 列出所有生产 pipeline 完成的运行 / List every completed production-pipeline run
     base = project_root() / "reports" / "production"  # 生产输出目录 / Production output directory
     if not base.exists():  # 没有运行过 / No runs yet
         return []  # 返回空列表 / Empty list
@@ -752,7 +758,11 @@ def load_production_runs() -> list[dict]:  # 列出所有生产 pipeline 完成�
         except Exception:  # 解析失败 / Parse failed
             continue  # / Skip
         try:  # 容错压缩 / Tolerate summary build errors
-            rows.append(_summarise_production_run(data, d, summary))  # 压缩 / Distil
+            row = _summarise_production_run(data, d, summary)  # 压缩 / Distil
+            row["diagnostic_run"] = _is_diagnostic_production_run(row)
+            if row["diagnostic_run"] and not include_diagnostics:
+                continue
+            rows.append(row)  # 加入 / Append
         except Exception:  # 略过 / Skip on summarise error
             continue  # / Continue
     rows.sort(key=lambda r: r.get("modified_at") or "", reverse=True)  # 最新优先 / Newest first
@@ -1593,7 +1603,8 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 return  # 结束请求 / Finish request
             if route == "/api/production-runs":  # 列出生产 pipeline 完成的运行 / List completed production runs
                 try:  # 容错 / Tolerate read errors
-                    self.send_json({"runs": load_production_runs()})  # 返回 / Return
+                    include_diagnostics = str(query.get("include_diagnostics", [""])[0]).lower() in {"1", "true", "yes", "on"}  # include smoke/dev runs when requested
+                    self.send_json({"runs": load_production_runs(include_diagnostics=include_diagnostics)})  # 返回 / Return
                 except Exception as exc:  # 处理异常 / Handle exception
                     self.send_json({"error": str(exc), "runs": []}, HTTPStatus.INTERNAL_SERVER_ERROR)  # / 500
                 return  # 结束请求 / Finish request
