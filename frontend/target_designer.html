@@ -3482,6 +3482,11 @@
         setStatus("Image file expected", "warn");
         return;
       }
+      // 关闭还开着的 Stretch 面板（其 anchor 是旧图，留着会污染新图）/
+      // Close any stale Stretch panel — its anchor would be the previous image.
+      if (typeof stretchActive !== "undefined" && stretchActive) {
+        try { closeStretchPanel(false); } catch (_) {}
+      }
       const reader = new FileReader();
       reader.onload = () => loadImageToCanvas(reader.result, "cover", { autoPolarity: true });
       reader.readAsDataURL(file);
