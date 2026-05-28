@@ -1088,6 +1088,28 @@
       gap: 10px; /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
 
+    .candidate-actions-note { /* 无 .mph 时显示的灰字提示 / Greyed-out hint shown when no .mph exists */
+      display: inline-block; /* 样式设置 / Style setting */
+      color: var(--muted); /* 样式设置 / Style setting */
+      font-size: 11px; /* 样式设置 / Style setting */
+      font-style: italic; /* 样式设置 / Style setting */
+      padding: 4px 8px; /* 样式设置 / Style setting */
+      border: 1px dashed rgba(16, 23, 22, 0.18); /* 样式设置 / Style setting */
+      border-radius: 6px; /* 样式设置 / Style setting */
+      cursor: help; /* 样式设置 / Style setting */
+    }
+
+    .diag-details summary { /* 高级诊断折叠区头部 / Advanced diagnostics summary header */
+      cursor: pointer; /* 样式设置 / Style setting */
+      padding: 6px 0; /* 样式设置 / Style setting */
+      color: var(--muted); /* 样式设置 / Style setting */
+      list-style: revert; /* 样式设置 / Style setting */
+    }
+
+    .diag-details[open] summary { /* 展开时强调 / Emphasised when open */
+      color: var(--ink); /* 样式设置 / Style setting */
+    }
+
     .candidate-id { /* 样式设置 / Style setting */
       display: grid; /* 样式设置 / Style setting */
       gap: 4px; /* 样式设置 / Style setting */
@@ -4056,12 +4078,37 @@
       // Phase 1 / Phase 2 / Thickness / Target / COMSOL 段 / Sections
       const sections = [];
       // 前端逻辑 / Frontend logic
+      // Target vs surrogate-achieved 对比放最显眼位置 / Target + surrogate-achieved comparison goes first so the user sees the headline match immediately
+      const overlayBlock = previews["overlay_target_achieved.png"]
+        // 前端逻辑 / Frontend logic
+        ? `<div><div class="status">Overlay (red = target · green = achieved · yellow = overlap)</div>${imgBlock(previews["overlay_target_achieved.png"], "target vs achieved overlay", "Target vs achieved overlay")}</div>`
+        // 前端逻辑 / Frontend logic
+        : "";
+      // 前端逻辑 / Frontend logic
       sections.push(`
         <!-- 模板内容 / Template content --><section class="candidate-section">
-          <!-- 模板内容 / Template content --><h3>Target (resized to scoring grid)</h3>
-          <!-- 模板内容 / Template content -->${imgBlock(previews["target.png"], "target", "Target binary")}
+          <!-- 模板内容 / Template content --><h3>Target vs achieved (surrogate forward)</h3>
+          <!-- 模板内容 / Template content --><div class="comparison-grid">
+            <!-- 模板内容 / Template content --><div><div class="status">Target (resized to scoring grid)</div>${imgBlock(previews["target.png"], "target", "Target binary")}</div>
+            <!-- 模板内容 / Template content --><div><div class="status">Achieved powder density (broad σ=0.05)</div>${imgBlock(previews["surrogate_powder_broad.png"], "achieved powder broad", "Achieved powder broad")}</div>
+            <!-- 模板内容 / Template content -->${overlayBlock}
+          <!-- 模板内容 / Template content --></div>
         <!-- 模板内容 / Template content --></section>
       <!-- 模板内容 / Template content -->`);
+      // Surrogate 正向额外细节图 / Extra surrogate-forward detail images
+      if (previews["surrogate_amp.png"] || previews["surrogate_powder_sharp.png"]) {
+        // 前端逻辑 / Frontend logic
+        sections.push(`
+          <!-- 模板内容 / Template content --><section class="candidate-section">
+            <!-- 模板内容 / Template content --><h3>Surrogate Chladni response (detail)</h3>
+            <!-- 模板内容 / Template content --><div class="comparison-grid">
+              <!-- 模板内容 / Template content --><div><div class="status">Raw amplitude (inverted → bright = nodal)</div>${imgBlock(previews["surrogate_amp.png"], "surrogate amplitude", "Surrogate amplitude")}</div>
+              <!-- 模板内容 / Template content --><div><div class="status">Powder density (sharp σ=0.025)</div>${imgBlock(previews["surrogate_powder_sharp.png"], "surrogate powder sharp", "Surrogate powder sharp")}</div>
+            <!-- 模板内容 / Template content --></div>
+          <!-- 模板内容 / Template content --></section>
+        <!-- 模板内容 / Template content -->`);
+      // 前端逻辑 / Frontend logic
+      }
       // 前端逻辑 / Frontend logic
       if (previews["phase1_powder_broad.png"] || previews["phase1_amp.png"]) {
         // 前端逻辑 / Frontend logic
@@ -4116,6 +4163,39 @@
         <!-- 模板内容 / Template content -->`);
       // 前端逻辑 / Frontend logic
       }
+      // 高级诊断折叠区：θ 场 / W10 loss 曲线 / 频率+权重柱状图（默认收起，研发用） / Collapsible advanced diagnostics: θ field / W10 loss curve / frequency bars (collapsed by default)
+      const diagBits = [];
+      // 前端逻辑 / Frontend logic
+      if (previews["theta_field.png"]) {
+        // 前端逻辑 / Frontend logic
+        diagBits.push(`<div><div class="status">Fibre orientation θ (per cell, deg)</div>${imgBlock(previews["theta_field.png"], "theta field", "Fibre orientation θ")}</div>`);
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (previews["w10_loss_curve.png"]) {
+        // 前端逻辑 / Frontend logic
+        diagBits.push(`<div><div class="status">W10 loss trace (best step marked)</div>${imgBlock(previews["w10_loss_curve.png"], "W10 loss curve", "W10 loss curve")}</div>`);
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (previews["w10_frequencies.png"]) {
+        // 前端逻辑 / Frontend logic
+        diagBits.push(`<div><div class="status">W10 drive frequencies + weights</div>${imgBlock(previews["w10_frequencies.png"], "W10 frequencies", "W10 frequencies + weights")}</div>`);
+      // 前端逻辑 / Frontend logic
+      }
+      // 前端逻辑 / Frontend logic
+      if (diagBits.length) {
+        // 前端逻辑 / Frontend logic
+        sections.push(`
+          <!-- 模板内容 / Template content --><section class="candidate-section">
+            <!-- 模板内容 / Template content --><details class="diag-details">
+              <!-- 模板内容 / Template content --><summary><h3 style="display:inline; margin:0;">Diagnostics (advanced) — click to expand</h3></summary>
+              <!-- 模板内容 / Template content --><div class="comparison-grid" style="margin-top:8px;">${diagBits.join("")}</div>
+            <!-- 模板内容 / Template content --></details>
+          <!-- 模板内容 / Template content --></section>
+        <!-- 模板内容 / Template content -->`);
+      // 前端逻辑 / Frontend logic
+      }
       // Phase 1 驱动频率列表 / Phase 1 drive frequencies
       const driveFreqsBlock = (Array.isArray(digest.phase1_drive_freqs) && digest.phase1_drive_freqs.length)
         // 前端逻辑 / Frontend logic
@@ -4137,6 +4217,15 @@
       // 前端逻辑 / Frontend logic
       const wallclockBlock = wcBits.length ? `<div class="status">wallclock: ${wcBits.join(" · ")}</div>` : "";
 
+      // 按钮区：只在真的有 .mph 时才显示 Open in COMSOL，避免 surrogate-only 跑出来一片"没找到"红字 / Only show Open in COMSOL when a .mph actually exists; surrogate-only runs hide it cleanly
+      const comsolAvailable = Boolean(detail.comsol_available);
+      // 前端逻辑 / Frontend logic
+      const comsolButtonHtml = comsolAvailable
+        // 前端逻辑 / Frontend logic
+        ? `<button class="download-link" type="button" data-action="open-in-comsol" data-candidate-id="${encodeURIComponent(detail.candidate_id)}">Open .mph in COMSOL${detail.comsol_mph_count > 1 ? ` (${detail.comsol_mph_count})` : ""}</button>`
+        // 前端逻辑 / Frontend logic
+        : `<span class="candidate-actions-note" title="Surrogate-only runs never invoke COMSOL, so no .mph is saved. Run the pipeline with COMSOL enabled to generate one.">No COMSOL .mph (surrogate-only run)</span>`;
+      // 状态条放在 candidate-head 之外，避免被纳入 flex 流挤动按钮 / Place status banner OUTSIDE candidate-head so toggling it can't shift the button row
       candidateDetail.innerHTML = `
         <!-- 模板内容 / Template content --><div class="candidate-head">
           <!-- 模板内容 / Template content --><div class="candidate-id">
@@ -4144,10 +4233,10 @@
             <!-- 模板内容 / Template content --><span>${headerBits.join(" · ")}</span>
           <!-- 模板内容 / Template content --></div>
           <!-- 模板内容 / Template content --><div class="candidate-actions">
-            <!-- 模板内容 / Template content --><button class="download-link" type="button" data-action="open-in-comsol" data-candidate-id="${encodeURIComponent(detail.candidate_id)}">Open .mph in COMSOL</button>
+            <!-- 模板内容 / Template content -->${comsolButtonHtml}
           <!-- 模板内容 / Template content --></div>
-          <!-- 模板内容 / Template content --><div id="comsolOpenStatus" class="status" hidden></div>
         <!-- 模板内容 / Template content --></div>
+        <!-- 模板内容 / Template content --><div id="comsolOpenStatus" class="status" hidden></div>
         <!-- 模板内容 / Template content -->${metricCards.length ? `<div class="metric-grid">${metricCards.join("")}</div>` : ""}
         <!-- 模板内容 / Template content -->${compositeBlock}
         <!-- 模板内容 / Template content -->${driveFreqsBlock}

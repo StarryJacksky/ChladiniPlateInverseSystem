@@ -691,6 +691,7 @@ def _list_production_comsol_modes(config: dict, candidate_id: str) -> list[dict]
 def load_production_run_detail(config: dict, candidate_id: str) -> dict:  # 读取生产 pipeline 候选详情 / Load production-run detail
     from src.visualisation.plot_amplitude import render_production_pngs  # 延迟导入 / Lazy import
     from src.visualisation.plot_thickness import render_candidate_preview  # 延迟导入 / Lazy import
+    from src.visualisation.production_artefacts import render_production_artefacts  # 延迟导入扩展渲染器 / Lazy import extended renderer
     valid_id = validate_production_candidate_id(candidate_id)  # 校验编号 / Validate id
     base = project_root() / "reports" / "production" / valid_id  # 生产输出目录 / Production output dir
     summary_path = base / "production_summary.json"  # 摘要路径 / Summary path
@@ -700,7 +701,12 @@ def load_production_run_detail(config: dict, candidate_id: str) -> dict:  # 读�
     summary = json.loads(summary_path.read_text(encoding="utf-8"))  # 解析 / Parse
     digest = _summarise_production_run(summary, base, summary_path)  # 压缩 / Distil
 
-    rendered = render_production_pngs(base)  # 渲染 .npy → .png / Render arrays
+    rendered = render_production_pngs(base)  # 渲染 .npy → .png（Phase1/2 振幅） / Render Phase 1/2 amplitude arrays
+    try:  # 扩展渲染（surrogate 正向 + 诊断图）出错不阻断 / Extended renders (surrogate-forward + diagnostics) may fail without blocking
+        extended = render_production_artefacts(base, config)  # 传 config 以便 surrogate 正向 / Pass config so surrogate-forward can build the plate
+        rendered.update(extended)  # 合并 / Merge
+    except Exception:  # 容错 / Tolerate
+        pass  # / Continue
     previews = {name: f"/assets/production/{valid_id}/{name}" for name in rendered.keys()}  # 预览 URL / Preview URLs
 
     candidate_dir = Path(config["paths"]["candidates_dir"]) / valid_id  # 候选目录 / Candidate directory
@@ -717,6 +723,16 @@ def load_production_run_detail(config: dict, candidate_id: str) -> dict:  # 读�
 
     comsol_modes = _list_production_comsol_modes(config, valid_id)  # COMSOL 模态预览 / COMSOL mode previews
 
+    # 检查 .mph 是否存在；surrogate-only 阶段没有 .mph，前端据此隐藏按钮 / Detect saved .mph so the frontend can hide the COMSOL button for surrogate-only runs
+    comsol_available = False  # 默认无 / Default false
+    comsol_mph_count = 0  # 计数 / Count
+    try:  # 发现可能因路径异常失败 / Discovery may fail on odd paths
+        mph_files = discover_candidate_mph_files(valid_id)  # 查找 .mph / Discover .mph
+        comsol_mph_count = len(mph_files)  # 个数 / Count
+        comsol_available = bool(mph_files)  # 是否有 / Whether any exists
+    except Exception:  # 容错 / Tolerate
+        pass  # / Continue
+
     return {  # 详情字典 / Detail dict
         "candidate_id": valid_id,
         "summary": summary,
@@ -724,6 +740,8 @@ def load_production_run_detail(config: dict, candidate_id: str) -> dict:  # 读�
         "previews": previews,
         "thickness_preview": thickness_url,
         "comsol_modes": comsol_modes,
+        "comsol_available": comsol_available,
+        "comsol_mph_count": comsol_mph_count,
         "summary_path": str(summary_path),
         "output_dir": str(base),
     }
