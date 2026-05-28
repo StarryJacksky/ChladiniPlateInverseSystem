@@ -108,6 +108,7 @@ end
 
 mphsave(model, fullfile(export_dir, 'debug_before_export_forced_response_model.mph'), 'copy', 'on');
 export_forced_response(model, export_dir);
+prepare_forced_response_view(model, drive_frequency_hz, export_dir);
 mphsave(model, fullfile(export_dir, 'last_forced_response_model.mph'), 'copy', 'on');
 end
 
@@ -255,4 +256,58 @@ for point_index = 1:numel(w_abs)
     fprintf(response_file, '%.12g,%.12g,%.12g,%.12g,%.12g\n', x(point_index), y(point_index), w_real(point_index), w_imag(point_index), w_abs(point_index));
 end
 fclose(response_file);
+end
+
+function prepare_forced_response_view(model, drive_frequency_hz, export_dir)
+viewer_log_path = fullfile(export_dir, 'forced_response_viewer_summary.txt');
+viewer_log = fopen(viewer_log_path, 'w');
+fprintf(viewer_log, 'drive_frequency_hz=%.12g\n', drive_frequency_hz);
+try
+    dataset_tag = latest_result_dataset(model);
+    fprintf(viewer_log, 'dataset_tag=%s\n', dataset_tag);
+    if has_feature(model.result, 'pg_mosaic_forced_response')
+        model.result.remove('pg_mosaic_forced_response');
+    end
+    pg = model.result.create('pg_mosaic_forced_response', 'PlotGroup3D');
+    pg.label(sprintf('MOSAIC forced response |w| @ %.4g Hz', drive_frequency_hz));
+    try
+        pg.set('data', dataset_tag);
+    catch data_err
+        fprintf(viewer_log, 'plot_group_data_warning=%s\n', data_err.message);
+    end
+    try
+        pg.set('titletype', 'manual');
+        pg.set('title', sprintf('Forced response |w| at %.4g Hz', drive_frequency_hz));
+    catch title_err
+        fprintf(viewer_log, 'title_warning=%s\n', title_err.message);
+    end
+    surf = pg.create('surf_mosaic_forced_response', 'Surface');
+    surf.label('Forced-response displacement amplitude |w|');
+    surf.set('expr', 'abs(shell.w)');
+    try
+        surf.set('unit', 'm');
+    catch unit_err
+        fprintf(viewer_log, 'unit_warning=%s\n', unit_err.message);
+    end
+    try
+        surf.set('descr', 'Forced-response displacement amplitude');
+    catch descr_err
+        fprintf(viewer_log, 'descr_warning=%s\n', descr_err.message);
+    end
+    pg.run;
+    fprintf(viewer_log, 'viewer_status=ok\n');
+catch err
+    fprintf(viewer_log, 'viewer_status=failed:%s\n', err.message);
+end
+fclose(viewer_log);
+end
+
+function dataset_tag = latest_result_dataset(model)
+dataset_tag = 'dset1';
+try
+    datasets = model.result.dataset.tags;
+    dataset_tag = char(datasets(end));
+catch
+    dataset_tag = 'dset1';
+end
 end

@@ -112,6 +112,7 @@ end % 结束研究状态检查 / End study status check
 
 mphsave(model, fullfile(export_dir, 'debug_before_export_forced_response_model.mph'), 'copy', 'on'); % 保存导出前调试模型 / Save pre-export debug model
 export_forced_response(model, export_dir); % 导出强迫响应结果 / Export forced response results
+prepare_forced_response_view(model, drive_frequency_hz, export_dir); % 保存前创建默认查看图 / Create default viewer plot before save
 mphsave(model, fullfile(export_dir, 'last_forced_response_model.mph'), 'copy', 'on'); % 保存验证模型副本 / Save validation model copy
 end % 结束主函数 / End main function
 
@@ -259,3 +260,57 @@ for point_index = 1:numel(w_abs) % 遍历采样点 / Iterate sample points
 end % 结束采样点循环 / End sample-point loop
 fclose(response_file); % 关闭响应 CSV / Close response CSV
 end % 结束响应导出函数 / End response export function
+
+function prepare_forced_response_view(model, drive_frequency_hz, export_dir) % 创建打开 MPH 时更清楚的强迫响应图 / Create clear forced-response plot for opened MPH
+viewer_log_path = fullfile(export_dir, 'forced_response_viewer_summary.txt'); % 查看图日志路径 / Viewer log path
+viewer_log = fopen(viewer_log_path, 'w'); % 打开日志 / Open log
+fprintf(viewer_log, 'drive_frequency_hz=%.12g\n', drive_frequency_hz); % 写入频率 / Write frequency
+try % 尽量创建图，但不要让查看图失败影响仿真保存 / Best-effort viewer plot
+    dataset_tag = latest_result_dataset(model); % 读取最新数据集 / Read latest dataset
+    fprintf(viewer_log, 'dataset_tag=%s\n', dataset_tag); % 写入数据集 / Write dataset
+    if has_feature(model.result, 'pg_mosaic_forced_response') % 删除旧图组 / Remove old plot group
+        model.result.remove('pg_mosaic_forced_response'); % 删除 / Remove
+    end % 结束旧图清理 / End old plot cleanup
+    pg = model.result.create('pg_mosaic_forced_response', 'PlotGroup3D'); % 创建 3D 图组 / Create 3D plot group
+    pg.label(sprintf('MOSAIC forced response |w| @ %.4g Hz', drive_frequency_hz)); % 设置标签 / Set label
+    try % 设置数据集 / Set dataset
+        pg.set('data', dataset_tag); % 绑定最新解 / Bind latest solution
+    catch data_err % 记录但不中断 / Log but continue
+        fprintf(viewer_log, 'plot_group_data_warning=%s\n', data_err.message); % 写入警告 / Write warning
+    end % 结束数据集绑定 / End dataset binding
+    try % 设置标题 / Set title
+        pg.set('titletype', 'manual'); % 手动标题 / Manual title
+        pg.set('title', sprintf('Forced response |w| at %.4g Hz', drive_frequency_hz)); % 标题 / Title
+    catch title_err % 记录但不中断 / Log but continue
+        fprintf(viewer_log, 'title_warning=%s\n', title_err.message); % 写入警告 / Write warning
+    end % 结束标题设置 / End title setup
+    surf = pg.create('surf_mosaic_forced_response', 'Surface'); % 创建表面图 / Create surface plot
+    surf.label('Forced-response displacement amplitude |w|'); % 标签 / Label
+    surf.set('expr', 'abs(shell.w)'); % 位移幅值表达式 / Displacement amplitude expression
+    try % 设置单位 / Set unit
+        surf.set('unit', 'm'); % 单位 / Unit
+    catch unit_err % 记录但不中断 / Log but continue
+        fprintf(viewer_log, 'unit_warning=%s\n', unit_err.message); % 写入警告 / Write warning
+    end % 结束单位设置 / End unit setup
+    try % 设置描述 / Set description
+        surf.set('descr', 'Forced-response displacement amplitude'); % 描述 / Description
+    catch descr_err % 记录但不中断 / Log but continue
+        fprintf(viewer_log, 'descr_warning=%s\n', descr_err.message); % 写入警告 / Write warning
+    end % 结束描述设置 / End description setup
+    pg.run; % 运行图组 / Run plot group
+    fprintf(viewer_log, 'viewer_status=ok\n'); % 记录成功 / Log success
+catch err % 捕获查看图错误 / Catch viewer error
+    fprintf(viewer_log, 'viewer_status=failed:%s\n', err.message); % 写入失败 / Write failure
+end % 结束查看图创建 / End viewer plot creation
+fclose(viewer_log); % 关闭日志 / Close log
+end % 结束查看图函数 / End viewer function
+
+function dataset_tag = latest_result_dataset(model) % 获取最新结果数据集 / Get latest result dataset
+dataset_tag = 'dset1'; % 默认数据集 / Default dataset
+try % 尝试读取最后一个数据集 / Try reading last dataset
+    datasets = model.result.dataset.tags; % 读取数据集标签 / Read dataset tags
+    dataset_tag = char(datasets(end)); % 使用最后一个数据集 / Use latest dataset
+catch % 读取失败时保持默认 / Keep default on failure
+    dataset_tag = 'dset1'; % 回退 / Fallback
+end % 结束数据集读取 / End dataset read
+end % 结束数据集函数 / End dataset helper
