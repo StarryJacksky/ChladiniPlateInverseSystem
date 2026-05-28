@@ -4067,10 +4067,24 @@
     // 前端逻辑 / Frontend logic
     }
 
+    // 显示自动恢复后的非阻塞提示 / Render non-blocking auto-recovery notices
+    function showWorkflowPreflightNotices(notices) {
+      // 前端逻辑 / Frontend logic
+      workflowHint.hidden = false;
+      // 前端逻辑 / Frontend logic
+      workflowHint.innerHTML = `
+        <!-- 模板内容 / Template content --><strong>Heads up</strong>
+        <!-- 模板内容 / Template content -->${notices.map((note) => `<span>${escapeText(note)}</span>`).join("")}
+      <!-- 模板内容 / Template content -->`;
+    // 前端逻辑 / Frontend logic
+    }
+
     // 前端逻辑 / Frontend logic
     async function validateWorkflowPreflight() {
       // 前端逻辑 / Frontend logic
       const issues = [];
+      // 自动恢复提示（不阻塞）/ Auto-recovery notices (non-blocking)
+      const notices = [];
       // 前端逻辑 / Frontend logic
       const sr = Number(prodStiffnessRatioInput.value);
       // 前端逻辑 / Frontend logic
@@ -4089,22 +4103,36 @@
       if (!Number.isInteger(iters) || iters < 0 || iters > 10) { issues.push("Phase 2 iters must be an integer from 0 to 10."); }
       // 前端逻辑 / Frontend logic
       if (!(prodCandidateIdInput.value || "").trim()) { issues.push("Candidate ID cannot be empty."); }
-      // 前端逻辑 / Frontend logic
+      // 先尝试拉取已有的目标分析 / First try to load existing target analysis
       if (!Object.keys(latestTargetAnalysis).length) { await loadTargetAnalysis(); }
-      // 前端逻辑 / Frontend logic
-      if (!Object.keys(latestTargetAnalysis).length) { issues.push("Save the target once so preprocessing and target-quality metrics exist."); }
-      // 前端逻辑 / Frontend logic
+      // 若仍为空，自动保存画板内容（新电脑首跑保护）/ Still empty → auto-save canvas (fresh-machine fallback)
+      if (!Object.keys(latestTargetAnalysis).length) {
+        // 静默自动保存 / Silent auto-save
+        try {
+          // 调用现有 saveTarget 函数 / Reuse the existing saveTarget function
+          await saveTarget();
+          // 提示用户自动保存已完成 / Inform the user about the auto-save
+          notices.push("Target was auto-saved before the run because no analysis was cached yet.");
+        } catch (err) {
+          // 保存失败的情况下让下方的硬检查报告 / Let the hard check below surface the failure
+        }
+      }
+      // 仍然没有分析则视为画板为空 / Still empty → treat as a blank canvas (hard block)
+      if (!Object.keys(latestTargetAnalysis).length) { issues.push("Draw a target on the canvas first — auto-save did not produce any analysis."); }
+      // 是否需要 COMSOL / Does this run need COMSOL?
       const needComsol = !prodSkipComsolToggle.checked;
-      // 前端逻辑 / Frontend logic
+      // 拉取最新诊断 / Refresh latest diagnostics
       if (needComsol && !latestDiagnostics.ready_for_auto_run) { await loadDiagnostics(); }
-      // 前端逻辑 / Frontend logic
+      // 若 COMSOL 仍不可用，自动切回 surrogate-only 模式 / If COMSOL still unavailable, auto-flip to surrogate-only
       if (needComsol && !latestDiagnostics.ready_for_auto_run) {
-        // 前端逻辑 / Frontend logic
-        issues.push("COMSOL is required by this run but diagnostics are not ready. Enable 'Skip COMSOL' for a surrogate-only preview or refresh diagnostics.");
+        // 自动勾选 Skip COMSOL / Auto-enable the Skip COMSOL toggle
+        prodSkipComsolToggle.checked = true;
+        // 提示用户已自动降级 / Notify the user about the auto-fallback
+        notices.push("COMSOL is not ready on this machine — switching to surrogate-only mode. Install COMSOL and run Diagnostics → Refresh to enable the full pipeline.");
       // 前端逻辑 / Frontend logic
       }
-      // 前端逻辑 / Frontend logic
-      return { ok: issues.length === 0, issues };
+      // 返回硬错误 + 自动恢复说明 / Return both hard issues and auto-recovery notices
+      return { ok: issues.length === 0, issues, notices };
     // 前端逻辑 / Frontend logic
     }
 
@@ -4134,10 +4162,18 @@
       workflowProgress.hidden = true;
       // 前端逻辑 / Frontend logic
       workflowTimeline.textContent = "Queueing pipeline...";
+      // 保留 preflight 自动恢复的非阻塞提示，否则清空 / Keep auto-recovery notices; otherwise clear the hint
+      if (preflight.notices && preflight.notices.length) {
+        // 前端逻辑 / Frontend logic
+        showWorkflowPreflightNotices(preflight.notices);
       // 前端逻辑 / Frontend logic
-      workflowHint.hidden = true;
+      } else {
+        // 前端逻辑 / Frontend logic
+        workflowHint.hidden = true;
+        // 前端逻辑 / Frontend logic
+        workflowHint.textContent = "";
       // 前端逻辑 / Frontend logic
-      workflowHint.textContent = "";
+      }
       // 前端逻辑 / Frontend logic
       try {
         // 前端逻辑 / Frontend logic
