@@ -39,6 +39,26 @@ def legend_values_for_thickness(H: np.ndarray) -> list[float]:  # 选择连续�
     return [minimum, (minimum + maximum) / 2.0, maximum]  # 返回连续图例三点 / Return three continuous legend points
 
 
+def adaptive_precision(H: np.ndarray) -> int:  # 根据动态范围选数字精度 / Pick label precision based on dynamic range
+    """Return the number of decimal places that lets the highest-value cell
+    visually differ from the lowest-value cell. 2dp is enough when H spans
+    say 0.6-2.0 mm, but when W10 converges near h_max (e.g. 1.99-2.00 mm)
+    everything rounds to '2.00' and the grid looks uniform even though the
+    colours differ — this helper bumps to 3dp / 4dp so the user can read
+    the actual gradient."""
+    finite = H[np.isfinite(H)]
+    if finite.size == 0:
+        return 2
+    span = float(np.max(finite) - np.min(finite))
+    if span <= 0.0:  # 全相等，无信息可读 → 2 位足够 / Exactly uniform field → 2 dp is fine
+        return 2
+    if span >= 0.05:  # 范围 >= 0.05 mm，2 位足够 / 2 dp is enough when range >= 0.05 mm
+        return 2
+    if span >= 0.005:  # 1.99 ~ 2.00 这类，需要 3 位 / Need 3 dp for tight clusters
+        return 3
+    return 4  # 极端紧密，给 4 位 / Very tight cluster, fall back to 4 dp
+
+
 def render_thickness_matrix(H: np.ndarray, output_path: str | Path, title: str = "Thickness matrix") -> Path:  # 渲染厚度矩阵 / Render thickness matrix
     path = Path(output_path)  # 转换为路径对象 / Convert to path object
     path.parent.mkdir(parents=True, exist_ok=True)  # 创建输出目录 / Create output directory
@@ -57,6 +77,14 @@ def render_thickness_matrix(H: np.ndarray, output_path: str | Path, title: str =
     draw.text((margin, 18), title, fill=(24, 32, 40), font=title_font)  # 绘制标题 / Draw title
     min_value = float(np.min(H))  # 获取最小厚度 / Get minimum thickness
     max_value = float(np.max(H))  # 获取最大厚度 / Get maximum thickness
+    precision = adaptive_precision(H)  # 自适应小数位 / Adaptive decimal precision
+    fmt = f".{precision}f"  # 数字格式化模板 / Number format template
+    # 小字体保险：高精度（4 位）的标签可能挤不下 80px 格子，降一档字号 /
+    # Smaller font for high-precision labels so 4-digit numbers still fit
+    if precision >= 4:
+        label_font = load_font(13)
+    elif precision == 3:
+        label_font = load_font(15)
     grid_top = title_height + margin  # 计算网格顶部位置 / Compute grid top position
     center_cells = set(center_cells_for_grid(rows)) if rows == cols else set()  # 计算中心单元集合 / Compute centre-cell set
     for row in range(rows):  # 遍历矩阵行 / Iterate matrix rows
@@ -67,7 +95,7 @@ def render_thickness_matrix(H: np.ndarray, output_path: str | Path, title: str =
             y1 = y0 + cell  # 计算单元下边界 / Compute cell bottom edge
             colour = thickness_colour(float(H[row, col]), min_value, max_value)  # 计算单元颜色 / Compute cell colour
             draw.rectangle((x0, y0, x1, y1), fill=colour, outline=(255, 255, 255), width=3)  # 绘制单元格 / Draw cell
-            label = f"{H[row, col]:.2f}"  # 生成连续厚度标签 / Build continuous thickness label
+            label = format(float(H[row, col]), fmt)  # 自适应精度厚度标签 / Adaptive-precision thickness label
             box = draw.textbbox((0, 0), label, font=label_font)  # 计算文字边界 / Compute text bounding box
             tx = x0 + (cell - (box[2] - box[0])) / 2  # 计算文字 x 坐标 / Compute text x coordinate
             ty = y0 + (cell - (box[3] - box[1])) / 2  # 计算文字 y 坐标 / Compute text y coordinate
@@ -75,12 +103,13 @@ def render_thickness_matrix(H: np.ndarray, output_path: str | Path, title: str =
             if (row, col) in center_cells:  # 判断是否为中心固定单元 / Check whether this is center fixed cell
                 draw_center_marker(draw, x0, y0, x1, y1)  # 绘制中心标记 / Draw center marker
     legend_y = grid_top + rows * cell + 22  # 计算图例 y 坐标 / Compute legend y coordinate
-    draw.text((margin, legend_y), "Thickness / 厚度 (mm)", fill=(24, 32, 40), font=small_font)  # 绘制图例标题 / Draw legend title
+    span_text = f"  ·  range {max_value - min_value:{fmt}} mm" if max_value > min_value else ""  # 范围提示 / Show dynamic range hint
+    draw.text((margin, legend_y), f"Thickness / 厚度 (mm){span_text}", fill=(24, 32, 40), font=small_font)  # 绘制图例标题 / Draw legend title
     for index, value in enumerate(legend_values_for_thickness(H)):  # 遍历厚度图例值 / Iterate thickness legend values
-        swatch_x = margin + 160 + index * 76  # 计算色块 x 坐标 / Compute swatch x coordinate
+        swatch_x = margin + 220 + index * 86  # 计算色块 x 坐标（让位给 range 提示）/ Compute swatch x (leave room for range hint)
         colour = thickness_colour(value, min_value, max_value)  # 计算色块颜色 / Compute swatch colour
         draw.rectangle((swatch_x, legend_y - 2, swatch_x + 24, legend_y + 22), fill=colour)  # 绘制色块 / Draw swatch
-        draw.text((swatch_x + 30, legend_y), f"{value:.2f}", fill=(24, 32, 40), font=small_font)  # 绘制连续厚度标签 / Draw continuous thickness label
+        draw.text((swatch_x + 30, legend_y), format(value, fmt), fill=(24, 32, 40), font=small_font)  # 绘制自适应精度厚度标签 / Adaptive-precision legend label
     image.save(path)  # 保存预览图 / Save preview image
     return path  # 返回输出路径 / Return output path
 
