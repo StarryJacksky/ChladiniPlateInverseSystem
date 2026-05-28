@@ -2020,7 +2020,7 @@
         <div class="tab-panel" data-tab-panel="results"> <!-- 页面结构 / Page structure -->
         <section class="panel"> <!-- 生产 pipeline 输出 / Production pipeline output -->
           <h2>Production Runs</h2> <!-- 页面结构 / Page structure -->
-          <p class="field-hint" style="font-size:0.85em;opacity:0.7;margin:0 0 8px 0">Completed runs from the W10 + Phase 1 + Phase 2 pipeline. Each row shows surrogate enrichment, the best COMSOL composite (when COMSOL ran), and Phase 2 improvement. Click <strong>Open .mph</strong> to inspect a run in COMSOL. / 完成的 W10 + Phase 1 + Phase 2 流水线运行。每行显示 surrogate enrichment、最佳 COMSOL 合成（启用 COMSOL 时）以及 Phase 2 改进。点击 <strong>Open .mph</strong> 可以在 COMSOL 中检查。</p>
+          <p class="field-hint" style="font-size:0.85em;opacity:0.7;margin:0 0 8px 0">Completed runs from the W10 + Phase 1 + Phase 2 pipeline. Each row shows surrogate enrichment, the best COMSOL composite (when COMSOL ran), and Phase 2 improvement. Click <strong>Open best .mph</strong> to inspect the selected best model in COMSOL. / 完成的 W10 + Phase 1 + Phase 2 流水线运行。每行显示 surrogate enrichment、最佳 COMSOL 合成（启用 COMSOL 时）以及 Phase 2 改进。点击 <strong>Open best .mph</strong> 可在 COMSOL 中检查自动选出的最佳模型。</p>
           <div id="productionRunsSummary" class="result-summary">0 runs</div> <!-- 计数 / Run count -->
           <div id="productionRunsList" class="results">No production runs yet</div> <!-- 列表 / List -->
         </section> <!-- 页面结构 / Page structure -->
@@ -4222,7 +4222,7 @@
       // 前端逻辑 / Frontend logic
       const comsolButtonHtml = comsolAvailable
         // 前端逻辑 / Frontend logic
-        ? `<button class="download-link" type="button" data-action="open-in-comsol" data-candidate-id="${encodeURIComponent(detail.candidate_id)}">Open .mph in COMSOL${detail.comsol_mph_count > 1 ? ` (${detail.comsol_mph_count})` : ""}</button>`
+        ? `<button class="download-link" type="button" data-action="open-in-comsol" data-candidate-id="${encodeURIComponent(detail.candidate_id)}">Open best .mph in COMSOL${detail.comsol_mph_count > 1 ? ` (${detail.comsol_mph_count} saved)` : ""}</button>`
         // 前端逻辑 / Frontend logic
         : `<span class="candidate-actions-note" title="Surrogate-only runs never invoke COMSOL, so no .mph is saved. Run the pipeline with COMSOL enabled to generate one.">No COMSOL .mph (surrogate-only run)</span>`;
       // 状态条放在 candidate-head 之外，避免被纳入 flex 流挤动按钮 / Place status banner OUTSIDE candidate-head so toggling it can't shift the button row
@@ -6144,38 +6144,17 @@
 
     async function openCandidateInComsol(candidateId) {
       const statusEl = document.getElementById("comsolOpenStatus");
-      if (statusEl) { statusEl.hidden = false; statusEl.textContent = "Locating COMSOL model files..."; }
+      if (statusEl) { statusEl.hidden = false; statusEl.textContent = "Opening best COMSOL model..."; }
       try {
-        const listRes = await fetch(`/api/candidate-mph?id=${encodeURIComponent(candidateId)}&t=${Date.now()}`);
-        const list = await listRes.json();
-        if (!listRes.ok) { throw new Error(list.error || "Failed to list COMSOL models"); }
-        if (!list.files || list.files.length === 0) {
-          if (statusEl) statusEl.textContent = `No COMSOL .mph saved for "${candidateId}". Re-run with COMSOL enabled (Production Pipeline without "Skip COMSOL"). / 该候选没有保存的 .mph 文件；请启用 COMSOL 重新运行。`;
-          return;
-        }
-        let chosenPath;
-        if (list.files.length === 1) {
-          chosenPath = list.files[0].path;
-        } else {
-          const labels = list.files.map((f, i) => `${i + 1}. ${f.label} (${f.size_mb} MB)`).join("\n");
-          const choice = window.prompt(`Multiple COMSOL models found for "${candidateId}". Enter number to open:\n\n${labels}`, "1");
-          if (!choice) { if (statusEl) statusEl.textContent = "Cancelled."; return; }
-          const idx = parseInt(choice, 10) - 1;
-          if (Number.isNaN(idx) || idx < 0 || idx >= list.files.length) {
-            if (statusEl) statusEl.textContent = "Invalid selection.";
-            return;
-          }
-          chosenPath = list.files[idx].path;
-        }
-        if (statusEl) statusEl.textContent = "Launching COMSOL...";
         const openRes = await fetch("/api/open-in-comsol", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ path: chosenPath })
+          body: JSON.stringify({ candidate_id: candidateId })
         });
         const openJson = await openRes.json();
         if (!openRes.ok) { throw new Error(openJson.error || "Failed to launch COMSOL"); }
-        if (statusEl) statusEl.textContent = `COMSOL launched (pid ${openJson.pid}). Opening: ${openJson.mph_path}`;
+        const reason = openJson.selection && openJson.selection.selection_reason ? ` — ${openJson.selection.selection_reason}` : "";
+        if (statusEl) statusEl.textContent = `COMSOL launched (pid ${openJson.pid}). Opening best model: ${openJson.mph_path}${reason}`;
       } catch (err) {
         if (statusEl) statusEl.textContent = "Error: " + err.message;
       }

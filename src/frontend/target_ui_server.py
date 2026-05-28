@@ -154,7 +154,7 @@ def discover_candidate_mph_files(candidate_id: str) -> list[dict]:  # 收集候�
     direct_dir = root / candidate_id  # / Direct dir
     if direct_dir.is_dir():  # / If dir
         for mph in sorted(direct_dir.rglob("*.mph")):  # 递归 .mph / Recurse for .mph
-            if mph.name.startswith("debug_") or "/recovery/" in str(mph):  # 跳过 debug / recovery / Skip debug & recovery
+            if mph.name.startswith("debug_") or "recovery" in {part.lower() for part in mph.parts}:  # 跳过 debug / recovery / Skip debug & recovery
                 continue  # / Skip
             kind = "eigenfrequency" if "eigenfrequency" in mph.parent.name else ("forced_response" if "forced_response" in mph.parent.name else "other")  # 类型 / Kind
             candidates.append({  # 加入 / Append
@@ -174,7 +174,7 @@ def discover_candidate_mph_files(candidate_id: str) -> list[dict]:  # 收集候�
         if candidate_id not in variant_dir.name:  # 不相关 / Unrelated
             continue  # / Skip
         for mph in sorted(variant_dir.rglob("*.mph")):  # 递归 / Recurse
-            if mph.name.startswith("debug_") or "/recovery/" in str(mph):  # / Skip
+            if mph.name.startswith("debug_") or "recovery" in {part.lower() for part in mph.parts}:  # / Skip
                 continue  # / Skip
             kind = "eigenfrequency" if "eigenfrequency" in mph.parent.name else ("forced_response" if "forced_response" in mph.parent.name else "other")  # / Kind
             # Extract a friendly suffix like "f165Hz" or "eig30" from variant dir name: / 友好后缀
@@ -188,6 +188,110 @@ def discover_candidate_mph_files(candidate_id: str) -> list[dict]:  # 收集候�
                 "size_mb": round(mph.stat().st_size / 1024.0 / 1024.0, 2),  # / Size
             })
     return candidates  # 返回列表 / Return list
+
+
+def _variant_matches_design(variant_dir: str, design_id: str) -> bool:
+    if variant_dir == f"prod_eig_{design_id}":
+        return True
+    if "_comsol_" in variant_dir:
+        prefix = variant_dir.split("_comsol_", 1)[0]
+        return prefix.endswith("_" + design_id)
+    return variant_dir == design_id
+
+
+def _frequency_from_variant_dir(variant_dir: str) -> float | None:
+    match = re.search(r"_f(\d+(?:p\d+)?)Hz(?:$|_)", variant_dir)
+    if not match:
+        return None
+    try:
+        return float(match.group(1).replace("p", "."))
+    except ValueError:
+        return None
+
+
+def _best_phase2_entry(summary: dict) -> dict | None:
+    phase2 = summary.get("phase2") or {}
+    history = phase2.get("history") or []
+    best_iter = phase2.get("best_iter")
+    for row in history:
+        if row.get("iter") == best_iter:
+            return row
+    if history:
+        def score(row: dict) -> float:
+            broad = ((row.get("best_composite") or {}).get("broad") or {})
+            return float(broad.get("enrich") or -1.0)
+        return max(history, key=score)
+    return None
+
+
+def _best_forced_frequency(summary: dict, selected_entry: dict | None, design_id: str) -> float | None:
+    best_composite = (selected_entry or {}).get("best_composite") or (summary.get("phase1") or {}).get("best_composite") or {}
+    subset = [str(item) for item in (best_composite.get("subset") or [])]
+    if not subset:
+        return None
+    per_freq = (summary.get("phase1") or {}).get("per_freq") or {}
+    if design_id == str(summary.get("candidate_id", "")):
+        scored = []
+        for key in subset:
+            broad = (per_freq.get(key) or {}).get("broad") or {}
+            if broad.get("enrich") is not None:
+                scored.append((float(broad.get("enrich")), key))
+        if scored:
+            return float(max(scored, key=lambda item: item[0])[1])
+    return float(subset[0])
+
+
+def _production_summary_for_candidate(candidate_id: str) -> dict | None:
+    summary_path = project_root() / "reports" / "production" / candidate_id / "production_summary.json"
+    if not summary_path.exists():
+        return None
+    try:
+        return json.loads(summary_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def select_best_candidate_mph_file(candidate_id: str) -> dict:
+    files = discover_candidate_mph_files(candidate_id)
+    if not files:
+        raise FileNotFoundError(f"No .mph saved for candidate {candidate_id}. Re-run with COMSOL enabled to generate one. / 候选 {candidate_id} 没有保存的 .mph 文件，请在启用 COMSOL 的情况下重新运行以生成。")
+    if len(files) == 1:
+        chosen = dict(files[0])
+        chosen["selection_reason"] = "Only saved COMSOL model for this candidate. / 该候选唯一保存的 COMSOL 模型。"
+        return chosen
+
+    summary = _production_summary_for_candidate(candidate_id)
+    design_id = candidate_id
+    target_freq = None
+    if summary:
+        selected_entry = _best_phase2_entry(summary)
+        design_id = str((selected_entry or {}).get("candidate_id") or summary.get("candidate_id") or candidate_id)
+        target_freq = _best_forced_frequency(summary, selected_entry, design_id)
+
+    design_files = [file for file in files if _variant_matches_design(str(file.get("variant_dir", "")), design_id)] or files
+    forced = [file for file in design_files if file.get("kind") == "forced_response"]
+    if forced:
+        if target_freq is not None:
+            chosen = min(forced, key=lambda file: abs((_frequency_from_variant_dir(str(file.get("variant_dir", ""))) or target_freq) - target_freq))
+            chosen = dict(chosen)
+            chosen["selection_reason"] = f"Best production forced-response model near {target_freq:g} Hz. / 打开最接近最佳频率 {target_freq:g} Hz 的强迫响应模型。"
+            return chosen
+        chosen = max(forced, key=lambda file: Path(str(file["path"])).stat().st_mtime)
+        chosen = dict(chosen)
+        chosen["selection_reason"] = "Most recent forced-response COMSOL model. / 最新的强迫响应 COMSOL 模型。"
+        return chosen
+
+    eigen = [file for file in design_files if file.get("kind") == "eigenfrequency"]
+    if eigen:
+        chosen = max(eigen, key=lambda file: Path(str(file["path"])).stat().st_mtime)
+        chosen = dict(chosen)
+        chosen["selection_reason"] = "No forced-response model found; opening the eigenfrequency model. / 未找到强迫响应模型，打开特征频率模型。"
+        return chosen
+
+    chosen = max(files, key=lambda file: Path(str(file["path"])).stat().st_mtime)
+    chosen = dict(chosen)
+    chosen["selection_reason"] = "Fallback to the most recent saved COMSOL model. / 回退打开最新保存的 COMSOL 模型。"
+    return chosen
 
 
 def open_mph_in_comsol(config: dict, mph_path: str) -> dict:  # 用 COMSOL 打开 .mph / Launch COMSOL with .mph
@@ -1675,17 +1779,16 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                     length = int(self.headers.get("Content-Length", "0"))  # 请求体长度 / Body length
                     payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 解析 JSON / Parse JSON
                     mph_path = str(payload.get("path", "")).strip()  # 读取路径 / Read path
+                    auto_selected_mph = None  # 自动选择的模型 / Auto-selected model
                     if not mph_path:  # 缺失 / Missing
                         candidate_id = str(payload.get("candidate_id", "")).strip()  # 候选编号 / Candidate id
                         if not candidate_id:  # 完全无线索 / No clue
                             raise ValueError("Provide either 'path' or 'candidate_id'. / 必须提供 path 或 candidate_id。")  # / Reject
-                        files = discover_candidate_mph_files(candidate_id)  # 自动发现 / Auto-discover
-                        if not files:  # 无文件 / None
-                            raise FileNotFoundError(f"No .mph saved for candidate {candidate_id}. Re-run with COMSOL enabled to generate one. / 候选 {candidate_id} 没有保存的 .mph 文件，请在启用 COMSOL 的情况下重新运行以生成。")  # / Helpful error
-                        if len(files) > 1:  # 多个 / Multiple
-                            raise ValueError(f"Multiple .mph files exist for {candidate_id}; specify 'path'. / 候选 {candidate_id} 有多个 .mph 文件，请通过 path 指定具体文件。")  # / Need disambiguation
-                        mph_path = files[0]["path"]  # 用唯一文件 / Use single match
+                        auto_selected_mph = select_best_candidate_mph_file(candidate_id)  # 选择最佳模型 / Select best model
+                        mph_path = str(auto_selected_mph["path"])  # 使用最佳模型 / Use best model
                     result = open_mph_in_comsol(config, mph_path)  # 启动 / Launch
+                    if auto_selected_mph is not None:  # 候选自动选择时附带选择理由 / Include selection metadata for candidate auto-pick
+                        result["selection"] = auto_selected_mph  # 最佳模型元数据 / Best-model metadata
                     self.send_json(result)  # 返回元数据 / Return metadata
                 except FileNotFoundError as exc:  # 文件不存在 / Missing file
                     self.send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)  # 404 / 404
