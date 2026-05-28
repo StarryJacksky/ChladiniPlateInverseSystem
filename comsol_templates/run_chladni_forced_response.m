@@ -298,12 +298,94 @@ try % 尽量创建图，但不要让查看图失败影响仿真保存 / Best-eff
         fprintf(viewer_log, 'descr_warning=%s\n', descr_err.message); % 写入警告 / Write warning
     end % 结束描述设置 / End description setup
     pg.run; % 运行图组 / Run plot group
+    fprintf(viewer_log, 'forced_response_plot_status=ok\n'); % Log amplitude plot success
+    [sand_threshold_abs, sand_peak_abs] = sampled_response_stats(model, dataset_tag, viewer_log); % Compute low-amplitude mask threshold
+    prepare_sand_prediction_view(model, dataset_tag, drive_frequency_hz, sand_threshold_abs, sand_peak_abs, viewer_log); % Create sand prediction plot
     fprintf(viewer_log, 'viewer_status=ok\n'); % 记录成功 / Log success
 catch err % 捕获查看图错误 / Catch viewer error
     fprintf(viewer_log, 'viewer_status=failed:%s\n', err.message); % 写入失败 / Write failure
 end % 结束查看图创建 / End viewer plot creation
 fclose(viewer_log); % 关闭日志 / Close log
 end % 结束查看图函数 / End viewer function
+
+function [threshold_abs, peak_abs] = sampled_response_stats(model, dataset_tag, viewer_log)
+threshold_abs = NaN;
+peak_abs = NaN;
+try
+    try
+        data = mpheval(model, {'abs(shell.w)'}, 'dataset', dataset_tag, 'edim', 2);
+    catch
+        data = mpheval(model, {'abs(shell.w)'}, 'edim', 2);
+    end
+    amplitudes = abs(data.d1(:));
+    amplitudes = amplitudes(isfinite(amplitudes));
+    if isempty(amplitudes)
+        fprintf(viewer_log, 'sand_prediction_status=skipped:no_amplitude_samples\n');
+        return;
+    end
+    peak_abs = max(amplitudes);
+    sorted_amplitudes = sort(amplitudes);
+    threshold_index = max(1, min(numel(sorted_amplitudes), ceil(0.10 * numel(sorted_amplitudes))));
+    threshold_abs = sorted_amplitudes(threshold_index);
+    if peak_abs > 0
+        threshold_abs = max(threshold_abs, peak_abs * 1e-6);
+    end
+    fprintf(viewer_log, 'sand_threshold_percentile=10\n');
+    fprintf(viewer_log, 'sand_threshold_abs_m=%.12g\n', threshold_abs);
+    fprintf(viewer_log, 'sand_peak_abs_m=%.12g\n', peak_abs);
+catch stats_err
+    fprintf(viewer_log, 'sand_prediction_status=skipped:stats_failed:%s\n', stats_err.message);
+end
+end
+
+function prepare_sand_prediction_view(model, dataset_tag, drive_frequency_hz, threshold_abs, peak_abs, viewer_log)
+try
+    if ~isfinite(threshold_abs) || threshold_abs <= 0 || ~isfinite(peak_abs) || peak_abs <= 0
+        fprintf(viewer_log, 'sand_prediction_status=skipped:invalid_threshold\n');
+        return;
+    end
+    if has_feature(model.result, 'pg_mosaic_sand_prediction')
+        model.result.remove('pg_mosaic_sand_prediction');
+    end
+    pg = model.result.create('pg_mosaic_sand_prediction', 'PlotGroup3D');
+    pg.label(sprintf('MOSAIC sand prediction nodes @ %.4g Hz', drive_frequency_hz));
+    try
+        pg.set('data', dataset_tag);
+    catch data_err
+        fprintf(viewer_log, 'sand_plot_group_data_warning=%s\n', data_err.message);
+    end
+    try
+        pg.set('titletype', 'manual');
+        pg.set('title', sprintf('Sand prediction: lowest 10%% |w| at %.4g Hz', drive_frequency_hz));
+    catch title_err
+        fprintf(viewer_log, 'sand_title_warning=%s\n', title_err.message);
+    end
+    surf = pg.create('surf_mosaic_sand_prediction', 'Surface');
+    surf.label('Sand prediction: low-vibration node mask');
+    surf.set('expr', sprintf('if(abs(shell.w)<=%.12g[m],1-abs(shell.w)/(%.12g[m]),0)', threshold_abs, threshold_abs));
+    try
+        surf.set('unit', '1');
+    catch unit_err
+        fprintf(viewer_log, 'sand_unit_warning=%s\n', unit_err.message);
+    end
+    try
+        surf.set('descr', 'Predicted sand retention from lowest 10% displacement amplitude');
+    catch descr_err
+        fprintf(viewer_log, 'sand_descr_warning=%s\n', descr_err.message);
+    end
+    try
+        surf.set('rangecoloractive', 'on');
+        surf.set('rangecolormin', '0');
+        surf.set('rangecolormax', '1');
+    catch range_err
+        fprintf(viewer_log, 'sand_color_range_warning=%s\n', range_err.message);
+    end
+    pg.run;
+    fprintf(viewer_log, 'sand_prediction_status=ok\n');
+catch sand_err
+    fprintf(viewer_log, 'sand_prediction_status=failed:%s\n', sand_err.message);
+end
+end
 
 function dataset_tag = latest_result_dataset(model) % 获取最新结果数据集 / Get latest result dataset
 dataset_tag = 'dset1'; % 默认数据集 / Default dataset
