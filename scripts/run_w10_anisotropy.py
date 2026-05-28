@@ -4,8 +4,27 @@ W10 命令行入口：H + θ 在正交各向异性 Kirchhoff 板上的联合优�
 from __future__ import annotations  # 类型注解 / Type hints
 
 import argparse  # / Argparse
+import os  # / OS for thread env-vars
 import sys  # / System
 from pathlib import Path  # / Paths
+
+
+# === Cross-platform determinism: pin BLAS / OMP threads to 1 BEFORE numpy /
+# torch are imported. PyTorch on Windows (Intel MKL) and macOS (Accelerate /
+# Apple-built MKL) reorder float accumulation differently across threads, so
+# the *same* seed on two machines diverges to different local minima after a
+# few hundred Adam steps. Forcing single-thread BLAS keeps Adam state
+# (numerically) close enough across platforms that the COMSOL forced-response
+# downstream lands on the same composite. Users who want max throughput can
+# override with --torch-num-threads. /
+# 跨平台确定性：在 numpy/torch 导入前钉死单线程 BLAS。Win MKL 和 Mac Accelerate
+# 在多线程下浮点累加顺序不同，同 seed 跑出来 Adam 状态会逐步分叉到不同局部极小；
+# 锁死单线程后跨平台数值收敛趋同。要回多线程加速可加 --torch-num-threads。
+_DEFAULT_TORCH_THREADS = int(os.environ.get("W10_TORCH_NUM_THREADS", "1"))
+for _env_name in ("OMP_NUM_THREADS", "MKL_NUM_THREADS",
+                   "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS",
+                   "VECLIB_MAXIMUM_THREADS"):
+    os.environ.setdefault(_env_name, str(_DEFAULT_TORCH_THREADS))
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]  # 项目根 / Project root
 if str(PROJECT_ROOT) not in sys.path:  # / Check
@@ -63,6 +82,7 @@ def build_argument_parser() -> argparse.ArgumentParser:  # 解析器 / Parser
     parser.add_argument("--shear-ratio", type=float, default=None, help="Override shear ratio G/G_iso. / 覆盖剪切比。")  # / Gr
     parser.add_argument("--theta-init-mode", type=str, default="random", choices=["random", "zeros", "diagonal"], help="θ initial mode. / θ 初始模式。")  # / mode
     parser.add_argument("--theta-seed", type=int, default=42, help="θ random seed. / θ 随机种子。")  # / seed
+    parser.add_argument("--torch-num-threads", type=int, default=_DEFAULT_TORCH_THREADS, help="torch.set_num_threads value (default 1 for Win/Mac reproducibility; raise for speed). / torch 线程数，默认 1 以求跨平台一致。")  # / threads
     return parser  # / Return
 
 
@@ -74,8 +94,14 @@ def _load_theta_csv(path: Path) -> "np.ndarray":  # 读 θ CSV / Load θ CSV
 
 def main(argv: list[str] | None = None) -> int:  # 主 / Main
     import numpy as np  # / NumPy
+    import torch  # / Torch — env vars set above were honoured at import
     parser = build_argument_parser()  # / Parser
     args = parser.parse_args(argv)  # / Parse
+    # Apply the requested torch thread count. ``set_num_threads`` is safe to
+    # call repeatedly; the env vars above pinned BLAS at import time so this
+    # mainly affects PyTorch's intra-op pool. /
+    # 应用 torch 线程数；环境变量已在导入时锁定 BLAS，这里再锁 torch 自身线程池
+    torch.set_num_threads(max(1, int(args.torch_num_threads)))
     config = load_config(args.config)  # / Config
     target = load_target_binary(config, args.target)  # / Target
     verdict = load_verdict(Path(args.verdict_report) if args.verdict_report else None)  # / Verdict

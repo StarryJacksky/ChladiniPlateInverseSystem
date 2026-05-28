@@ -70,10 +70,11 @@ def build_default_pipeline_config(config_yaml_path: str | Path = "config.yaml",
         phase1_off_resonance_hz=float(take("phase1_off_resonance_hz", 1.5)),
         magic_off_resonance_hz=magic,
         eig_n_modes=int(take("eig_n_modes", 30)),
-        phase2_max_iters=int(take("phase2_max_iters", 1)),
-        phase2_inner_steps=int(take("phase2_inner_steps", 80)),
+        phase2_max_iters=int(take("phase2_max_iters", 3)),
+        phase2_inner_steps=int(take("phase2_inner_steps", 200)),
         phase2_lr_h_init=float(take("phase2_lr_h_init", 0.025)),
         phase2_lr_theta_init=float(take("phase2_lr_theta_init", 0.05)),
+        phase2_freeze_freq_first_steps=int(take("phase2_freeze_freq_first_steps", 20)),
         skip_phase2=bool(overrides.get("skip_phase2", False)),
         skip_comsol=bool(overrides.get("skip_comsol", False)),
     )
@@ -105,11 +106,19 @@ class ProductionPipelineConfig:
     magic_off_resonance_hz: tuple[float, ...] = (165.0,)
     eig_n_modes: int = 30
 
-    # Phase 2 trust-region (set max_iters=0 to skip)
-    phase2_max_iters: int = 1
-    phase2_inner_steps: int = 80
+    # Phase 2 trust-region (set max_iters=0 to skip).
+    # Defaults bumped (2026-05): old (1 iter / 80 steps / freeze=60 from W10
+    # default) routinely produced delta=0 because P2 effectively only got
+    # ~20 steps of freq/weight optimisation from a near-optimal P1 starting
+    # point. New defaults give P2 a real chance to escape the P1 basin while
+    # keeping wall-clock at ~3x the old single-iter cost. /
+    # Phase 2 信任域：旧默认（1 轮 / 80 步 / freeze=60）让 P2 实质只跑 ~20 步
+    # freq/weight 优化，绝大多数情况下 delta=0；新默认给 P2 真正的优化空间
+    phase2_max_iters: int = 3
+    phase2_inner_steps: int = 200
     phase2_lr_h_init: float = 0.025
     phase2_lr_theta_init: float = 0.05
+    phase2_freeze_freq_first_steps: int = 20
 
     # Scoring
     image_size: int = 256
@@ -148,8 +157,17 @@ def _run_subprocess(cmd: list[str], cwd: Path, label: str) -> subprocess.Complet
 def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progress=None,
                          initial_H_csv: Path | None = None, initial_theta_csv: Path | None = None,
                          candidate_id: str | None = None, num_steps: int | None = None,
-                         lr_h: float | None = None, lr_theta: float | None = None) -> dict:
-    """Run W10 surrogate optimisation. Returns its summary dict."""
+                         lr_h: float | None = None, lr_theta: float | None = None,
+                         freeze_freq_first_steps: int | None = None) -> dict:
+    """Run W10 surrogate optimisation. Returns its summary dict.
+
+    ``freeze_freq_first_steps`` (when not None) overrides the W10 default of
+    60. Useful for short Phase 2 inner iterations where 60 steps of frozen
+    freqs/weights would consume almost the entire budget and leave Adam
+    barely any time to update them. /
+    Phase 2 短 inner-iter 用：W10 默认前 60 步冻结 freq/weight，对 P2 80~200 步
+    几乎没法真正调 freq；传低值让 freq/weight 有充分优化时间
+    """
     cand_id = candidate_id or cfg.candidate_id
     cmd = [
         sys.executable, "scripts/run_w10_anisotropy.py",
@@ -169,6 +187,8 @@ def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progre
         cmd.extend(["--initial-H", str(initial_H_csv)])
     if initial_theta_csv is not None:
         cmd.extend(["--initial-theta-rad", str(initial_theta_csv)])
+    if freeze_freq_first_steps is not None:
+        cmd.extend(["--freeze-freq-first-steps", str(int(freeze_freq_first_steps))])
     _emit(progress, "surrogate", f"Running W10 surrogate ({int(num_steps or cfg.w10_num_steps)} steps)", candidate_id=cand_id)
     _run_subprocess(cmd, project_root, label=f"W10 surrogate ({cand_id})")
     summary_path = project_root / "candidates" / cand_id / "w10_optimization_summary.json"
@@ -471,11 +491,12 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
             old = project_root / "candidates" / iter_cand
             if old.exists():
                 shutil.rmtree(old)
-            _emit(progress, "phase2_iter_start", f"iter {it}/{cfg.phase2_max_iters}: surrogate continue (lr_H={lr_h:.4f}, lr_θ={lr_theta:.4f})", iter=it)
+            _emit(progress, "phase2_iter_start", f"iter {it}/{cfg.phase2_max_iters}: surrogate continue (lr_H={lr_h:.4f}, lr_θ={lr_theta:.4f}, freeze_freq={cfg.phase2_freeze_freq_first_steps})", iter=it)
             _run_w10_surrogate(cfg, project_root, progress=progress,
                                 initial_H_csv=cur_H, initial_theta_csv=cur_theta,
                                 candidate_id=iter_cand, num_steps=cfg.phase2_inner_steps,
-                                lr_h=lr_h, lr_theta=lr_theta)
+                                lr_h=lr_h, lr_theta=lr_theta,
+                                freeze_freq_first_steps=cfg.phase2_freeze_freq_first_steps)
             res = _evaluate_design(cfg, project_root, iter_cand,
                                      variant_prefix=f"prodp2it{it}", target=target,
                                      plate_length_mm=plate_length_mm, progress=progress)

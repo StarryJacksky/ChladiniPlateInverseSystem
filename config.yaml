@@ -59,10 +59,11 @@ production:
   phase1_off_resonance_hz: 1.5 # 偏离本征频率的驱动偏移 / Off-resonance offset
   magic_off_resonance_hz: [165.0] # tier1 经验发现的 magic 频率（探索新材料请重新扫频） / tier1 empirically-discovered magic freq
   eig_n_modes: 30 # COMSOL eigenfreq 求解阶数 / COMSOL eigenfrequency modes
-  phase2_max_iters: 1 # 信任域外层迭代数（0 = 跳过 Phase 2） / Trust-region outer iters (0 = skip Phase 2)
-  phase2_inner_steps: 80 # 每次 Phase 2 内层 W10 步数 / Inner W10 steps per Phase 2 iter
+  phase2_max_iters: 3 # 信任域外层迭代数（0 = 跳过 Phase 2；旧默认 1 实质 delta=0） / Trust-region outer iters (was 1, raised so P2 can actually escape the P1 basin)
+  phase2_inner_steps: 200 # 每次 Phase 2 内层 W10 步数（旧默认 80 太短） / Inner W10 steps per Phase 2 iter (was 80)
   phase2_lr_h_init: 0.025 # / Trust-region H LR initial
   phase2_lr_theta_init: 0.05 # / Trust-region θ LR initial
+  phase2_freeze_freq_first_steps: 20 # P2 内层冻结 freq/weight 步数（W10 默认 60，对 P2 短步数太长） / Freeze freq/weight first-N steps in P2 (W10 default 60 is too long for short P2 inner runs)
 
 # COMSOL 仿真设置 / COMSOL simulation settings
 simulation:
