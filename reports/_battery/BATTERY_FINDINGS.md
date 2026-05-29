@@ -113,3 +113,39 @@ Each pipeline run takes ~10 min. Total: ~100 min for the full 10-run battery
 - `config.yaml` is **temporarily patched** with PLA material parameters during the PLA half
   of the battery, then restored from a `.bak` in a `try/finally` block. If the orchestrator
   is killed, restore from `config.yaml.bak_battery*` manually before re-running.
+
+## Addendum — CF-PETG with θ FROZEN (decisive verification)
+
+After the main battery, we suspected θ might be a parasitic dimension that the W10 surrogate
+cannot actually optimise. The diagnostic chain that led to this:
+
+- W10 working frequencies sit in the regime where `ω²·||M||` ≫ `||K||` (mass term dominates by
+  ~5 orders of magnitude). θ only enters physics through K, so its gradient is effectively zero.
+- Direct sensitivity probe (`scripts/_test_theta_sensitivity.py`): swapping θ to uniform vs random
+  changes composite amplitude by **≤ 7 ppm** in W10's working band — far below numerical noise.
+- CF-PETG surrogate enrichment was bit-identical between θ-active and θ-frozen runs on the same
+  target/H seed (e.g. `binary` → enr=3.049 in both).
+
+To verify on a hostile target, we re-ran **CF-PETG × `diagonal` with `freeze_theta=True`**
+(`reports/_battery_noθ_check/cfpetg_diag/`). Result:
+
+| Config | broad enr | broad recall | tight enr |
+|---|---|---|---|
+| CF-PETG **active θ** (orig battery) | 8.37 | 0.63 | 11.75 |
+| **CF-PETG frozen θ** (this verification) | **9.80** | **0.67** | 11.98 |
+| PLA iso (no θ) baseline | 11.35 | 0.92 | — |
+
+**Freezing θ alone gains +17% broad enrichment and +6% recall on CF-PETG diagonal**
+— without changing the material, the H/ω optimiser, or COMSOL inputs. This rules out
+"material effect" as the explanation for PLA's wins; the parasitic dimension is the real culprit.
+
+CF-PETG with frozen θ still trails PLA iso (9.80 vs 11.35), suggesting an additional
+material-side handicap for diagonal targets on anisotropic plates. But freezing θ is
+unconditionally a net positive on this target — and we now have direct sensitivity data
+showing it should be a net positive on every target whose drive frequencies sit in the
+non-resonant regime, which appears to be all of them.
+
+**Consequence for the codebase**: θ optimisation is being removed entirely as a follow-up
+to this addendum. `freeze_theta=True` was the temporary fix; the cleanup removes the dead
+code path so future work cannot regress into it. See commit `<remove-theta>` for details.
+

@@ -10,7 +10,16 @@ candidates/bat_*
 candidates/prod_*
 candidates/prodp1_*
 candidates/prodp2it*
+candidates/production_*
+candidates/check_*
 candidates/ranked_candidates.csv
+reports/_d_verify/
+reports/_geom_probe/
+reports/_h_init_smoke/
+reports/_material_smoke/
+reports/production/_comsol_*/
+reports/production/production_design/
+reports/modal_calibration/prod_eig_*.json
 .DS_Store
 config.yaml.bak*
 reports/*_export.m
