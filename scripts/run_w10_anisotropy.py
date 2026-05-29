@@ -74,6 +74,7 @@ def build_argument_parser() -> argparse.ArgumentParser:  # 解析器 / Parser
     parser.add_argument("--plateau-patience", type=int, default=80, help="Plateau patience. / 平台容忍。")  # / Plat
     parser.add_argument("--snapshot-every", type=int, default=25, help="Snapshot interval. / 快照间隔。")  # / Snap
     parser.add_argument("--initial-H", type=str, default=None, help="Initial 15x15 H mm. / H 初值。")  # / H Init
+    parser.add_argument("--h-init-mm", type=float, default=None, help="W10 H init thickness (uniform). None = (h_min+h_max)/2 mid-range, escapes sigmoid saturation. Don't confuse with thickness.default_mm (center clamp). / W10 H 初值厚度；None=中点；与中心夹持 default_mm 解耦。")  # / H init mm
     parser.add_argument("--initial-theta-rad", type=str, default=None, help="Initial 15x15 θ rad (CSV). / θ 初值（弧度 CSV）。")  # / θ Init
     parser.add_argument("--output-dir", type=str, default=None, help="Override output dir. / 覆盖输出目录。")  # / Out
     parser.add_argument("--sinkhorn-weight", type=float, default=0.0, help="Sinkhorn weight. / Sinkhorn 权重。")  # / Sinkhorn
@@ -148,6 +149,7 @@ def main(argv: list[str] | None = None) -> int:  # 主 / Main
         shear_ratio=args.shear_ratio,
         theta_init_mode=str(args.theta_init_mode),
         theta_seed=int(args.theta_seed),
+        h_init_mm=(float(args.h_init_mm) if args.h_init_mm is not None else None),
         sigma_anneal_start=(float(args.sigma_anneal_start) if args.sigma_anneal_start is not None else None),
         sigma_anneal_steps=int(args.sigma_anneal_steps),
         target_dilation_px=int(args.target_dilation_px),

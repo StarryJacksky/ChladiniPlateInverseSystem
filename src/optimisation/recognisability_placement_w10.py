@@ -115,6 +115,18 @@ class W10AnisotropyConfig:  # W10 配置 / W10 config
     shear_ratio: float | None = None  # 剪切比覆盖 / Override shear ratio
     theta_init_mode: str = "random"  # θ 初值 ("random" | "zeros" | "diagonal") / θ init mode
     theta_seed: int = 42  # θ 随机种子 / θ random seed
+    # H init thickness for the sigmoid reparam. Defaults to None → use the
+    # midpoint of (h_min, h_max) so Adam starts in the linear region of the
+    # sigmoid where the gradient signal is strong. Set explicitly to override.
+    # Why this is NOT bound to thickness.default_mm: that field is the
+    # center-clamp value (a physical design constraint), which is currently
+    # 2.0 mm = h_max. Initialising every H cell there puts the optimiser deep
+    # in the sigmoid saturation zone (dsig/dx ≈ 0), so Adam can't move H —
+    # a smoke test confirmed default_mm=2.0 → best_enrichment ≈ 0,
+    # default_mm=1.3 → best_enrichment ≈ 0.72 with the same number of steps.
+    # H 初值厚度。默认 None = (h_min+h_max)/2 中点，避开 sigmoid 饱和区。
+    # 不绑定 default_mm（中心夹持的物理值，目前=h_max，会卡死优化）。
+    h_init_mm: float | None = None  # H init thickness / H 初始厚度
 
 
 @dataclass  # 数据类 / Dataclass
@@ -180,7 +192,15 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
     thickness_cfg = config["thickness"]  # 厚度配置 / Thickness
     h_min = float(thickness_cfg["min_mm"])  # 下限 / Min
     h_max = float(thickness_cfg["max_mm"])  # 上限 / Max
-    default_h = float(thickness_cfg.get("default_mm", h_max))  # 默认 / Default
+    default_h = float(thickness_cfg.get("default_mm", h_max))  # 中心夹持 / Centre clamp
+    # H init thickness: defaults to (h_min+h_max)/2 unless opt_config.h_init_mm
+    # is explicitly provided. Crucially decoupled from default_h (which is the
+    # physical center-clamp value, currently sitting at h_max=2.0 mm). Initing
+    # at h_max puts every cell deep in sigmoid saturation, so Adam can't move
+    # H; midpoint init keeps the gradient signal strong.
+    # H 初值厚度：跟中心夹持解耦，默认中点；避免 sigmoid 饱和区。
+    init_h = float(opt_config.h_init_mm) if opt_config.h_init_mm is not None else 0.5 * (h_min + h_max)
+    init_h = float(max(h_min + 1.0e-3, min(h_max - 1.0e-3, init_h)))  # 安全夹紧 / Safety clamp
     grid_size = int(config["project"]["grid_size"])  # 网格 / Grid
     centre_cells = center_cells_for_grid(grid_size)  # 中心单元 / Centre cells
     max_neighbour_diff_mm = float(opt_config.smoothness_max_diff_mm if opt_config.smoothness_max_diff_mm is not None else thickness_cfg.get("max_neighbor_difference_mm", 1.0))  # 邻差 / Diff cap
@@ -201,7 +221,8 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
         normalised = np.clip((h0 - h_min) / max(h_max - h_min, 1.0e-6), 1.0e-3, 1.0 - 1.0e-3)  # 归一 / Normalise
         h_logit_init = torch.tensor(np.log(normalised / (1.0 - normalised)), dtype=dtype, device=device)  # 反 sigmoid / Inverse
     else:  # 默认 / Default
-        h_logit_init = initial_h_logit(default_h, h_min, h_max, grid_size, dtype).to(device)  # / Default
+        h_logit_init = initial_h_logit(init_h, h_min, h_max, grid_size, dtype).to(device)  # 中点初值 / Mid-range init
+        print(f"[W10] H init: {init_h:.3f} mm  (center clamp stays at {default_h:.3f} mm) / H 初值 / 中心夹持")
     h_logit = h_logit_init.detach().clone().requires_grad_(True)  # 优化变量 / Decision variable
 
     # θ 初值 / θ init
