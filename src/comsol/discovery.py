@@ -118,8 +118,16 @@ def extract_executable_hint(text: str) -> str:  # Extract executable path hint f
     candidates += re.findall(r"([A-Za-z]:[/\\][^,\"]*(?:comsol|matlab)[^,\"]*)", text, flags=re.IGNORECASE)
     for candidate in candidates:
         cleaned = candidate.strip().strip(",")
-        if Path(cleaned).exists():
-            return str(Path(cleaned))
+        # ``Path(cleaned).exists()`` raises OSError (e.g. ENAMETOOLONG / errno 63)
+        # when a process command line embeds a very long argument that the regex
+        # captured into ``cleaned`` (long MATLAB -batch strings, python -c blobs,
+        # etc.). A probe must never crash discovery, so swallow OS-level errors
+        # and treat the candidate as "not an existing path".
+        try:
+            if Path(cleaned).exists():
+                return str(Path(cleaned))
+        except OSError:
+            continue
     return candidates[0].strip().strip(",") if candidates else ""
 
 

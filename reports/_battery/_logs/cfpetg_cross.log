@@ -1,0 +1,32 @@
+[               start] Pipeline start (sr=3.0, candidate=bat_cfpetg_cross)
+[              target] Target loaded (4631 pixels)
+[     surrogate_start] Running W10 surrogate (single-start)
+[           surrogate] Running W10 surrogate (300 steps)
+[      surrogate_done] W10 done in 84s; surrogate enr=2.78×
+[        phase1_start] Phase 1: COMSOL eigfreq + Phase 1 selection + forced response + composite search
+[      comsol_eigfreq] Running COMSOL eigenfrequency (30 modes)
+[Phase 1] rejecting 5 eigenmodes outside W10 band [100,1220] Hz: [25.1, 27.9, 39.9, 53.8, 80.8]
+[Phase 1] adding 2 W10-trained drive freqs: 746.4Hz(w=0.44), 726.8Hz(w=0.32)
+[       comsol_forced] Running COMSOL forced response at 9 freqs
+[         phase1_done] Phase 1 done in 221s; best composite = 9.19× broad
+[        phase2_start] Phase 2 trust-region (1 iters, score_mode=composite)
+[   phase2_iter_start] iter 1/1: surrogate continue (lr_H=0.0250, lr_θ=0.0500, freeze_freq=20)
+[           surrogate] Running W10 surrogate (200 steps)
+[      comsol_eigfreq] Running COMSOL eigenfrequency (30 modes)
+[Phase 1] rejecting 5 eigenmodes outside W10 band [100,1220] Hz: [24.2, 26.6, 39.1, 54.6, 79.3]
+[Phase 1] adding 3 W10-trained drive freqs: 663.4Hz(w=0.25), 696.8Hz(w=0.25), 1003.8Hz(w=0.16)
+[       comsol_forced] Running COMSOL forced response at 10 freqs
+[    phase2_iter_done] iter 1: score 6.210→5.393  (enr 9.19→10.17×, rec 0.46→0.28)  [REJECT]
+[gap monitor] COMSOL (9.19×) outperformed surrogate (2.78×) — unusual but harmless; usually means target dilation gave the surrogate a softer goal than the real physics could deliver.
+[                done] Pipeline complete. Best enrichment = 9.19×
+
+================================================================================
+PIPELINE FINAL
+================================================================================
+  Phase 1 best: MAX(333+818+165)
+    broad enr=9.19× rec=0.46
+    tight enr=10.91× rec=0.93
+  Phase 2: best iter 0 → score 6.210 (enr 9.19× rec 0.46)  +0.0% over Phase 1  [mode=composite]
+
+  Output: /Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/cross/bat_cfpetg_cross
+  Summary: /Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/cross/bat_cfpetg_cross/production_summary.json

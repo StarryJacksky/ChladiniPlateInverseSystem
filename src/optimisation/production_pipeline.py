@@ -62,7 +62,6 @@ def build_default_pipeline_config(config_yaml_path: str | Path = "config.yaml",
         shear_ratio=float(take("shear_ratio", 1.0)),
         w10_num_steps=int(take("w10_num_steps", 300)),
         w10_lr_h=float(take("w10_lr_h", 0.05)),
-        w10_lr_theta=float(take("w10_lr_theta", 0.10)),
         w10_num_frequencies=int(take("w10_num_frequencies", 6)),
         w10_f_min_hz=float(take("w10_f_min_hz", 120.0)),
         w10_f_max_hz=float(take("w10_f_max_hz", 1200.0)),
@@ -83,7 +82,6 @@ def build_default_pipeline_config(config_yaml_path: str | Path = "config.yaml",
         phase2_max_iters=int(take("phase2_max_iters", 3)),
         phase2_inner_steps=int(take("phase2_inner_steps", 200)),
         phase2_lr_h_init=float(take("phase2_lr_h_init", 0.025)),
-        phase2_lr_theta_init=float(take("phase2_lr_theta_init", 0.05)),
         phase2_freeze_freq_first_steps=int(take("phase2_freeze_freq_first_steps", 20)),
         skip_phase2=bool(overrides.get("skip_phase2", False)),
         skip_comsol=bool(overrides.get("skip_comsol", False)),
@@ -102,10 +100,10 @@ class ProductionPipelineConfig:
     stiffness_ratio: float = 3.0
     shear_ratio: float = 1.0
 
-    # W10 surrogate hyper-params
+    # W10 surrogate hyper-params (theta optimisation removed; see
+    # `recognisability_placement_w10.py` and BATTERY_FINDINGS.md for rationale)
     w10_num_steps: int = 300
     w10_lr_h: float = 0.05
-    w10_lr_theta: float = 0.10
     w10_num_frequencies: int = 6
     w10_f_min_hz: float = 120.0
     w10_f_max_hz: float = 1200.0
@@ -116,7 +114,7 @@ class ProductionPipelineConfig:
     # produces enrichment < 1e-9, killing the gradient signal and leaving the
     # design essentially random (observed: 4-pointed star outline yielded
     # surrogate enrichment = 4e-36 after 300 steps). /
-    # P0 修复：sigma 退火 + 目标膨胀，防止细线/稀疏目标在初始随机 H+θ 下
+    # P0 修复：sigma 退火 + 目标膨胀，防止细线/稀疏目标在初始 H 下
     # enrichment 起步即 1e-40、梯度被 -log(x+1e-9) 的 epsilon 削平
     w10_sigma_anneal_start: float = 0.20
     w10_sigma_anneal_steps: int = 100
@@ -126,15 +124,14 @@ class ProductionPipelineConfig:
     # learned anything. /
     # 健康度阈值：W10 自评 enrichment 低于此值就拒绝下推到 COMSOL
     w10_min_surrogate_enrichment: float = 0.5
-    # Multi-start: run N W10 surrogates with different theta seeds, pick
-    # the best by composite score, fall back to seed=42 if no seed beats
-    # it by ``multistart_uplift_threshold``. Defaults to 1 (off) to keep
-    # the canonical single-start cost; users on Win/Mac with budget can
-    # raise to 4-8 to escape local minima. /
-    # 多启动：N 个不同 theta_seed 跑 W10，按复合 score 选赢家；保底 seed=42
+    # Multi-start used to differentiate runs via θ_seed when θ was an
+    # optimisation variable. After θ optimisation was removed in 2026-05
+    # (see BATTERY_FINDINGS.md) the W10 surrogate is deterministic for a
+    # given target + config, so N > 1 is a no-op. These fields are kept on
+    # the config for backwards compatibility only. /
+    # 多启动 N>1 在 θ 撤掉后无效；保留字段仅做兼容
     multistart_n: int = 1
-    multistart_uplift_threshold: float = 0.05  # 赢家相对 seed=42 至少 +5%
-    multistart_seeds: tuple[int, ...] = (42, 1, 2, 3, 4, 5, 6, 7)  # 取前 multistart_n 个
+    multistart_uplift_threshold: float = 0.05  # 兼容字段 / Compat only
     # Phase 2 acceptance scoring. "composite" (default, new) uses
     # enrich · √recall to reject the "collapse-to-a-bright-dot" failure
     # mode where enrichment shoots up but the target shape is destroyed.
@@ -181,7 +178,6 @@ class ProductionPipelineConfig:
     phase2_max_iters: int = 3
     phase2_inner_steps: int = 200
     phase2_lr_h_init: float = 0.025
-    phase2_lr_theta_init: float = 0.05
     phase2_freeze_freq_first_steps: int = 20
 
     # Scoring
@@ -219,11 +215,10 @@ def _run_subprocess(cmd: list[str], cwd: Path, label: str) -> subprocess.Complet
 
 
 def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progress=None,
-                         initial_H_csv: Path | None = None, initial_theta_csv: Path | None = None,
+                         initial_H_csv: Path | None = None,
                          candidate_id: str | None = None, num_steps: int | None = None,
-                         lr_h: float | None = None, lr_theta: float | None = None,
+                         lr_h: float | None = None,
                          freeze_freq_first_steps: int | None = None,
-                         theta_seed: int | None = None,
                          skip_health_check: bool = False) -> dict:
     """Run W10 surrogate optimisation. Returns its summary dict.
 
@@ -240,7 +235,6 @@ def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progre
         "--candidate-id", cand_id,
         "--num-steps", str(int(num_steps if num_steps is not None else cfg.w10_num_steps)),
         "--learning-rate-h", f"{float(lr_h if lr_h is not None else cfg.w10_lr_h)}",
-        "--learning-rate-theta", f"{float(lr_theta if lr_theta is not None else cfg.w10_lr_theta)}",
         "--num-frequencies", str(int(cfg.w10_num_frequencies)),
         "--f-min-hz", f"{float(cfg.w10_f_min_hz)}",
         "--f-max-hz", f"{float(cfg.w10_f_max_hz)}",
@@ -254,12 +248,8 @@ def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progre
     ]
     if initial_H_csv is not None:
         cmd.extend(["--initial-H", str(initial_H_csv)])
-    if initial_theta_csv is not None:
-        cmd.extend(["--initial-theta-rad", str(initial_theta_csv)])
     if freeze_freq_first_steps is not None:
         cmd.extend(["--freeze-freq-first-steps", str(int(freeze_freq_first_steps))])
-    if theta_seed is not None:
-        cmd.extend(["--theta-seed", str(int(theta_seed))])
     _emit(progress, "surrogate", f"Running W10 surrogate ({int(num_steps or cfg.w10_num_steps)} steps)", candidate_id=cand_id)
     _run_subprocess(cmd, project_root, label=f"W10 surrogate ({cand_id})")
     summary_path = project_root / "candidates" / cand_id / "w10_optimization_summary.json"
@@ -314,134 +304,26 @@ def _phase2_score(best_composite: dict, mode: str = "composite") -> dict:
     }
 
 
-def _composite_score(summary: dict) -> dict:
-    """Compute a composite quality score from a W10 summary.
-
-    Score = enrichment · √recall · min(1, effective_count / 3). Designed
-    to reward *all-around healthy* designs over single-metric winners:
-    a seed that scores 5× enrichment but 10% recall (looks great on
-    surrogate, collapses in COMSOL) gets penalised; one with 3× enrichment,
-    60% recall and effective_count ≥ 3 wins. /
-    复合 score：奖励 enr+recall+多频 三者都健康的设计，避免单指标作弊
-    """
-    metrics = summary.get("best_surrogate_metrics", {}) or {}
-    wdist = summary.get("weight_distribution", {}) or {}
-    enr = float(metrics.get("enrichment", 0.0))
-    rec = float(metrics.get("recall", 0.0))
-    eff = float(wdist.get("effective_count", 1.0))
-    score = enr * (max(rec, 0.0) ** 0.5) * min(1.0, eff / 3.0)
-    return {"enrichment": enr, "recall": rec, "effective_count": eff, "score": float(score)}
-
-
 def _run_w10_multistart(cfg: ProductionPipelineConfig, project_root: Path, progress=None) -> dict:
-    """Multi-start W10: run N seeds, pick the winner by composite score.
+    """Run W10 surrogate.
 
-    Anti-regression contract — three guards keep this from making things worse:
-      1. ``seed=42`` (the canonical single-start) is always included so multi-
-         start ≥ single-start in the worst case.
-      2. Winner must beat the seed=42 baseline by ``multistart_uplift_threshold``
-         (default +5%) to be promoted; otherwise we keep seed=42. This filters
-         out noise-level "wins" that won't survive COMSOL re-validation.
-      3. Score uses recall + effective_count, not just enrichment — so a single-
-         mode high-enrichment seed (that surrogate loves but COMSOL hates) can't
-         hijack the decision.
-    Result: when N=1, behaviour is identical to single-start (zero overhead). /
-    多启动；3 重防退化：保底 seed=42、5% uplift 阈值、复合 score（防单指标作弊）
+    Historical note: this was a multi-start wrapper that ran N seeds and
+    picked a winner by composite score, with anti-regression guards. The
+    seeds differed only in θ_seed — which made sense while θ was an
+    optimisation variable. After θ optimisation was removed (2026-05; see
+    BATTERY_FINDINGS.md), the W10 surrogate is fully deterministic for a
+    given target + config, so N > 1 would just repeat the same computation.
+    This now always single-starts. ``multistart_n`` / ``multistart_uplift_threshold``
+    in config / CLI are still accepted for backwards compatibility but
+    ignored with a one-line warning when N > 1. /
+    多启动机制因 θ 移除后 surrogate 完全确定而失效；保留 API 但 N>1 时只警告
     """
     N = max(1, int(cfg.multistart_n))
-    if N == 1:
-        return _run_w10_surrogate(cfg, project_root, progress=progress)
-
-    base_cand_id = cfg.candidate_id
-    seeds = list(cfg.multistart_seeds)[:N]
-    if 42 not in seeds:  # 强制保底 / Always include baseline
-        seeds[0] = 42
-
-    _emit(progress, "multistart_start", f"Multi-start: {N} W10 seeds {seeds}", n=N, seeds=seeds)
-
-    results: list[dict] = []
-    for i, seed in enumerate(seeds):
-        tmp_cand = f"{base_cand_id}_ms_s{seed}"
-        tmp_dir = project_root / "candidates" / tmp_cand
-        if tmp_dir.exists():
-            shutil.rmtree(tmp_dir)
-        _emit(progress, "multistart_seed_start", f"seed {seed} ({i+1}/{N})", seed=seed)
-        try:
-            summary = _run_w10_surrogate(cfg, project_root, progress=progress,
-                                          candidate_id=tmp_cand, theta_seed=int(seed),
-                                          skip_health_check=True)
-            scored = _composite_score(summary)
-            ok = scored["enrichment"] >= float(cfg.w10_min_surrogate_enrichment)
-            results.append({"seed": int(seed), "candidate_id": tmp_cand,
-                            **scored, "ok": bool(ok), "summary_path": str(tmp_dir / "w10_optimization_summary.json")})
-            _emit(progress, "multistart_seed_done",
-                  f"seed {seed}: enr={scored['enrichment']:.2f}× rec={scored['recall']:.2f} eff={scored['effective_count']:.1f} → score={scored['score']:.3f}",
-                  seed=seed, **scored)
-        except RuntimeError as e:  # subprocess / health failure
-            results.append({"seed": int(seed), "candidate_id": tmp_cand,
-                            "enrichment": 0.0, "recall": 0.0, "effective_count": 0.0,
-                            "score": 0.0, "ok": False, "error": str(e)[:240]})
-            _emit(progress, "multistart_seed_done", f"seed {seed}: FAILED — {str(e)[:80]}", seed=seed, score=0.0)
-
-    healthy = [r for r in results if r["ok"]]
-    if not healthy:
-        raise RuntimeError(
-            f"Multi-start: all {N} seeds failed W10 health check "
-            f"(enrichment < {cfg.w10_min_surrogate_enrichment}). "
-            f"Try raising --target-dilation-px / --sigma-anneal-start. / "
-            f"多启动 {N} 个种子全部失败健康度检查")
-
-    baseline = next((r for r in results if r["seed"] == 42 and r["ok"]), None)
-    best = max(healthy, key=lambda r: r["score"])
-    threshold = float(cfg.multistart_uplift_threshold)
-
-    if baseline is None:
-        winner = best
-        decision = f"seed=42 health-check failed → promote seed={best['seed']} (score={best['score']:.3f})"
-    elif best["seed"] == 42:
-        winner = baseline
-        decision = f"seed=42 wins on its own (score={baseline['score']:.3f})"
-    else:
-        uplift = best["score"] / max(baseline["score"], 1e-9) - 1.0
-        if uplift > threshold:
-            winner = best
-            decision = (f"seed={best['seed']} beats seed=42 by +{uplift*100:.1f}% "
-                        f"(> {threshold*100:.0f}% threshold) → promote")
-        else:
-            winner = baseline
-            decision = (f"best seed={best['seed']} only +{uplift*100:.1f}% over seed=42 "
-                        f"(< {threshold*100:.0f}% threshold) → KEEP seed=42 (anti-regression)")
-
-    _emit(progress, "multistart_decision", f"Decision: {decision}",
-          winner_seed=winner["seed"], all_seeds=results)
-
-    # Promote winner's artifacts into the canonical candidate dir
-    winner_dir = project_root / "candidates" / winner["candidate_id"]
-    canonical_dir = project_root / "candidates" / base_cand_id
-    if canonical_dir.exists() and canonical_dir != winner_dir:
-        shutil.rmtree(canonical_dir)
-    if canonical_dir != winner_dir:
-        shutil.copytree(winner_dir, canonical_dir)
-
-    summary_path = canonical_dir / "w10_optimization_summary.json"
-    summary = json.loads(summary_path.read_text(encoding="utf-8"))
-    summary["multistart_log"] = {
-        "n": N,
-        "seeds": [int(s) for s in seeds],
-        "uplift_threshold": threshold,
-        "winner_seed": int(winner["seed"]),
-        "decision": decision,
-        "candidates": results,
-    }
-    summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    # Cleanup tmp dirs (keep only the canonical one)
-    for r in results:
-        d = project_root / "candidates" / r["candidate_id"]
-        if d.exists() and d.resolve() != canonical_dir.resolve():
-            shutil.rmtree(d, ignore_errors=True)
-
-    return summary
+    if N > 1:
+        _emit(progress, "multistart_noop",
+              f"multistart_n={N} requested but W10 surrogate is deterministic since "
+              "θ optimisation was removed; falling back to single-start. / 多启动已无意义")
+    return _run_w10_surrogate(cfg, project_root, progress=progress)
 
 
 def _run_comsol_eigfreq(cfg: ProductionPipelineConfig, project_root: Path, candidate_id: str, progress=None) -> Path:
@@ -856,9 +738,7 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
         best_amp = p1_result["best_composite_amp"]
 
         lr_h = cfg.phase2_lr_h_init
-        lr_theta = cfg.phase2_lr_theta_init
         cur_H = cand_dir / "H.csv"
-        cur_theta = cand_dir / "theta_continuous_rad.csv"
 
         for it in range(1, cfg.phase2_max_iters + 1):
             t2 = time.time()
@@ -866,11 +746,11 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
             old = project_root / "candidates" / iter_cand
             if old.exists():
                 shutil.rmtree(old)
-            _emit(progress, "phase2_iter_start", f"iter {it}/{cfg.phase2_max_iters}: surrogate continue (lr_H={lr_h:.4f}, lr_θ={lr_theta:.4f}, freeze_freq={cfg.phase2_freeze_freq_first_steps})", iter=it)
+            _emit(progress, "phase2_iter_start", f"iter {it}/{cfg.phase2_max_iters}: surrogate continue (lr_H={lr_h:.4f}, freeze_freq={cfg.phase2_freeze_freq_first_steps})", iter=it)
             _run_w10_surrogate(cfg, project_root, progress=progress,
-                                initial_H_csv=cur_H, initial_theta_csv=cur_theta,
+                                initial_H_csv=cur_H,
                                 candidate_id=iter_cand, num_steps=cfg.phase2_inner_steps,
-                                lr_h=lr_h, lr_theta=lr_theta,
+                                lr_h=lr_h,
                                 freeze_freq_first_steps=cfg.phase2_freeze_freq_first_steps)
             res = _evaluate_design(cfg, project_root, iter_cand,
                                      variant_prefix=f"prodp2it{it}", target=target,
@@ -883,10 +763,8 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
             accepted = delta > 0
             if delta > 0.10:
                 lr_h *= 1.3
-                lr_theta *= 1.3
             elif delta <= 0:
                 lr_h *= 0.5
-                lr_theta *= 0.5
             history.append({"iter": it, "candidate_id": iter_cand,
                             "best_composite": res["best_composite"],
                             "score": new_score_obj,
@@ -895,7 +773,6 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
                             "wallclock_s": float(time.time() - t2)})
             if accepted:
                 cur_H = project_root / "candidates" / iter_cand / "H.csv"
-                cur_theta = project_root / "candidates" / iter_cand / "theta_continuous_rad.csv"
                 if new_score > best_score:
                     best_score = new_score
                     best_score_obj = new_score_obj

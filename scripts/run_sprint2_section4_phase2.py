@@ -84,18 +84,24 @@ def score_tight(amp: np.ndarray, target: np.ndarray) -> dict:
 def run_surrogate_refine(candidate_id: str, initial_H_csv: Path, initial_theta_csv: Path,
                           num_steps: int, lr_H: float, lr_theta: float, stiffness_ratio: float,
                           shear_ratio: float, sigma_rel: float = 0.05, target_path: str = "data/processed_targets/target_binary.npy") -> dict:
-    """Call W10 anisotropy surrogate to refine H+θ. Returns the produced candidate's summary."""
+    """Call W10 surrogate to refine H. Returns the produced candidate's summary.
+
+    Historical note: this used to refine H + θ, but θ optimisation was removed
+    from W10 in 2026-05 (see BATTERY_FINDINGS.md). The ``initial_theta_csv``
+    and ``lr_theta`` parameters are kept in the signature for back-compat but
+    no longer forwarded to the W10 CLI. /
+    历史注：曾用于 H+θ 联合微调；θ 优化已撤，θ 参数仅保留签名兼容
+    """
+    del initial_theta_csv, lr_theta  # silence linter; no longer wired into W10
     cmd = [
         ".venv/bin/python", "scripts/run_w10_anisotropy.py",
         "--candidate-id", candidate_id,
         "--num-steps", str(int(num_steps)),
         "--learning-rate-h", f"{float(lr_H)}",
-        "--learning-rate-theta", f"{float(lr_theta)}",
         "--learning-rate-freq", "0.0",
         "--learning-rate-weight", "0.0",
         "--freeze-freq-first-steps", str(int(num_steps + 10)),
         "--initial-H", str(initial_H_csv),
-        "--initial-theta-rad", str(initial_theta_csv),
         "--stiffness-ratio", f"{float(stiffness_ratio)}",
         "--shear-ratio", f"{float(shear_ratio)}",
         "--sigma-rel", f"{float(sigma_rel)}",

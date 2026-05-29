@@ -118,11 +118,13 @@ def run_w10_single(target_name: str, target_path: Path, sr: float, num_steps: in
         "--f-min-hz", "120",
         "--f-max-hz", "1200",
         "--learning-rate-h", "0.05",
-        "--learning-rate-theta", "0.10",
         "--snapshot-every", "300",  # disable intermediate snapshots
-        "--theta-init-mode", "random",
-        "--theta-seed", "42",
     ]
+    # NB: θ optimisation removed from W10 in 2026-05 (see BATTERY_FINDINGS.md).
+    # Per-cell rotation is fixed at 0 in every cell. The plate is still
+    # orthotropic via sr/gr, but legacy --theta-{init-mode,seed,learning-rate}
+    # flags are gone. /
+    # θ 已撤；脚本不再传 θ 相关 CLI 参数
     print(f"\n>>> Running W10 for {target_name} sr={sr}...")
     t0 = __import__("time").time()
     res = subprocess.run(cmd, capture_output=True, text=True)

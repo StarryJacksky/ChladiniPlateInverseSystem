@@ -28,19 +28,25 @@ design_variables:
 
 # 材料参数 / Material parameters
 material:
-  density_kg_m3: 1300 # 密度 / Density
-  poisson_ratio: 0.38 # 泊松比 / Poisson ratio
-  youngs_modulus_pa: 3700000000 # 杨氏模量 / Young's modulus
-  thermal_conductivity_w_mk: 0.25 # 导热系数 / Thermal conductivity
-  heat_capacity_j_kgk: 1400 # 定压热容 / Heat capacity
-  thermal_expansion_1_k: 0.00005 # 热膨胀系数 / Thermal expansion coefficient
+  # 默认材料 = FDM PLA（学校打印机常备）。θ 优化已移除后各向异性不再带来增益，
+  # 故默认改用工程上最易制造的 PLA，省去每次手动切换。/ Default = FDM PLA (common
+  # school printer filament). With θ optimisation removed, anisotropy no longer
+  # helps, so default to the easiest-to-manufacture PLA preset. Matches the
+  # frontend "PLA — FDM layered" preset (pla_fdm).
+  density_kg_m3: 1240 # 密度 / Density
+  poisson_ratio: 0.36 # 泊松比 / Poisson ratio
+  youngs_modulus_pa: 2900000000 # 杨氏模量 / Young's modulus
+  thermal_conductivity_w_mk: 0.13 # 导热系数 / Thermal conductivity
+  heat_capacity_j_kgk: 1800 # 定压热容 / Heat capacity
+  thermal_expansion_1_k: 0.00007 # 热膨胀系数 / Thermal expansion coefficient
   # 正交各向异性参数 / Orthotropic anisotropy
   # 材料档位参考 / Material tier reference:
-  #   tier0 (SLA grey resin)   : sr ≈ 1.05, near-isotropic   — θ 优化几乎无效 / θ optimisation barely effective
-  #   tier1 (FDM CF-PETG)      : sr ≈ 3.0  — 工程可制造、Phase 1+2 测试最优 / Engineering-realistic & best Phase 1+2 enrichment
-  #   tier2 (Continuous CF)    : sr ≈ 12.0 — surrogate 上限，工程难制造 / Surrogate ceiling, hard to manufacture
-  stiffness_ratio: 2.8 # E_||/E_⊥（沿主刚度方向 vs 垂直），1.0 = 各向同性 / E_||/E_perp, 1.0 = isotropic
-  shear_ratio: 0.75 # G_pp / G_iso 剪切模量相对各向同性比 / Shear modulus ratio vs isotropic
+  #   tier0 (SLA grey resin)   : sr ≈ 1.05, near-isotropic
+  #   FDM PLA (current default) : sr ≈ 1.45 — 学校常备、易制造 / common & easy to print
+  #   tier1 (FDM CF-PETG)      : sr ≈ 2.8-3.0 — 各向异性，θ 移除后无额外增益 / no extra gain after θ removal
+  #   tier2 (Continuous CF)    : sr ≈ 12.0 — surrogate 上限，工程难制造 / surrogate ceiling, hard to manufacture
+  stiffness_ratio: 1.45 # E_||/E_⊥（沿主刚度方向 vs 垂直），1.0 = 各向同性 / E_||/E_perp, 1.0 = isotropic
+  shear_ratio: 0.85 # G_pp / G_iso 剪切模量相对各向同性比 / Shear modulus ratio vs isotropic
 
 # 生产 pipeline 配置 / Production pipeline configuration
 # 经过 350+ 次实验后验证的最佳路径：W10 surrogate → COMSOL eigfreq → Phase 1 IC-likeness → Phase 2 trust-region
@@ -51,8 +57,7 @@ production:
   shear_ratio: 1.0 # / Default shear
   w10_num_steps: 300 # surrogate Adam 步数 / Surrogate Adam steps
   w10_lr_h: 0.05 # H 学习率 / H learning rate
-  w10_lr_theta: 0.10 # θ 学习率（角度） / θ learning rate (radians)
-  w10_num_frequencies: 6 # 联合频率数 K / Joint frequency count K
+  w10_num_frequencies: 6 # 联合频率数 K / Joint frequency count K (theta optimisation removed 2026-05; see BATTERY_FINDINGS.md)
   w10_f_min_hz: 120.0 # / Frequency lower bound
   w10_f_max_hz: 1200.0 # / Frequency upper bound
   w10_sigma_anneal_start: 0.20 # Sigma 退火起点（防止细线 target 梯度悬崖）/ Sigma annealing start; protects against thin-target gradient cliff
@@ -72,7 +77,6 @@ production:
   phase2_max_iters: 3 # 信任域外层迭代数（0 = 跳过 Phase 2；旧默认 1 实质 delta=0） / Trust-region outer iters (was 1, raised so P2 can actually escape the P1 basin)
   phase2_inner_steps: 200 # 每次 Phase 2 内层 W10 步数（旧默认 80 太短） / Inner W10 steps per Phase 2 iter (was 80)
   phase2_lr_h_init: 0.025 # / Trust-region H LR initial
-  phase2_lr_theta_init: 0.05 # / Trust-region θ LR initial
   phase2_freeze_freq_first_steps: 20 # P2 内层冻结 freq/weight 步数（W10 默认 60，对 P2 短步数太长） / Freeze freq/weight first-N steps in P2 (W10 default 60 is too long for short P2 inner runs)
 
 # COMSOL 仿真设置 / COMSOL simulation settings

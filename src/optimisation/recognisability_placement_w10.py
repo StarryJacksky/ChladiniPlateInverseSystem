@@ -1,21 +1,32 @@
-"""W10 — joint H + θ optimisation on orthotropic Kirchhoff plate.
-W10：H + θ 在正交各向异性 Kirchhoff 板上的联合优化。
+"""W10 — joint H + ω optimisation on orthotropic Kirchhoff plate.
+W10：H + ω 在正交各向异性 Kirchhoff 板上的联合优化。
 
-物理动机 / Motivation:
-W8 只优化 H，板算子始终是 D4 对称，所以中心激励只能耦合到 A1 irrep。
-W10 引入 per-cell 主刚度方向 θ_ij 作为决策变量；θ 不对称 ⇒ 算子不对称 ⇒
-非 A1 irrep 也能被激发 ⇒ 41.9% A1-accessible 的目标（如 IC 字母）才有希望突破。
+历史与现状 / History & current state:
+W10 originally optimised three groups of variables jointly — per-cell thickness
+H, per-cell fibre orientation θ, and the K drive frequencies ω. Empirical work
+in 2026-05 (`reports/_battery/BATTERY_FINDINGS.md`) showed θ is a parasitic
+dimension under this surrogate: at the off-resonance frequencies W10 actually
+probes, ω²M dominates K by ~5 orders of magnitude, so θ (which only enters
+through K) has near-zero gradient. The optimiser ended up drifting θ randomly,
+and that drift then perturbed the COMSOL anisotropic eigenmodes downstream
+into worse configurations. A 10-run battery (5 targets × 2 materials) confirmed
+that isotropic PLA (θ trivially uniform) beats anisotropic CF-PETG with
+"optimised" θ on 4/6 targets, ties 1, loses only IC.
+
+This file therefore optimises only H + ω. θ is kept as a fixed (zero) field
+that still flows into the OrthotropicPlate stiffness assembly — the material
+remains genuinely orthotropic (sr / gr from config), but every cell has the
+same principal axis aligned with the global x-axis. The all-zero θ field is
+also written to `theta_continuous_*.csv` for backwards compatibility with the
+downstream COMSOL pipeline which expects those files. /
+W10 现在只优化 H + ω。θ 作为全零常量字段仍流过正交板装配，材料 sr/gr
+保留各向异性效果，只是每格主轴对齐全局 x 轴。零 θ CSV 仍写给下游 COMSOL。
 
 关键参数 / Key knobs:
-- material.stiffness_ratio (E_||/E_⊥)：越大 θ 优化空间越大
-  · SLA grey resin ≈ 1.05  →  θ 几乎无效
-  · FDM PLA          ≈ 1.45  →  θ 边际有效
-  · FDM CF-PETG (T1) ≈ 3.0   →  θ 显著有效
-  · 连续 CF      (T2) ≈ 12   →  θ 接近上限
-
-θ 平滑罚 / θ smoothness penalty:
-方向场 θ 在邻格之间应该连续；用 (sin 2θ, cos 2θ) 表示（自动处理 π 周期性），
-邻差平方做 L2 惩罚以防 θ 在每格独立乱跳。
+- material.stiffness_ratio (E_||/E_⊥) 仍生效：板物理本身仍是正交各向异性
+  · SLA grey resin ≈ 1.05  ≈ 各向同性
+  · FDM PLA          ≈ 1.0  → 推荐
+  · FDM CF-PETG      ≈ 3.0  → 沿打印方向偏强；不再做 per-cell 旋转
 """
 from __future__ import annotations  # 启用现代类型注解 / Enable modern type hints
 
@@ -55,7 +66,6 @@ class W10AnisotropyConfig:  # W10 配置 / W10 config
     damping_ratio: float = 0.02  # 阻尼 / Damping
     num_steps: int = 250  # Adam 步数 / Adam steps
     learning_rate_H: float = 0.05  # H 学习率 / H LR
-    learning_rate_theta: float = 0.10  # θ 学习率 (角度变化快) / θ LR (angles need bigger step)
     learning_rate_freq: float = 0.10  # 频率 / Freq LR
     learning_rate_weight: float = 0.10  # 权重 / Weight LR
     weight_decay: float = 0.0  # 衰减 / Weight decay
@@ -67,7 +77,6 @@ class W10AnisotropyConfig:  # W10 配置 / W10 config
     base_accel_m_s2: float = 1.0  # 加速度 / Accel
     smoothness_weight: float = 4.0  # H 邻平滑 / H smoothness weight
     smoothness_max_diff_mm: float | None = None  # H 邻差上限 / H neighbour diff cap
-    theta_smoothness_weight: float = 0.50  # θ 邻平滑 / θ smoothness weight
     freq_separation_min_hz: float = 30.0  # 频率间隔 / Freq gap
     freq_separation_weight: float = 0.5  # 间隔罚 / Separation
     freeze_freq_first_steps: int = 60  # 冻结 / Freeze
@@ -96,7 +105,7 @@ class W10AnisotropyConfig:  # W10 配置 / W10 config
     # thin/sparse targets underflows to ~1e-40 and the gradient cliff
     # (-log(x + 1e-9)) zeroes out — Adam never gets a useful signal. Starting
     # sigma at e.g. 0.20 keeps initial enrichment near O(1), so the optimiser
-    # can actually move H+θ in a meaningful direction before tightening. /
+    # can actually move H in a meaningful direction before tightening. /
     # Sigma 退火：起步用宽 powder（粗），训练前 N 步线性收紧到 sigma_rel；
     # 防止细线/稀疏目标在 sigma=0.05 下 enrichment 起步即 1e-40、梯度被 epsilon 削平
     sigma_anneal_start: float | None = None  # None = 关闭 / None disables
@@ -113,8 +122,6 @@ class W10AnisotropyConfig:  # W10 配置 / W10 config
     sinkhorn_target_irreps: list[str] | None = None  # irrep 投影 / irrep projection
     stiffness_ratio: float | None = None  # 各向异性比覆盖 / Override anisotropy ratio
     shear_ratio: float | None = None  # 剪切比覆盖 / Override shear ratio
-    theta_init_mode: str = "random"  # θ 初值 ("random" | "zeros" | "diagonal") / θ init mode
-    theta_seed: int = 42  # θ 随机种子 / θ random seed
     # H init thickness for the sigmoid reparam. Defaults to None → use the
     # midpoint of (h_min, h_max) so Adam starts in the linear region of the
     # sigmoid where the gradient signal is strong. Set explicitly to override.
@@ -137,31 +144,10 @@ class W10Trace:  # W10 轨迹 / Trace
     contrast: list[float] = field(default_factory=list)  # / Contrast
     recall: list[float] = field(default_factory=list)  # / Recall
     smoothness_loss: list[float] = field(default_factory=list)  # H 平滑 / H smoothness
-    theta_smoothness_loss: list[float] = field(default_factory=list)  # θ 平滑 / θ smoothness
     freq_sep_loss: list[float] = field(default_factory=list)  # / Separation
     sinkhorn_loss: list[float] = field(default_factory=list)  # / Sinkhorn
     frequencies_history: list[list[float]] = field(default_factory=list)  # / Freqs
     weights_history: list[list[float]] = field(default_factory=list)  # / Weights
-    theta_rms_deg: list[float] = field(default_factory=list)  # θ RMS 偏离 0 的角度 / θ RMS dev from 0
-
-
-def _initialise_theta_field(mode: str, grid_size: int, seed: int, dtype: torch.dtype, device: torch.device) -> torch.Tensor:  # θ 初值 / θ init field
-    mode = (mode or "random").lower()  # 规范 / Normalise
-    if mode == "zeros":  # 全 0 / All zero
-        return torch.zeros((grid_size, grid_size), dtype=dtype, device=device)  # 0 / 0
-    if mode == "diagonal":  # 沿对角 π/4 / Along diagonal π/4
-        return torch.full((grid_size, grid_size), float(math.pi / 4.0), dtype=dtype, device=device)  # π/4 / π/4
-    gen = torch.Generator(device="cpu").manual_seed(int(seed))  # 生成器 / Generator
-    rand = torch.rand((grid_size, grid_size), generator=gen, dtype=torch.float64) * math.pi  # [0, π) / [0, π)
-    return rand.to(dtype=dtype, device=device)  # 转 / Cast
-
-
-def _theta_smoothness_penalty(theta_design_rad: torch.Tensor) -> torch.Tensor:  # 方向场邻平滑（用 sin/cos 2θ 处理 π 周期） / θ smoothness via sin/cos 2θ
-    s = torch.sin(2.0 * theta_design_rad)  # sin 2θ / sin 2θ
-    c = torch.cos(2.0 * theta_design_rad)  # cos 2θ / cos 2θ
-    row_diff = (s[1:, :] - s[:-1, :]) ** 2 + (c[1:, :] - c[:-1, :]) ** 2  # 行邻差 / Row diff
-    col_diff = (s[:, 1:] - s[:, :-1]) ** 2 + (c[:, 1:] - c[:, :-1]) ** 2  # 列邻差 / Col diff
-    return row_diff.mean() + col_diff.mean()  # 总平滑 / Total
 
 
 def _build_thickness(h_logit: torch.Tensor, grid_size: int, h_min: float, h_max: float, default_h: float, centre_cells: list[tuple[int, int]]) -> torch.Tensor:  # H 重参化 / Build thickness
@@ -184,7 +170,7 @@ def _build_target_mask_proxy(target_binary_full: np.ndarray, proxy_grid_size: in
     return torch.as_tensor(resized.astype(np.float64), dtype=dtype, device=device)  # 张量 / Tensor
 
 
-def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_config: W10AnisotropyConfig, output_dir: Path, verdict: dict | None = None, initial_H_mm: np.ndarray | None = None, initial_theta_rad: np.ndarray | None = None) -> dict:  # W10 主入口 / W10 main
+def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_config: W10AnisotropyConfig, output_dir: Path, verdict: dict | None = None, initial_H_mm: np.ndarray | None = None) -> dict:  # W10 主入口 / W10 main
     output_dir = Path(output_dir)  # 路径 / Path
     output_dir.mkdir(parents=True, exist_ok=True)  # 建目录 / Mkdir
     device = torch.device(opt_config.device)  # 设备 / Device
@@ -225,12 +211,13 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
         print(f"[W10] H init: {init_h:.3f} mm  (center clamp stays at {default_h:.3f} mm) / H 初值 / 中心夹持")
     h_logit = h_logit_init.detach().clone().requires_grad_(True)  # 优化变量 / Decision variable
 
-    # θ 初值 / θ init
-    if initial_theta_rad is not None:  # 提供 / Provided
-        theta_init = torch.tensor(np.asarray(initial_theta_rad, dtype=np.float64), dtype=dtype, device=device)  # numpy → tensor / Convert
-    else:  # 默认 / Default
-        theta_init = _initialise_theta_field(opt_config.theta_init_mode, grid_size, opt_config.theta_seed, dtype, device)  # 随机/对角/零 / Random/diagonal/zero
-    theta_design = theta_init.detach().clone().requires_grad_(True)  # 优化变量 / Decision variable
+    # θ field: held constant at zero. Material remains orthotropic via sr/gr
+    # in OrthotropicPlate; per-cell θ rotation was empirically shown to be a
+    # parasitic optimisation variable in the ω²M ≫ K regime W10 probes, so it
+    # is no longer optimised. The zero field still flows through assemble_K_M
+    # so the physics path is unchanged. /
+    # θ 字段恒为 0；材料各向异性通过 sr/gr 保留，per-cell 旋转优化已撤
+    theta_design = torch.zeros((grid_size, grid_size), dtype=dtype, device=device)
 
     # 频率 + 权重 / Freqs + weights
     if opt_config.initial_frequencies_hz is not None and len(opt_config.initial_frequencies_hz) == K:  # 显式初值 / Explicit init
@@ -243,12 +230,14 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
     freq_logits = freq_logits_init.detach().clone().requires_grad_(True)  # 优化 / Decision
     weight_logits = weight_logits_init.detach().clone().requires_grad_(True)  # 优化 / Decision
 
-    optimiser = torch.optim.Adam([
+    # Adam param groups: H + freq + weight (θ is fixed, see init above). /
+    # Adam 参数组：H + freq + weight；θ 固定不入优化
+    param_groups = [
         {"params": [h_logit], "lr": float(opt_config.learning_rate_H)},  # H / H
-        {"params": [theta_design], "lr": float(opt_config.learning_rate_theta)},  # θ / θ
         {"params": [freq_logits], "lr": float(opt_config.learning_rate_freq)},  # f / f
         {"params": [weight_logits], "lr": float(opt_config.learning_rate_weight)},  # w / w
-    ], weight_decay=float(opt_config.weight_decay))  # Adam / Adam
+    ]
+    optimiser = torch.optim.Adam(param_groups, weight_decay=float(opt_config.weight_decay))  # Adam / Adam
 
     sigma_end = float(opt_config.sigma_rel)  # 末态 σ / Final sigma
     sigma_start = float(opt_config.sigma_anneal_start) if opt_config.sigma_anneal_start is not None else sigma_end  # 起态 σ / Initial sigma
@@ -267,7 +256,6 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
     best_loss = math.inf  # 最佳 / Best
     best_step = 0  # 步号 / Step
     best_H: np.ndarray | None = None  # 缓存 / Cache
-    best_theta: np.ndarray | None = None  # 缓存 / Cache
     best_freqs: list[float] | None = None  # 缓存 / Cache
     best_weights: list[float] | None = None  # 缓存 / Cache
     best_composite: np.ndarray | None = None  # 缓存 / Cache
@@ -314,7 +302,6 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
                 sinkhorn_part, _ = sinkhorn_powder_target_loss(composite_amp, target_proxy, sigma_rel=float(opt_config.sigma_rel), epsilon=float(opt_config.sinkhorn_epsilon))  # / Sinkhorn
 
         smoothness = neighbour_smoothness_penalty(H_clamped, max_neighbour_diff_mm)  # H 邻平滑 / H smoothness
-        theta_smooth = _theta_smoothness_penalty(theta_design)  # θ 邻平滑 / θ smoothness
         freq_sep = frequency_separation_penalty(frequencies_hz, float(opt_config.freq_separation_min_hz)) if step >= int(opt_config.freeze_freq_first_steps) else frequencies_hz.new_tensor(0.0)  # 间隔 / Separation
         # Weight-entropy regulariser. H(w) = -Σ w log(w + 1e-12), max at
         # uniform distribution (H = log K). Subtracting it from the loss
@@ -330,7 +317,6 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
         loss = (
             recog_loss
             + float(opt_config.smoothness_weight) * smoothness
-            + float(opt_config.theta_smoothness_weight) * theta_smooth
             + float(opt_config.freq_separation_weight) * freq_sep
             + float(opt_config.sinkhorn_weight) * sinkhorn_part
             - float(opt_config.weight_entropy_weight) * weight_entropy  # 减熵 = 鼓励均匀 / Subtract entropy = encourage uniform
@@ -346,13 +332,10 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
         trace.contrast.append(float(parts["contrast"].item()))  # / Contrast
         trace.recall.append(float(parts["recall"].item()))  # / Recall
         trace.smoothness_loss.append(float(smoothness.item()))  # / Smoothness
-        trace.theta_smoothness_loss.append(float(theta_smooth.item()))  # / θ smoothness
         trace.freq_sep_loss.append(float(freq_sep.item()))  # / Separation
         trace.sinkhorn_loss.append(float(sinkhorn_part.item()))  # / Sinkhorn
         trace.frequencies_history.append([float(v) for v in frequencies_hz.detach().cpu().numpy().tolist()])  # / Freqs
         trace.weights_history.append([float(v) for v in weights.detach().cpu().numpy().tolist()])  # / Weights
-        theta_dev_deg = float(torch.sqrt((theta_design.detach() ** 2).mean()).item()) * 180.0 / math.pi  # θ RMS deg / θ RMS deg
-        trace.theta_rms_deg.append(theta_dev_deg)  # / θ RMS
 
         # 缓存最佳 / Cache best
         current = float(loss.item())  # / Current
@@ -360,7 +343,6 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
             best_loss = current  # / Update
             best_step = step  # / Step
             best_H = H_clamped.detach().cpu().numpy().copy()  # / Cache
-            best_theta = theta_design.detach().cpu().numpy().copy()  # / Cache
             best_freqs = [float(v) for v in frequencies_hz.detach().cpu().numpy().tolist()]  # / Freqs
             best_weights = [float(v) for v in weights.detach().cpu().numpy().tolist()]  # / Weights
             best_composite = composite_amp.detach().cpu().numpy().copy()  # / Composite
@@ -372,23 +354,25 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
         if (step + 1) % int(max(1, opt_config.snapshot_every)) == 0 or step == 0:  # 快照 / Snapshot
             with torch.no_grad():  # / No grad
                 np.save(output_dir / f"snapshot_step_{step:04d}_H.npy", H_clamped.detach().cpu().numpy())  # / Save H
-                np.save(output_dir / f"snapshot_step_{step:04d}_theta.npy", theta_design.detach().cpu().numpy())  # / Save θ
                 np.save(output_dir / f"snapshot_step_{step:04d}_composite.npy", composite_amp.detach().cpu().numpy())  # / Save composite
-            print(f"  step {step:4d}  loss {current:.4e}  enr {parts['enrichment'].item():.3f}  ctr {parts['contrast'].item():.3f}  rec {parts['recall'].item():.3f}  θRMS {theta_dev_deg:5.1f}°")  # 进度 / Progress
+            print(f"  step {step:4d}  loss {current:.4e}  enr {parts['enrichment'].item():.3f}  ctr {parts['contrast'].item():.3f}  rec {parts['recall'].item():.3f}")  # 进度 / Progress
 
         if stale >= int(opt_config.plateau_patience):  # 平台 / Plateau
             print(f"  early stop at step {step} (plateau {stale} >= {opt_config.plateau_patience})")  # / Print
             break  # / Break
 
     final_H = best_H if best_H is not None else H_clamped.detach().cpu().numpy()  # 最终 H / Final H
-    final_theta = best_theta if best_theta is not None else theta_design.detach().cpu().numpy()  # 最终 θ / Final θ
+    final_theta = theta_design.detach().cpu().numpy()  # 全 0 θ / Zero θ
     final_freqs = best_freqs if best_freqs is not None else trace.frequencies_history[-1]  # / Freqs
     final_weights = best_weights if best_weights is not None else trace.weights_history[-1]  # / Weights
 
-    # 保存连续 / Save continuous
+    # 保存连续 / Save continuous. θ stays zero but the CSVs are still written
+    # for backward compat with downstream COMSOL pipeline (validation /
+    # eigfreq calibration scripts both read theta_continuous_rad.csv). /
+    # θ 全 0 仍写 CSV，下游 COMSOL 脚本依赖
     np.savetxt(output_dir / "H_continuous.csv", final_H, delimiter=",", fmt="%.6f")  # / Save
     np.savetxt(output_dir / "theta_continuous_rad.csv", final_theta, delimiter=",", fmt="%.6f")  # / Save θ rad
-    np.savetxt(output_dir / "theta_continuous_deg.csv", np.rad2deg(final_theta) % 180.0, delimiter=",", fmt="%.3f")  # / Save θ deg (mod 180°)
+    np.savetxt(output_dir / "theta_continuous_deg.csv", np.rad2deg(final_theta) % 180.0, delimiter=",", fmt="%.3f")  # / Save θ deg
 
     # H 量化和修复 / Quantise + repair H
     levels = list(thickness_cfg.get("levels_mm") or [h_min, h_max])  # 等级 / Levels
@@ -405,7 +389,7 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
     summary_weights = summarise_weight_distribution(torch.tensor(final_weights), torch.tensor(final_freqs))  # / Summary
 
     summary = {
-        "version": "w10_anisotropy_v1",
+        "version": "w10_anisotropy_v2_theta_removed",
         "best_loss": float(best_loss) if best_H is not None else float(trace.total_loss[-1]),
         "best_step": int(best_step),
         "executed_steps": int(len(trace.total_loss)),
@@ -424,15 +408,13 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
         "f_min_hz": float(opt_config.f_min_hz),
         "f_max_hz": float(opt_config.f_max_hz),
         "smoothness_weight": float(opt_config.smoothness_weight),
-        "theta_smoothness_weight": float(opt_config.theta_smoothness_weight),
         "smoothness_max_diff_mm": float(max_neighbour_diff_mm),
         "h_min_mm": h_min,
         "h_max_mm": h_max,
         "final_max_row_neighbour_diff_mm": row_diff,
         "final_max_col_neighbour_diff_mm": col_diff,
         "quantised_levels_mm": levels,
-        "theta_init_mode": opt_config.theta_init_mode,
-        "theta_seed": int(opt_config.theta_seed),
+        "theta_optimisation": "removed",
         "loss_weights": {"enrichment": float(opt_config.enrichment_weight), "contrast": float(opt_config.contrast_weight), "recall": float(opt_config.recall_weight), "sigma_rel": float(opt_config.sigma_rel), "sinkhorn_weight": float(opt_config.sinkhorn_weight)},
         "trace": {
             "total_loss": trace.total_loss,
@@ -441,10 +423,8 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
             "contrast": trace.contrast,
             "recall": trace.recall,
             "smoothness_loss": trace.smoothness_loss,
-            "theta_smoothness_loss": trace.theta_smoothness_loss,
             "freq_sep_loss": trace.freq_sep_loss,
             "sinkhorn_loss": trace.sinkhorn_loss,
-            "theta_rms_deg": trace.theta_rms_deg,
             "frequencies_history": trace.frequencies_history,
             "weights_history": trace.weights_history,
         },

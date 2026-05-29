@@ -1,0 +1,32 @@
+[               start] Pipeline start (sr=1.0, candidate=bat_pla_diagonal)
+[              target] Target loaded (3232 pixels)
+[     surrogate_start] Running W10 surrogate (single-start)
+[           surrogate] Running W10 surrogate (300 steps)
+[      surrogate_done] W10 done in 69s; surrogate enr=3.05×
+[        phase1_start] Phase 1: COMSOL eigfreq + Phase 1 selection + forced response + composite search
+[      comsol_eigfreq] Running COMSOL eigenfrequency (30 modes)
+[Phase 1] rejecting 6 eigenmodes outside W10 band [100,1220] Hz: [26.4, 30.5, 39.7, 55.4, 81.2, 1230.8]
+[Phase 1] adding 3 W10-trained drive freqs: 484.9Hz(w=0.25), 1136.9Hz(w=0.19), 223.0Hz(w=0.18)
+[       comsol_forced] Running COMSOL forced response at 9 freqs
+[         phase1_done] Phase 1 done in 227s; best composite = 11.35× broad
+[        phase2_start] Phase 2 trust-region (1 iters, score_mode=composite)
+[   phase2_iter_start] iter 1/1: surrogate continue (lr_H=0.0250, lr_θ=0.0500, freeze_freq=20)
+[           surrogate] Running W10 surrogate (200 steps)
+[      comsol_eigfreq] Running COMSOL eigenfrequency (30 modes)
+[Phase 1] rejecting 5 eigenmodes outside W10 band [100,1220] Hz: [22.7, 25.0, 34.2, 48.6, 72.2]
+[Phase 1] adding 2 W10-trained drive freqs: 1021.8Hz(w=0.19), 673.1Hz(w=0.18)
+[       comsol_forced] Running COMSOL forced response at 8 freqs
+[    phase2_iter_done] iter 1: score 10.907→5.487  (enr 11.35→10.27×, rec 0.92→0.29)  [REJECT]
+[gap monitor] COMSOL (11.35×) outperformed surrogate (3.05×) — unusual but harmless; usually means target dilation gave the surrogate a softer goal than the real physics could deliver.
+[                done] Pipeline complete. Best enrichment = 11.35×
+
+================================================================================
+PIPELINE FINAL
+================================================================================
+  Phase 1 best: MAX(307+332+1040)
+    broad enr=11.35× rec=0.92
+    tight enr=13.36× rec=1.00
+  Phase 2: best iter 0 → score 10.907 (enr 11.35× rec 0.92)  +0.0% over Phase 1  [mode=composite]
+
+  Output: /Users/apple/Documents/ChladiniPlateProject/reports/_battery/pla/diagonal/bat_pla_diagonal
+  Summary: /Users/apple/Documents/ChladiniPlateProject/reports/_battery/pla/diagonal/bat_pla_diagonal/production_summary.json
