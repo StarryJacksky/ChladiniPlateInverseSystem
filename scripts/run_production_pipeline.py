@@ -51,6 +51,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--multistart-uplift-threshold", type=float, default=0.05,
                      help="Min relative score improvement over seed=42 for a multi-start winner "
                           "to be promoted (default 0.05 = +5%%).")
+    # θ optimisation control. Default = freeze (battery confirmed θ parasitic
+    # because surrogate operates in ω²M >> K regime). /
+    # θ 优化：默认冻结
+    p.add_argument("--enable-theta", action="store_true",
+                     help="Enable θ optimisation in W10 surrogate + Phase 2 (default OFF — "
+                          "battery showed θ is parasitic since surrogate is in ω²M >> K regime).")
     return p.parse_args()
 
 
@@ -73,6 +79,7 @@ def main() -> int:
         skip_comsol=args.skip_comsol,
         multistart_n=args.multistart_n,
         multistart_uplift_threshold=args.multistart_uplift_threshold,
+        enable_theta=bool(args.enable_theta),
     )
 
     def progress_printer(event: dict) -> None:

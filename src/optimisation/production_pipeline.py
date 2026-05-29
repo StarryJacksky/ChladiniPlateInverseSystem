@@ -63,6 +63,7 @@ def build_default_pipeline_config(config_yaml_path: str | Path = "config.yaml",
         w10_num_steps=int(take("w10_num_steps", 300)),
         w10_lr_h=float(take("w10_lr_h", 0.05)),
         w10_lr_theta=float(take("w10_lr_theta", 0.10)),
+        enable_theta=bool(take("enable_theta", False)),
         w10_num_frequencies=int(take("w10_num_frequencies", 6)),
         w10_f_min_hz=float(take("w10_f_min_hz", 120.0)),
         w10_f_max_hz=float(take("w10_f_max_hz", 1200.0)),
@@ -106,6 +107,12 @@ class ProductionPipelineConfig:
     w10_num_steps: int = 300
     w10_lr_h: float = 0.05
     w10_lr_theta: float = 0.10
+    # θ optimisation. Default = freeze. 10-run battery (5 targets × 2
+    # materials) confirmed that freezing θ at 0 ≈ isotropic PLA's behaviour,
+    # which wins on 4/6 targets vs CF-PETG's θ-active drift. Setting True
+    # restores the legacy joint H+θ+ω surrogate for ablation studies. /
+    # θ 优化：默认冻结。设 True 恢复历史 H+θ+ω 联合优化。
+    enable_theta: bool = False
     w10_num_frequencies: int = 6
     w10_f_min_hz: float = 120.0
     w10_f_max_hz: float = 1200.0
@@ -260,6 +267,11 @@ def _run_w10_surrogate(cfg: ProductionPipelineConfig, project_root: Path, progre
         cmd.extend(["--freeze-freq-first-steps", str(int(freeze_freq_first_steps))])
     if theta_seed is not None:
         cmd.extend(["--theta-seed", str(int(theta_seed))])
+    # θ optimisation control. Default = freeze (battery confirmed θ parasitic);
+    # set production cfg.enable_theta=True to recover legacy joint H+θ+ω. /
+    # θ 优化控制：默认冻结
+    if getattr(cfg, "enable_theta", False):  # opt-in / 显式开启
+        cmd.append("--enable-theta")
     _emit(progress, "surrogate", f"Running W10 surrogate ({int(num_steps or cfg.w10_num_steps)} steps)", candidate_id=cand_id)
     _run_subprocess(cmd, project_root, label=f"W10 surrogate ({cand_id})")
     summary_path = project_root / "candidates" / cand_id / "w10_optimization_summary.json"

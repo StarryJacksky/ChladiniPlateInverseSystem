@@ -82,8 +82,14 @@ def build_argument_parser() -> argparse.ArgumentParser:  # 解析器 / Parser
     parser.add_argument("--sinkhorn-target-irreps", type=str, default=None, help="Comma-separated irreps. / irrep 列表。")  # / irrep
     parser.add_argument("--stiffness-ratio", type=float, default=None, help="Override stiffness ratio E_||/E_⊥ (else read config.material.stiffness_ratio). / 覆盖各向异性比。")  # / sr
     parser.add_argument("--shear-ratio", type=float, default=None, help="Override shear ratio G/G_iso. / 覆盖剪切比。")  # / Gr
-    parser.add_argument("--theta-init-mode", type=str, default="random", choices=["random", "zeros", "diagonal"], help="θ initial mode. / θ 初始模式。")  # / mode
-    parser.add_argument("--theta-seed", type=int, default=42, help="θ random seed. / θ 随机种子。")  # / seed
+    parser.add_argument("--theta-init-mode", type=str, default="random", choices=["random", "zeros", "diagonal"], help="θ initial mode (only meaningful when --enable-theta). / θ 初始模式（仅 --enable-theta 生效）。")  # / mode
+    parser.add_argument("--theta-seed", type=int, default=42, help="θ random seed (only meaningful when --enable-theta). / θ 随机种子。")  # / seed
+    # θ optimisation control. Battery (2026-05) showed W10 surrogate operates in
+    # ω²M >> K regime → θ gradient is ~0 → drifts randomly → COMSOL eigenmodes
+    # are perturbed away from clean uniform. Default freeze on; opt-in to legacy
+    # joint H+θ+ω for ablation experiments. /
+    # θ 优化控制：默认冻结。--enable-theta 才恢复历史 H+θ+ω 联合优化。
+    parser.add_argument("--enable-theta", action="store_true", help="Enable θ optimisation (default OFF — battery confirmed θ is parasitic). / 启用 θ 优化（默认关，电池实验证实 θ 寄生）。")  # / θ on
     parser.add_argument("--torch-num-threads", type=int, default=_DEFAULT_TORCH_THREADS, help="torch.set_num_threads value (default 1 for Win/Mac reproducibility; raise for speed). / torch 线程数，默认 1 以求跨平台一致。")  # / threads
     parser.add_argument("--sigma-anneal-start", type=float, default=None, help="Initial sigma_rel for powder loss; linearly shrinks to --sigma-rel over --sigma-anneal-steps. Larger value (e.g. 0.20) protects against gradient-cliff collapse on thin / sparse targets. None disables (uses sigma_rel throughout). / 损失中 powder σ 起步值，逐步收紧到 --sigma-rel；防止细线目标梯度悬崖；None 关闭")  # / sigma anneal
     parser.add_argument("--sigma-anneal-steps", type=int, default=100, help="Number of steps over which sigma anneals from start to end. / Sigma 退火步数")  # / anneal steps
@@ -148,6 +154,7 @@ def main(argv: list[str] | None = None) -> int:  # 主 / Main
         stiffness_ratio=args.stiffness_ratio,
         shear_ratio=args.shear_ratio,
         theta_init_mode=str(args.theta_init_mode),
+        freeze_theta=(not bool(args.enable_theta)),
         theta_seed=int(args.theta_seed),
         h_init_mm=(float(args.h_init_mm) if args.h_init_mm is not None else None),
         sigma_anneal_start=(float(args.sigma_anneal_start) if args.sigma_anneal_start is not None else None),
@@ -156,7 +163,8 @@ def main(argv: list[str] | None = None) -> int:  # 主 / Main
     )  # 配置 / Config
 
     sr_print = args.stiffness_ratio if args.stiffness_ratio is not None else config.get("material", {}).get("stiffness_ratio", 1.05)  # 显示用 / Display
-    print(f"W10 anisotropy start / 启动 W10: candidate={args.candidate_id}, K={opt_config.num_frequencies}, range=[{opt_config.f_min_hz:.0f},{opt_config.f_max_hz:.0f}]Hz, steps={opt_config.num_steps}, sr={sr_print:.3f}, θ_init={opt_config.theta_init_mode}")  # / Print
+    theta_status = "FROZEN" if opt_config.freeze_theta else f"active ({opt_config.theta_init_mode})"  # / θ status
+    print(f"W10 anisotropy start / 启动 W10: candidate={args.candidate_id}, K={opt_config.num_frequencies}, range=[{opt_config.f_min_hz:.0f},{opt_config.f_max_hz:.0f}]Hz, steps={opt_config.num_steps}, sr={sr_print:.3f}, θ={theta_status}")  # / Print
     summary = run_w10_anisotropy_placement(config, target, opt_config, output_dir, verdict=verdict, initial_H_mm=initial_H, initial_theta_rad=initial_theta)  # / Run
 
     losses = summary["trace"]["total_loss"]  # / Loss

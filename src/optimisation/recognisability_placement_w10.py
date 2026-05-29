@@ -115,6 +115,22 @@ class W10AnisotropyConfig:  # W10 配置 / W10 config
     shear_ratio: float | None = None  # 剪切比覆盖 / Override shear ratio
     theta_init_mode: str = "random"  # θ 初值 ("random" | "zeros" | "diagonal") / θ init mode
     theta_seed: int = 42  # θ 随机种子 / θ random seed
+    # θ freeze (2026-05). Empirical finding: the W10 surrogate operates in the
+    # off-resonance, mass-dominated regime where ω²M >> K (by ~5 orders of
+    # magnitude at typical W10 freqs). Since θ only enters through K, the
+    # surrogate response is essentially θ-invariant — the gradient through θ
+    # is near-zero, so θ wanders randomly during training driven only by the
+    # smoothness penalty. The drifted θ then perturbs COMSOL's anisotropic
+    # eigenmodes (which DO depend on K) AWAY from the cleaner uniform-θ
+    # configuration. A 10-run battery (5 targets × 2 materials) confirmed
+    # that isotropic PLA (sr=1, θ trivially uniform) BEATS anisotropic CF-PETG
+    # (sr=3, θ "optimised") on 4/6 targets, ties 1, loses only on IC.
+    # Default = True: freeze θ at the init value; do not include in the Adam
+    # parameter group; skip the θ smoothness penalty. Set False to restore
+    # the legacy joint H+θ+ω optimisation for ablation / experimentation. /
+    # 默认冻 θ：W10 surrogate 处于 ω²M>>K 的远共振区，θ 在 K 之外无信号；
+    # 让 θ 随机漂移反而把 COMSOL 的 anisotropic eigenmode 推离最优。
+    freeze_theta: bool = True  # 冻结 θ 优化 / Freeze θ optimisation
     # H init thickness for the sigmoid reparam. Defaults to None → use the
     # midpoint of (h_min, h_max) so Adam starts in the linear region of the
     # sigmoid where the gradient signal is strong. Set explicitly to override.
@@ -228,9 +244,16 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
     # θ 初值 / θ init
     if initial_theta_rad is not None:  # 提供 / Provided
         theta_init = torch.tensor(np.asarray(initial_theta_rad, dtype=np.float64), dtype=dtype, device=device)  # numpy → tensor / Convert
+    elif bool(opt_config.freeze_theta):  # 冻结 → 强制 zeros / Freeze → force zeros
+        theta_init = torch.zeros((grid_size, grid_size), dtype=dtype, device=device)  # 全 0 / Zeros
+        print(f"[W10] θ FROZEN at 0 (freeze_theta=True). Surrogate is θ-insensitive in mass-dominated regime; uniform θ avoids COMSOL drift. / θ 已冻结")
     else:  # 默认 / Default
         theta_init = _initialise_theta_field(opt_config.theta_init_mode, grid_size, opt_config.theta_seed, dtype, device)  # 随机/对角/零 / Random/diagonal/zero
-    theta_design = theta_init.detach().clone().requires_grad_(True)  # 优化变量 / Decision variable
+    # Only require gradients when θ is actually being optimised /
+    # 仅在 θ 参与优化时启用梯度
+    theta_design = theta_init.detach().clone()  # 共享存储 / Shared storage
+    if not bool(opt_config.freeze_theta):  # 优化 → 加梯度 / Optimise → require grad
+        theta_design.requires_grad_(True)  # 决策变量 / Decision variable
 
     # 频率 + 权重 / Freqs + weights
     if opt_config.initial_frequencies_hz is not None and len(opt_config.initial_frequencies_hz) == K:  # 显式初值 / Explicit init
@@ -243,12 +266,16 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
     freq_logits = freq_logits_init.detach().clone().requires_grad_(True)  # 优化 / Decision
     weight_logits = weight_logits_init.detach().clone().requires_grad_(True)  # 优化 / Decision
 
-    optimiser = torch.optim.Adam([
+    # Build Adam param groups. Skip θ when frozen (no gradient → no point updating). /
+    # 构造 Adam 参数组：冻结时跳过 θ
+    param_groups = [
         {"params": [h_logit], "lr": float(opt_config.learning_rate_H)},  # H / H
-        {"params": [theta_design], "lr": float(opt_config.learning_rate_theta)},  # θ / θ
-        {"params": [freq_logits], "lr": float(opt_config.learning_rate_freq)},  # f / f
-        {"params": [weight_logits], "lr": float(opt_config.learning_rate_weight)},  # w / w
-    ], weight_decay=float(opt_config.weight_decay))  # Adam / Adam
+    ]
+    if not bool(opt_config.freeze_theta):  # θ 启用 / θ enabled
+        param_groups.append({"params": [theta_design], "lr": float(opt_config.learning_rate_theta)})  # θ / θ
+    param_groups.append({"params": [freq_logits], "lr": float(opt_config.learning_rate_freq)})  # f / f
+    param_groups.append({"params": [weight_logits], "lr": float(opt_config.learning_rate_weight)})  # w / w
+    optimiser = torch.optim.Adam(param_groups, weight_decay=float(opt_config.weight_decay))  # Adam / Adam
 
     sigma_end = float(opt_config.sigma_rel)  # 末态 σ / Final sigma
     sigma_start = float(opt_config.sigma_anneal_start) if opt_config.sigma_anneal_start is not None else sigma_end  # 起态 σ / Initial sigma
@@ -314,7 +341,12 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
                 sinkhorn_part, _ = sinkhorn_powder_target_loss(composite_amp, target_proxy, sigma_rel=float(opt_config.sigma_rel), epsilon=float(opt_config.sinkhorn_epsilon))  # / Sinkhorn
 
         smoothness = neighbour_smoothness_penalty(H_clamped, max_neighbour_diff_mm)  # H 邻平滑 / H smoothness
-        theta_smooth = _theta_smoothness_penalty(theta_design)  # θ 邻平滑 / θ smoothness
+        # θ smoothness penalty is meaningless when θ is frozen at a uniform value /
+        # θ 冻结时邻域平滑罚永远是 0，跳过避免无用 autograd 开销
+        if bool(opt_config.freeze_theta):  # 冻结 → 0 / Frozen → 0
+            theta_smooth = theta_design.new_tensor(0.0)  # 占位 / Placeholder
+        else:  # / Active
+            theta_smooth = _theta_smoothness_penalty(theta_design)  # θ 邻平滑 / θ smoothness
         freq_sep = frequency_separation_penalty(frequencies_hz, float(opt_config.freq_separation_min_hz)) if step >= int(opt_config.freeze_freq_first_steps) else frequencies_hz.new_tensor(0.0)  # 间隔 / Separation
         # Weight-entropy regulariser. H(w) = -Σ w log(w + 1e-12), max at
         # uniform distribution (H = log K). Subtracting it from the loss
@@ -425,6 +457,7 @@ def run_w10_anisotropy_placement(config: dict, target_binary: np.ndarray, opt_co
         "f_max_hz": float(opt_config.f_max_hz),
         "smoothness_weight": float(opt_config.smoothness_weight),
         "theta_smoothness_weight": float(opt_config.theta_smoothness_weight),
+        "freeze_theta": bool(opt_config.freeze_theta),
         "smoothness_max_diff_mm": float(max_neighbour_diff_mm),
         "h_min_mm": h_min,
         "h_max_mm": h_max,
