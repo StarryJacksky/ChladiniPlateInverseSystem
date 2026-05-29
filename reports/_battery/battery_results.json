@@ -1,0 +1,106 @@
+{
+  "elapsed_total_s": 2950.2,
+  "n_done": 5,
+  "n_total": 10,
+  "results": [
+    {
+      "material": "cfpetg",
+      "target": "cross",
+      "candidate_id": "bat_cfpetg_cross",
+      "rc": 0,
+      "wallclock_s": 589.8,
+      "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/cross/bat_cfpetg_cross/production_summary.json",
+      "p1_broad_enr": 9.18538404582934,
+      "p1_broad_rec": 0.45713668754048803,
+      "p1_tight_enr": 10.914544471096768,
+      "p1_tight_rec": 0.9291729648024185,
+      "p1_subset": [
+        "333",
+        "818",
+        "165"
+      ],
+      "p2_best_iter": 0,
+      "p2_enr": 9.18538404582934,
+      "p2_rec": 0.45713668754048803
+    },
+    {
+      "material": "cfpetg",
+      "target": "diagonal",
+      "candidate_id": "bat_cfpetg_diagonal",
+      "rc": 0,
+      "wallclock_s": 567.7,
+      "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/diagonal/bat_cfpetg_diagonal/production_summary.json",
+      "p1_broad_enr": 8.3652756328644,
+      "p1_broad_rec": 0.6321163366336634,
+      "p1_tight_enr": 11.753944073814749,
+      "p1_tight_rec": 0.9359529702970297,
+      "p1_subset": [
+        "704",
+        "1077",
+        "333"
+      ],
+      "p2_best_iter": 0,
+      "p2_enr": 8.3652756328644,
+      "p2_rec": 0.6321163366336634
+    },
+    {
+      "material": "cfpetg",
+      "target": "xform",
+      "candidate_id": "bat_cfpetg_xform",
+      "rc": 0,
+      "wallclock_s": 595.7,
+      "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/xform/bat_cfpetg_xform/production_summary.json",
+      "p1_broad_enr": 8.104230825474357,
+      "p1_broad_rec": 0.15050377833753148,
+      "p1_tight_enr": 9.479396951995435,
+      "p1_tight_rec": 0.779911838790932,
+      "p1_subset": [
+        "214",
+        "481",
+        "1108"
+      ],
+      "p2_best_iter": 1,
+      "p2_enr": 7.6025123076500405,
+      "p2_rec": 0.18403652392947104
+    },
+    {
+      "material": "cfpetg",
+      "target": "star_outline",
+      "candidate_id": "bat_cfpetg_star_outline",
+      "rc": 0,
+      "wallclock_s": 605.4,
+      "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/star_outline/bat_cfpetg_star_outline/production_summary.json",
+      "p1_broad_enr": 3.443819625918578,
+      "p1_broad_rec": 0.6449760765550239,
+      "p1_tight_enr": 0.32221091361646587,
+      "p1_tight_rec": 1.0,
+      "p1_subset": [
+        "328",
+        "454"
+      ],
+      "p2_best_iter": 1,
+      "p2_enr": 3.582694724464857,
+      "p2_rec": 0.69377990430622
+    },
+    {
+      "material": "cfpetg",
+      "target": "ic",
+      "candidate_id": "bat_cfpetg_ic",
+      "rc": 0,
+      "wallclock_s": 591.6,
+      "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/ic/bat_cfpetg_ic/production_summary.json",
+      "p1_broad_enr": 10.112829800888344,
+      "p1_broad_rec": 0.48910626945309027,
+      "p1_tight_enr": 12.381503706708248,
+      "p1_tight_rec": 0.9966651845264562,
+      "p1_subset": [
+        "312",
+        "967",
+        "473"
+      ],
+      "p2_best_iter": 1,
+      "p2_enr": 11.80431477091771,
+      "p2_rec": 0.4488661627389951
+    }
+  ]
+}

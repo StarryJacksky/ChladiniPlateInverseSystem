@@ -1,0 +1,482 @@
+{
+  "candidate_id": "bat_pla_diagonal",
+  "output_dir": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/pla/diagonal/bat_pla_diagonal",
+  "stiffness_ratio": 1.0,
+  "shear_ratio": 1.0,
+  "stage_reached": "phase2",
+  "surrogate_metrics": {
+    "enrichment": 3.048780478253446,
+    "contrast": 99775319.1398241,
+    "recall": 0.6802358223684033
+  },
+  "phase1": {
+    "candidate_id": "bat_pla_diagonal",
+    "eig_dir": "/Users/apple/Documents/ChladiniPlateProject/data/comsol_exports/prod_eig_bat_pla_diagonal/eigenfrequency",
+    "top_modes": [
+      {
+        "mode": 6,
+        "freq_hz": 159.452848896,
+        "enrichment": 6.211287649152423,
+        "recall": 0.9842202970297029,
+        "ic_score": 6.113275374985723
+      },
+      {
+        "mode": 5,
+        "freq_hz": 81.172279955,
+        "enrichment": 6.16971457934284,
+        "recall": 0.9659653465346535,
+        "ic_score": 5.959730481654811
+      },
+      {
+        "mode": 17,
+        "freq_hz": 551.836082739,
+        "enrichment": 5.629340501103973,
+        "recall": 0.8988242574257426,
+        "ic_score": 5.059787795701436
+      },
+      {
+        "mode": 10,
+        "freq_hz": 305.875091125,
+        "enrichment": 4.523436311858457,
+        "recall": 0.8131188118811881,
+        "ic_score": 3.6780911595185715
+      },
+      {
+        "mode": 2,
+        "freq_hz": 30.472075235,
+        "enrichment": 4.006561296431245,
+        "recall": 0.8090965346534653,
+        "ic_score": 3.241694860819216
+      },
+      {
+        "mode": 23,
+        "freq_hz": 918.653048636,
+        "enrichment": 4.441325227207218,
+        "recall": 0.713799504950495,
+        "ic_score": 3.1702157485046576
+      }
+    ],
+    "drive_freqs": [
+      161.0,
+      553.3,
+      307.4,
+      920.2,
+      331.6,
+      1039.9,
+      486.4,
+      1138.4,
+      224.5
+    ],
+    "w10_freqs_weights": {
+      "frequencies_hz": [
+        223.00578365079963,
+        318.9422219500553,
+        484.9348145343345,
+        850.4187285832855,
+        889.6232451363286,
+        1136.9207753317708
+      ],
+      "weights": [
+        0.18337488987030753,
+        0.07797186128096235,
+        0.2462220132178688,
+        0.15096110959485448,
+        0.15344861795089468,
+        0.18802150808511217
+      ]
+    },
+    "per_freq": {
+      "161": {
+        "broad": {
+          "enrich": 2.8349618610790603,
+          "recall": 0.6160272277227723,
+          "contrast": 3.1332055995411814
+        },
+        "tight": {
+          "enrich": 3.9665669125375937,
+          "recall": 1.0,
+          "contrast": 4.68800209514077
+        }
+      },
+      "553": {
+        "broad": {
+          "enrich": 2.0909615043202923,
+          "recall": 0.22617574257425743,
+          "contrast": 2.216394510862516
+        },
+        "tight": {
+          "enrich": 4.825424755128247,
+          "recall": 1.0,
+          "contrast": 6.020061713829081
+        }
+      },
+      "307": {
+        "broad": {
+          "enrich": 3.6127812336219196,
+          "recall": 0.5866336633663366,
+          "contrast": 4.179221065721481
+        },
+        "tight": {
+          "enrich": 6.946576630040475,
+          "recall": 1.0,
+          "contrast": 10.045325719560443
+        }
+      },
+      "920": {
+        "broad": {
+          "enrich": 1.7985609868511472,
+          "recall": 0.26639851485148514,
+          "contrast": 1.8762863095006792
+        },
+        "tight": {
+          "enrich": 5.426274367785889,
+          "recall": 1.0,
+          "contrast": 7.043556073876284
+        }
+      },
+      "332": {
+        "broad": {
+          "enrich": 3.3174289302249265,
+          "recall": 0.5522896039603961,
+          "contrast": 3.770730601656698
+        },
+        "tight": {
+          "enrich": 4.351985778296897,
+          "recall": 1.0,
+          "contrast": 5.268002751867454
+        }
+      },
+      "1040": {
+        "broad": {
+          "enrich": 4.217323987609058,
+          "recall": 0.7728960396039604,
+          "contrast": 5.062191868181141
+        },
+        "tight": {
+          "enrich": 5.66328487582188,
+          "recall": 1.0,
+          "contrast": 7.470429307415479
+        }
+      },
+      "486": {
+        "broad": {
+          "enrich": 2.694613867412486,
+          "recall": 0.1797648514851485,
+          "contrast": 2.9543209115439493
+        },
+        "tight": {
+          "enrich": 6.280413143691902,
+          "recall": 0.8567450495049505,
+          "contrast": 8.649749708638353
+        }
+      },
+      "1138": {
+        "broad": {
+          "enrich": 1.9475826399895872,
+          "recall": 0.34282178217821785,
+          "contrast": 2.0482662688025437
+        },
+        "tight": {
+          "enrich": 3.141950297969622,
+          "recall": 0.7688737623762376,
+          "contrast": 3.5347014227324194
+        }
+      },
+      "224": {
+        "broad": {
+          "enrich": 3.5146664053549825,
+          "recall": 0.4192450495049505,
+          "contrast": 4.041925454374854
+        },
+        "tight": {
+          "enrich": 6.858397609350115,
+          "recall": 1.0,
+          "contrast": 9.852638517288188
+        }
+      }
+    },
+    "best_composite": {
+      "subset": [
+        "307",
+        "332",
+        "1040"
+      ],
+      "method": "MAX",
+      "broad": {
+        "enrich": 11.351112841922655,
+        "recall": 0.9232673267326733,
+        "contrast": 24.514356420275174
+      },
+      "tight": {
+        "enrich": 13.356689335008761,
+        "recall": 1.0,
+        "contrast": 37.20517535225275
+      }
+    },
+    "top10_composites": [
+      {
+        "subset": [
+          "307",
+          "332",
+          "1040"
+        ],
+        "method": "MAX",
+        "broad": {
+          "enrich": 11.351112841922655,
+          "recall": 0.9232673267326733,
+          "contrast": 24.514356420275174
+        },
+        "tight": {
+          "enrich": 13.356689335008761,
+          "recall": 1.0,
+          "contrast": 37.20517535225275
+        }
+      },
+      {
+        "subset": [
+          "161",
+          "332",
+          "1040"
+        ],
+        "method": "MAX",
+        "broad": {
+          "enrich": 11.259452248697372,
+          "recall": 0.8994430693069307,
+          "contrast": 24.069239574715304
+        },
+        "tight": {
+          "enrich": 13.36152565140526,
+          "recall": 1.0,
+          "contrast": 37.24467484685843
+        }
+      },
+      {
+        "subset": [
+          "332",
+          "1040"
+        ],
+        "method": "MAX",
+        "broad": {
+          "enrich": 11.133372143482202,
+          "recall": 0.8412747524752475,
+          "contrast": 23.471557159168746
+        },
+        "tight": {
+          "enrich": 13.575985747648106,
+          "recall": 1.0,
+          "contrast": 39.053547171724084
+        }
+      },
+      {
+        "subset": [
+          "307",
+          "332",
+          "1040"
+        ],
+        "method": "RMS",
+        "broad": {
+          "enrich": 10.903987346599589,
+          "recall": 0.9464727722772277,
+          "contrast": 22.425395986728414
+        },
+        "tight": {
+          "enrich": 12.890922395771295,
+          "recall": 1.0,
+          "contrast": 33.64350026267695
+        }
+      },
+      {
+        "subset": [
+          "307",
+          "920",
+          "1040"
+        ],
+        "method": "SUM",
+        "broad": {
+          "enrich": 10.657629464633375,
+          "recall": 0.8239480198019802,
+          "contrast": 21.357391433393328
+        },
+        "tight": {
+          "enrich": 13.537424115285846,
+          "recall": 1.0,
+          "contrast": 38.719809482918095
+        }
+      },
+      {
+        "subset": [
+          "307",
+          "920",
+          "1040"
+        ],
+        "method": "RMS",
+        "broad": {
+          "enrich": 10.65754635551791,
+          "recall": 0.8205445544554455,
+          "contrast": 21.357040108002526
+        },
+        "tight": {
+          "enrich": 13.51524870058512,
+          "recall": 1.0,
+          "contrast": 38.52961188668625
+        }
+      },
+      {
+        "subset": [
+          "161",
+          "332",
+          "1040"
+        ],
+        "method": "RMS",
+        "broad": {
+          "enrich": 10.544401235885818,
+          "recall": 0.9520420792079208,
+          "contrast": 20.884663276307208
+        },
+        "tight": {
+          "enrich": 12.656679179782037,
+          "recall": 1.0,
+          "contrast": 32.016804088634544
+        }
+      },
+      {
+        "subset": [
+          "307",
+          "920",
+          "1040"
+        ],
+        "method": "MAX",
+        "broad": {
+          "enrich": 10.522519985148739,
+          "recall": 0.7985767326732673,
+          "contrast": 20.79457339775839
+        },
+        "tight": {
+          "enrich": 13.35930789569292,
+          "recall": 1.0,
+          "contrast": 37.22655498262719
+        }
+      },
+      {
+        "subset": [
+          "307",
+          "332",
+          "1040"
+        ],
+        "method": "SUM",
+        "broad": {
+          "enrich": 10.426521818599172,
+          "recall": 0.9557549504950495,
+          "contrast": 20.40406248420969
+        },
+        "tight": {
+          "enrich": 12.488421675806462,
+          "recall": 1.0,
+          "contrast": 30.908726839432344
+        }
+      },
+      {
+        "subset": [
+          "920",
+          "332",
+          "1040"
+        ],
+        "method": "MAX",
+        "broad": {
+          "enrich": 10.297434218478111,
+          "recall": 0.812809405940594,
+          "contrast": 19.890788127002548
+        },
+        "tight": {
+          "enrich": 13.353880651745436,
+          "recall": 1.0,
+          "contrast": 37.18226141047855
+        }
+      }
+    ]
+  },
+  "wallclock_seconds": {
+    "surrogate": 69.04000997543335,
+    "phase1": 226.5243980884552
+  },
+  "phase2": {
+    "history": [
+      {
+        "iter": 0,
+        "candidate_id": "bat_pla_diagonal",
+        "best_composite": {
+          "subset": [
+            "307",
+            "332",
+            "1040"
+          ],
+          "method": "MAX",
+          "broad": {
+            "enrich": 11.351112841922655,
+            "recall": 0.9232673267326733,
+            "contrast": 24.514356420275174
+          },
+          "tight": {
+            "enrich": 13.356689335008761,
+            "recall": 1.0,
+            "contrast": 37.20517535225275
+          }
+        },
+        "score": {
+          "score": 10.906921172802843,
+          "broad_enrich": 11.351112841922655,
+          "broad_recall": 0.9232673267326733,
+          "tight_enrich": 13.356689335008761,
+          "tight_recall": 1.0
+        },
+        "accepted": true
+      },
+      {
+        "iter": 1,
+        "candidate_id": "bat_pla_diagonal_p2it1",
+        "best_composite": {
+          "subset": [
+            "529",
+            "596",
+            "1023"
+          ],
+          "method": "MAX",
+          "broad": {
+            "enrich": 10.272879968888702,
+            "recall": 0.28527227722772275,
+            "contrast": 19.794654275105792
+          },
+          "tight": {
+            "enrich": 13.293179884827579,
+            "recall": 0.7846534653465347,
+            "contrast": 36.6915495545308
+          }
+        },
+        "score": {
+          "score": 5.486836236962114,
+          "broad_enrich": 10.272879968888702,
+          "broad_recall": 0.28527227722772275,
+          "tight_enrich": 13.293179884827579,
+          "tight_recall": 0.7846534653465347
+        },
+        "delta": -5.420084935840729,
+        "accepted": false,
+        "wallclock_s": 260.91663694381714
+      }
+    ],
+    "score_mode": "composite",
+    "best_iter": 0,
+    "best_score": 10.906921172802843,
+    "best_enrichment": 11.351112841922655,
+    "best_recall": 0.9232673267326733,
+    "baseline_score": 10.906921172802843,
+    "improvement_pct": 0.0
+  },
+  "w10_comsol_gap": {
+    "surrogate_enrichment": 3.048780478253446,
+    "comsol_final_enrichment": 11.351112841922655,
+    "gap_absolute": -8.302332363669208,
+    "gap_relative": -2.7231650238148215,
+    "status": "comsol_outperformed_surrogate"
+  }
+}

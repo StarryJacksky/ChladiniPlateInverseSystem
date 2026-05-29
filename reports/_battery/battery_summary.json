@@ -1,0 +1,314 @@
+[
+  {
+    "target_label": "binary (8-elem)",
+    "target_path": "data/processed_targets/target_binary.npy",
+    "runs": {
+      "cfpetg": {
+        "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/production/production_design/production_summary.json",
+        "candidate_id": "production_design",
+        "stiffness_ratio": 3.0,
+        "p1_broad_enr": 0.9971239834968579,
+        "p1_broad_rec": 0.19128972293529256,
+        "p1_tight_enr": 0.8704506036982363,
+        "p1_tight_rec": 0.8943082234221474,
+        "p1_subset": [
+          "978"
+        ],
+        "p2_best_iter": 0,
+        "p2_enr": 0.9971239834968579,
+        "p2_rec": 0.19128972293529256,
+        "subset_str": "978",
+        "used_freqs": [
+          978.3
+        ],
+        "stage_tag": "Phase 1"
+      },
+      "pla": {
+        "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/production_pla/production_design/production_summary.json",
+        "candidate_id": "production_design",
+        "stiffness_ratio": 1.0,
+        "p1_broad_enr": 1.0992441290374182,
+        "p1_broad_rec": 0.22262547579003275,
+        "p1_tight_enr": 1.2340750246049337,
+        "p1_tight_rec": 0.936531822607772,
+        "p1_subset": [
+          "1101"
+        ],
+        "p2_best_iter": 0,
+        "p2_enr": 1.0992441290374182,
+        "p2_rec": 0.22262547579003275,
+        "subset_str": "1101",
+        "used_freqs": [
+          1100.9
+        ],
+        "stage_tag": "Phase 1"
+      }
+    }
+  },
+  {
+    "target_label": "cross",
+    "target_path": "data/processed_targets/target_cross.npy",
+    "runs": {
+      "cfpetg": {
+        "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/cross/bat_cfpetg_cross/production_summary.json",
+        "candidate_id": "bat_cfpetg_cross",
+        "stiffness_ratio": 3.0,
+        "p1_broad_enr": 9.18538404582934,
+        "p1_broad_rec": 0.45713668754048803,
+        "p1_tight_enr": 10.914544471096768,
+        "p1_tight_rec": 0.9291729648024185,
+        "p1_subset": [
+          "333",
+          "818",
+          "165"
+        ],
+        "p2_best_iter": 0,
+        "p2_enr": 9.18538404582934,
+        "p2_rec": 0.45713668754048803,
+        "subset_str": "333+818+165",
+        "used_freqs": [
+          332.8,
+          817.9,
+          165.0
+        ],
+        "stage_tag": "Phase 1"
+      },
+      "pla": {
+        "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/pla/cross/bat_pla_cross/production_summary.json",
+        "candidate_id": "bat_pla_cross",
+        "stiffness_ratio": 1.0,
+        "p1_broad_enr": 10.110690722313945,
+        "p1_broad_rec": 0.39062837400129563,
+        "p1_tight_enr": 11.295147824530837,
+        "p1_tight_rec": 0.9809976247030879,
+        "p1_subset": [
+          "323",
+          "948",
+          "295"
+        ],
+        "p2_best_iter": 1,
+        "p2_enr": 10.00135130650846,
+        "p2_rec": 0.4716044050960916,
+        "subset_str": "294+940+592",
+        "used_freqs": [
+          294.0,
+          940.0,
+          592.0
+        ],
+        "stage_tag": "Phase 2 iter 1"
+      }
+    }
+  },
+  {
+    "target_label": "diagonal",
+    "target_path": "data/processed_targets/target_diagonal.npy",
+    "runs": {
+      "cfpetg": {
+        "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/diagonal/bat_cfpetg_diagonal/production_summary.json",
+        "candidate_id": "bat_cfpetg_diagonal",
+        "stiffness_ratio": 3.0,
+        "p1_broad_enr": 8.3652756328644,
+        "p1_broad_rec": 0.6321163366336634,
+        "p1_tight_enr": 11.753944073814749,
+        "p1_tight_rec": 0.9359529702970297,
+        "p1_subset": [
+          "704",
+          "1077",
+          "333"
+        ],
+        "p2_best_iter": 0,
+        "p2_enr": 8.3652756328644,
+        "p2_rec": 0.6321163366336634,
+        "subset_str": "704+1077+333",
+        "used_freqs": [
+          704.5,
+          1076.9,
+          333.3
+        ],
+        "stage_tag": "Phase 1"
+      },
+      "pla": {
+        "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/pla/diagonal/bat_pla_diagonal/production_summary.json",
+        "candidate_id": "bat_pla_diagonal",
+        "stiffness_ratio": 1.0,
+        "p1_broad_enr": 11.351112841922655,
+        "p1_broad_rec": 0.9232673267326733,
+        "p1_tight_enr": 13.356689335008761,
+        "p1_tight_rec": 1.0,
+        "p1_subset": [
+          "307",
+          "332",
+          "1040"
+        ],
+        "p2_best_iter": 0,
+        "p2_enr": 11.351112841922655,
+        "p2_rec": 0.9232673267326733,
+        "subset_str": "307+332+1040",
+        "used_freqs": [
+          307.4,
+          331.6,
+          1039.9
+        ],
+        "stage_tag": "Phase 1"
+      }
+    }
+  },
+  {
+    "target_label": "xform",
+    "target_path": "data/processed_targets/target_xform.npy",
+    "runs": {
+      "cfpetg": {
+        "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/xform/bat_cfpetg_xform/production_summary.json",
+        "candidate_id": "bat_cfpetg_xform",
+        "stiffness_ratio": 3.0,
+        "p1_broad_enr": 8.104230825474357,
+        "p1_broad_rec": 0.15050377833753148,
+        "p1_tight_enr": 9.479396951995435,
+        "p1_tight_rec": 0.779911838790932,
+        "p1_subset": [
+          "214",
+          "481",
+          "1108"
+        ],
+        "p2_best_iter": 1,
+        "p2_enr": 7.6025123076500405,
+        "p2_rec": 0.18403652392947104,
+        "subset_str": "527+1087+472",
+        "used_freqs": [
+          527.0,
+          1087.0,
+          472.0
+        ],
+        "stage_tag": "Phase 2 iter 1"
+      },
+      "pla": {
+        "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/pla/xform/bat_pla_xform/production_summary.json",
+        "candidate_id": "bat_pla_xform",
+        "stiffness_ratio": 1.0,
+        "p1_broad_enr": 8.793106085422433,
+        "p1_broad_rec": 0.25661209068010077,
+        "p1_tight_enr": 9.638395832623434,
+        "p1_tight_rec": 0.7681045340050378,
+        "p1_subset": [
+          "334",
+          "506",
+          "1148"
+        ],
+        "p2_best_iter": 1,
+        "p2_enr": 8.45515854605386,
+        "p2_rec": 0.29565491183879095,
+        "subset_str": "347+559+1057",
+        "used_freqs": [
+          347.0,
+          559.0,
+          1057.0
+        ],
+        "stage_tag": "Phase 2 iter 1"
+      }
+    }
+  },
+  {
+    "target_label": "star_outline",
+    "target_path": "data/_d_verify_targets/star_outline.npy",
+    "runs": {
+      "cfpetg": {
+        "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/star_outline/bat_cfpetg_star_outline/production_summary.json",
+        "candidate_id": "bat_cfpetg_star_outline",
+        "stiffness_ratio": 3.0,
+        "p1_broad_enr": 3.443819625918578,
+        "p1_broad_rec": 0.6449760765550239,
+        "p1_tight_enr": 0.32221091361646587,
+        "p1_tight_rec": 1.0,
+        "p1_subset": [
+          "328",
+          "454"
+        ],
+        "p2_best_iter": 1,
+        "p2_enr": 3.582694724464857,
+        "p2_rec": 0.69377990430622,
+        "subset_str": "336+165",
+        "used_freqs": [
+          336.0,
+          165.0
+        ],
+        "stage_tag": "Phase 2 iter 1"
+      },
+      "pla": {
+        "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/pla/star_outline/bat_pla_star_outline/production_summary.json",
+        "candidate_id": "bat_pla_star_outline",
+        "stiffness_ratio": 1.0,
+        "p1_broad_enr": 2.492186880225088,
+        "p1_broad_rec": 0.5588516746411484,
+        "p1_tight_enr": 0.0229446429873885,
+        "p1_tight_rec": 1.0,
+        "p1_subset": [
+          "367",
+          "915"
+        ],
+        "p2_best_iter": 1,
+        "p2_enr": 3.422160870258772,
+        "p2_rec": 0.5789473684210527,
+        "subset_str": "368+508",
+        "used_freqs": [
+          368.0,
+          508.0
+        ],
+        "stage_tag": "Phase 2 iter 1"
+      }
+    }
+  },
+  {
+    "target_label": "ic",
+    "target_path": "data/processed_targets/target_ic.npy",
+    "runs": {
+      "cfpetg": {
+        "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/ic/bat_cfpetg_ic/production_summary.json",
+        "candidate_id": "bat_cfpetg_ic",
+        "stiffness_ratio": 3.0,
+        "p1_broad_enr": 10.112829800888344,
+        "p1_broad_rec": 0.48910626945309027,
+        "p1_tight_enr": 12.381503706708248,
+        "p1_tight_rec": 0.9966651845264562,
+        "p1_subset": [
+          "312",
+          "967",
+          "473"
+        ],
+        "p2_best_iter": 1,
+        "p2_enr": 11.80431477091771,
+        "p2_rec": 0.4488661627389951,
+        "subset_str": "220+1102+165",
+        "used_freqs": [
+          220.0,
+          1102.0,
+          165.0
+        ],
+        "stage_tag": "Phase 2 iter 1"
+      },
+      "pla": {
+        "summary_path": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/pla/ic/bat_pla_ic/production_summary.json",
+        "candidate_id": "bat_pla_ic",
+        "stiffness_ratio": 1.0,
+        "p1_broad_enr": 10.270801755739974,
+        "p1_broad_rec": 0.2999110715873722,
+        "p1_tight_enr": 11.793743922259083,
+        "p1_tight_rec": 0.9530902623388172,
+        "p1_subset": [
+          "210",
+          "271",
+          "1075"
+        ],
+        "p2_best_iter": 0,
+        "p2_enr": 10.270801755739974,
+        "p2_rec": 0.2999110715873722,
+        "subset_str": "210+271+1075",
+        "used_freqs": [
+          209.8,
+          271.2,
+          1075.2
+        ],
+        "stage_tag": "Phase 1"
+      }
+    }
+  }
+]

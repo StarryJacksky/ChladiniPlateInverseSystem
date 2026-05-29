@@ -1,0 +1,31 @@
+[               start] Pipeline start (sr=3.0, candidate=bat_cfpetg_star_outline)
+[              target] Target loaded (1045 pixels)
+[     surrogate_start] Running W10 surrogate (single-start)
+[           surrogate] Running W10 surrogate (300 steps)
+[      surrogate_done] W10 done in 79s; surrogate enr=4.95×
+[        phase1_start] Phase 1: COMSOL eigfreq + Phase 1 selection + forced response + composite search
+[      comsol_eigfreq] Running COMSOL eigenfrequency (30 modes)
+[Phase 1] rejecting 4 eigenmodes outside W10 band [100,1220] Hz: [49.7, 60.7, 67.1, 87.2]
+[Phase 1] adding 3 W10-trained drive freqs: 224.1Hz(w=0.67), 777.6Hz(w=0.13), 1051.2Hz(w=0.11)
+[       comsol_forced] Running COMSOL forced response at 10 freqs
+[         phase1_done] Phase 1 done in 237s; best composite = 3.44× broad
+[        phase2_start] Phase 2 trust-region (1 iters, score_mode=composite)
+[   phase2_iter_start] iter 1/1: surrogate continue (lr_H=0.0250, lr_θ=0.0500, freeze_freq=20)
+[           surrogate] Running W10 surrogate (200 steps)
+[      comsol_eigfreq] Running COMSOL eigenfrequency (30 modes)
+[Phase 1] rejecting 5 eigenmodes outside W10 band [100,1220] Hz: [49.4, 61.7, 65.6, 85.8, 1241.0]
+[Phase 1] adding 3 W10-trained drive freqs: 230.8Hz(w=0.73), 810.5Hz(w=0.15), 1071.7Hz(w=0.07)
+[       comsol_forced] Running COMSOL forced response at 10 freqs
+[    phase2_iter_done] iter 1: score 2.766→2.984  (enr 3.44→3.58×, rec 0.64→0.69)  [ACCEPT]
+[                done] Pipeline complete. Best enrichment = 3.58×
+
+================================================================================
+PIPELINE FINAL
+================================================================================
+  Phase 1 best: SUM(328+454)
+    broad enr=3.44× rec=0.64
+    tight enr=0.32× rec=1.00
+  Phase 2: best iter 1 → score 2.984 (enr 3.58× rec 0.69)  +7.9% over Phase 1  [mode=composite]
+
+  Output: /Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/star_outline/bat_cfpetg_star_outline
+  Summary: /Users/apple/Documents/ChladiniPlateProject/reports/_battery/cfpetg/star_outline/bat_cfpetg_star_outline/production_summary.json

@@ -1,0 +1,31 @@
+[               start] Pipeline start (sr=1.0, candidate=bat_pla_star_outline)
+[              target] Target loaded (1045 pixels)
+[     surrogate_start] Running W10 surrogate (single-start)
+[           surrogate] Running W10 surrogate (300 steps)
+[      surrogate_done] W10 done in 85s; surrogate enr=4.93×
+[        phase1_start] Phase 1: COMSOL eigfreq + Phase 1 selection + forced response + composite search
+[      comsol_eigfreq] Running COMSOL eigenfrequency (30 modes)
+[Phase 1] rejecting 5 eigenmodes outside W10 band [100,1220] Hz: [52.1, 54.4, 69.6, 72.1, 1223.4]
+[Phase 1] adding 3 W10-trained drive freqs: 227.6Hz(w=0.57), 887.3Hz(w=0.20), 855.7Hz(w=0.17)
+[       comsol_forced] Running COMSOL forced response at 9 freqs
+[         phase1_done] Phase 1 done in 232s; best composite = 2.49× broad
+[        phase2_start] Phase 2 trust-region (1 iters, score_mode=composite)
+[   phase2_iter_start] iter 1/1: surrogate continue (lr_H=0.0250, lr_θ=0.0500, freeze_freq=20)
+[           surrogate] Running W10 surrogate (200 steps)
+[      comsol_eigfreq] Running COMSOL eigenfrequency (30 modes)
+[Phase 1] rejecting 5 eigenmodes outside W10 band [100,1220] Hz: [55.2, 57.3, 72.8, 76.2, 1225.4]
+[Phase 1] adding 3 W10-trained drive freqs: 228.6Hz(w=0.59), 883.9Hz(w=0.35), 1176.7Hz(w=0.05)
+[       comsol_forced] Running COMSOL forced response at 9 freqs
+[    phase2_iter_done] iter 1: score 1.863→2.604  (enr 2.49→3.42×, rec 0.56→0.58)  [ACCEPT]
+[                done] Pipeline complete. Best enrichment = 3.42×
+
+================================================================================
+PIPELINE FINAL
+================================================================================
+  Phase 1 best: SUM(367+915)
+    broad enr=2.49× rec=0.56
+    tight enr=0.02× rec=1.00
+  Phase 2: best iter 1 → score 2.604 (enr 3.42× rec 0.58)  +39.8% over Phase 1  [mode=composite]
+
+  Output: /Users/apple/Documents/ChladiniPlateProject/reports/_battery/pla/star_outline/bat_pla_star_outline
+  Summary: /Users/apple/Documents/ChladiniPlateProject/reports/_battery/pla/star_outline/bat_pla_star_outline/production_summary.json

@@ -6,7 +6,13 @@ venv/
 data/processed_targets/*
 data/comsol_exports/*
 candidates/candidate_*
+candidates/bat_*
+candidates/prod_*
+candidates/prodp1_*
+candidates/prodp2it*
 candidates/ranked_candidates.csv
+.DS_Store
+config.yaml.bak*
 reports/*_export.m
 reports/*_export.m.status
 reports/*_export.m.recovery

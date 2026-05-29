@@ -1,0 +1,477 @@
+{
+  "candidate_id": "bat_pla_star_outline",
+  "output_dir": "/Users/apple/Documents/ChladiniPlateProject/reports/_battery/pla/star_outline/bat_pla_star_outline",
+  "stiffness_ratio": 1.0,
+  "shear_ratio": 1.0,
+  "stage_reached": "phase2",
+  "surrogate_metrics": {
+    "enrichment": 4.928192450624578,
+    "contrast": 15.30670292007667,
+    "recall": 0.9532259858199242
+  },
+  "phase1": {
+    "candidate_id": "bat_pla_star_outline",
+    "eig_dir": "/Users/apple/Documents/ChladiniPlateProject/data/comsol_exports/prod_eig_bat_pla_star_outline/eigenfrequency",
+    "top_modes": [
+      {
+        "mode": 2,
+        "freq_hz": 54.3644421562,
+        "enrichment": 2.507778961439217,
+        "recall": 0.5167464114832536,
+        "ic_score": 1.295885779116916
+      },
+      {
+        "mode": 13,
+        "freq_hz": 365.05607531,
+        "enrichment": 2.2140568666303047,
+        "recall": 0.4449760765550239,
+        "ic_score": 0.9852023377828628
+      },
+      {
+        "mode": 1,
+        "freq_hz": 52.0855655525,
+        "enrichment": 2.0551635287704015,
+        "recall": 0.46220095693779906,
+        "ic_score": 0.9498985496613435
+      },
+      {
+        "mode": 10,
+        "freq_hz": 321.556034863,
+        "enrichment": 2.1727977592710017,
+        "recall": 0.41148325358851673,
+        "ic_score": 0.8940698913746705
+      },
+      {
+        "mode": 3,
+        "freq_hz": 69.6063787552,
+        "enrichment": 1.9088130975528954,
+        "recall": 0.4076555023923445,
+        "ic_score": 0.7781381622560128
+      },
+      {
+        "mode": 24,
+        "freq_hz": 913.660585475,
+        "enrichment": 1.8805598339087226,
+        "recall": 0.3837320574162679,
+        "ic_score": 0.7216310941601892
+      }
+    ],
+    "drive_freqs": [
+      366.6,
+      323.1,
+      915.2,
+      501.2,
+      977.5,
+      991.4,
+      229.1,
+      888.8,
+      857.2
+    ],
+    "w10_freqs_weights": {
+      "frequencies_hz": [
+        227.60816562007108,
+        395.4921049207533,
+        582.1914899428953,
+        855.6775847393194,
+        887.2624638794819,
+        1195.6948764265492
+      ],
+      "weights": [
+        0.5708780498857756,
+        0.005744122640213561,
+        0.0013585423480505497,
+        0.17309604593569358,
+        0.19936367550535405,
+        0.04955956368491259
+      ]
+    },
+    "per_freq": {
+      "367": {
+        "broad": {
+          "enrich": 1.9635367953970415,
+          "recall": 0.4574162679425837,
+          "contrast": 1.994679654230247
+        },
+        "tight": {
+          "enrich": 0.7172792360767161,
+          "recall": 1.0,
+          "contrast": 0.7140082377898763
+        }
+      },
+      "323": {
+        "broad": {
+          "enrich": 1.3708083361253813,
+          "recall": 0.29952153110047847,
+          "contrast": 1.3790946304732563
+        },
+        "tight": {
+          "enrich": 0.6018971961953796,
+          "recall": 1.0,
+          "contrast": 0.5980393634220986
+        }
+      },
+      "915": {
+        "broad": {
+          "enrich": 1.7104317711837524,
+          "recall": 0.3435406698564593,
+          "contrast": 1.7303510500109396
+        },
+        "tight": {
+          "enrich": 1.259652394360956,
+          "recall": 1.0,
+          "contrast": 1.2649745791133136
+        }
+      },
+      "501": {
+        "broad": {
+          "enrich": 1.7111110515303338,
+          "recall": 0.33014354066985646,
+          "contrast": 1.7310575127413392
+        },
+        "tight": {
+          "enrich": 1.5272441251675835,
+          "recall": 0.9789473684210527,
+          "contrast": 1.5404043283006268
+        }
+      },
+      "978": {
+        "broad": {
+          "enrich": 1.5836602169501415,
+          "recall": 0.3559808612440191,
+          "contrast": 1.5987807093129516
+        },
+        "tight": {
+          "enrich": 1.0401552498550857,
+          "recall": 0.9435406698564593,
+          "contrast": 1.0408324654020087
+        }
+      },
+      "991": {
+        "broad": {
+          "enrich": 1.017563324160971,
+          "recall": 0.17703349282296652,
+          "contrast": 1.0178529924331576
+        },
+        "tight": {
+          "enrich": 0.7425412701667086,
+          "recall": 0.9636363636363636,
+          "contrast": 0.7394563819567942
+        }
+      },
+      "229": {
+        "broad": {
+          "enrich": 0.7096283514873425,
+          "recall": 0.23157894736842105,
+          "contrast": 0.706305089341474
+        },
+        "tight": {
+          "enrich": 0.007693502039275361,
+          "recall": 1.0,
+          "contrast": 0.007571754366006386
+        }
+      },
+      "889": {
+        "broad": {
+          "enrich": 1.4847086826628686,
+          "recall": 0.307177033492823,
+          "contrast": 1.4964620787797784
+        },
+        "tight": {
+          "enrich": 0.7337914337743054,
+          "recall": 0.9913875598086125,
+          "contrast": 0.7306397347758128
+        }
+      },
+      "857": {
+        "broad": {
+          "enrich": 1.2810921216460576,
+          "recall": 0.2708133971291866,
+          "contrast": 1.2869538821915147
+        },
+        "tight": {
+          "enrich": 1.3390621523568882,
+          "recall": 0.9837320574162679,
+          "contrast": 1.3464597032413714
+        }
+      }
+    },
+    "best_composite": {
+      "subset": [
+        "367",
+        "915"
+      ],
+      "method": "SUM",
+      "broad": {
+        "enrich": 2.492186880225088,
+        "recall": 0.5588516746411484,
+        "contrast": 2.553938826304746
+      },
+      "tight": {
+        "enrich": 0.0229446429873885,
+        "recall": 1.0,
+        "contrast": 0.02258704320479959
+      }
+    },
+    "top10_composites": [
+      {
+        "subset": [
+          "367",
+          "915"
+        ],
+        "method": "SUM",
+        "broad": {
+          "enrich": 2.492186880225088,
+          "recall": 0.5588516746411484,
+          "contrast": 2.553938826304746
+        },
+        "tight": {
+          "enrich": 0.0229446429873885,
+          "recall": 1.0,
+          "contrast": 0.02258704320479959
+        }
+      },
+      {
+        "subset": [
+          "367",
+          "915"
+        ],
+        "method": "MAX",
+        "broad": {
+          "enrich": 2.3798804722596856,
+          "recall": 0.5808612440191387,
+          "contrast": 2.434309962246674
+        },
+        "tight": {
+          "enrich": 0.04521018010280391,
+          "recall": 1.0,
+          "contrast": 0.044521377023084216
+        }
+      },
+      {
+        "subset": [
+          "367",
+          "915"
+        ],
+        "method": "RMS",
+        "broad": {
+          "enrich": 2.3579147757416195,
+          "recall": 0.5712918660287082,
+          "contrast": 2.4109641368448504
+        },
+        "tight": {
+          "enrich": 0.015998927390021865,
+          "recall": 1.0,
+          "contrast": 0.01574783406914722
+        }
+      },
+      {
+        "subset": [
+          "915",
+          "501",
+          "889"
+        ],
+        "method": "SUM",
+        "broad": {
+          "enrich": 2.2680218589819012,
+          "recall": 0.44976076555023925,
+          "contrast": 2.315599956086773
+        },
+        "tight": {
+          "enrich": 0.06260390770926172,
+          "recall": 1.0,
+          "contrast": 0.061667215663025486
+        }
+      },
+      {
+        "subset": [
+          "323",
+          "915",
+          "857"
+        ],
+        "method": "SUM",
+        "broad": {
+          "enrich": 2.26537032080872,
+          "recall": 0.44019138755980863,
+          "contrast": 2.312791331863028
+        },
+        "tight": {
+          "enrich": 0.17303542792198978,
+          "recall": 1.0,
+          "contrast": 0.17074740458366802
+        }
+      },
+      {
+        "subset": [
+          "367",
+          "323",
+          "889"
+        ],
+        "method": "SUM",
+        "broad": {
+          "enrich": 2.2510909608067164,
+          "recall": 0.47368421052631576,
+          "contrast": 2.297670311355369
+        },
+        "tight": {
+          "enrich": 0.11888196461436067,
+          "recall": 1.0,
+          "contrast": 0.11720851536556032
+        }
+      },
+      {
+        "subset": [
+          "367",
+          "915",
+          "889"
+        ],
+        "method": "RMS",
+        "broad": {
+          "enrich": 2.244742065404368,
+          "recall": 0.49569377990430624,
+          "contrast": 2.2909494796858163
+        },
+        "tight": {
+          "enrich": 0.029998308427771198,
+          "recall": 1.0,
+          "contrast": 0.02953409762676086
+        }
+      },
+      {
+        "subset": [
+          "367",
+          "915",
+          "501"
+        ],
+        "method": "SUM",
+        "broad": {
+          "enrich": 2.2423020312534576,
+          "recall": 0.5875598086124402,
+          "contrast": 2.288366879763408
+        },
+        "tight": {
+          "enrich": 0.006885023051441252,
+          "recall": 1.0,
+          "contrast": 0.006775981740639304
+        }
+      },
+      {
+        "subset": [
+          "367",
+          "915",
+          "889"
+        ],
+        "method": "SUM",
+        "broad": {
+          "enrich": 2.2356353489111074,
+          "recall": 0.5425837320574163,
+          "contrast": 2.281311738023018
+        },
+        "tight": {
+          "enrich": 0.021764230963234064,
+          "recall": 1.0,
+          "contrast": 0.021424624650196594
+        }
+      },
+      {
+        "subset": [
+          "367",
+          "323",
+          "889"
+        ],
+        "method": "RMS",
+        "broad": {
+          "enrich": 2.226915484663126,
+          "recall": 0.49569377990430624,
+          "contrast": 2.2720861187519867
+        },
+        "tight": {
+          "enrich": 0.06350470584190322,
+          "recall": 1.0,
+          "contrast": 0.06255543544434164
+        }
+      }
+    ]
+  },
+  "wallclock_seconds": {
+    "surrogate": 84.64049983024597,
+    "phase1": 232.12225794792175
+  },
+  "phase2": {
+    "history": [
+      {
+        "iter": 0,
+        "candidate_id": "bat_pla_star_outline",
+        "best_composite": {
+          "subset": [
+            "367",
+            "915"
+          ],
+          "method": "SUM",
+          "broad": {
+            "enrich": 2.492186880225088,
+            "recall": 0.5588516746411484,
+            "contrast": 2.553938826304746
+          },
+          "tight": {
+            "enrich": 0.0229446429873885,
+            "recall": 1.0,
+            "contrast": 0.02258704320479959
+          }
+        },
+        "score": {
+          "score": 1.8630687604505307,
+          "broad_enrich": 2.492186880225088,
+          "broad_recall": 0.5588516746411484,
+          "tight_enrich": 0.0229446429873885,
+          "tight_recall": 1.0
+        },
+        "accepted": true
+      },
+      {
+        "iter": 1,
+        "candidate_id": "bat_pla_star_outline_p2it1",
+        "best_composite": {
+          "subset": [
+            "368",
+            "508"
+          ],
+          "method": "MAX",
+          "broad": {
+            "enrich": 3.422160870258772,
+            "recall": 0.5789473684210527,
+            "contrast": 3.561961522721
+          },
+          "tight": {
+            "enrich": 0.6667416984440012,
+            "recall": 1.0,
+            "contrast": 0.6631605408651536
+          }
+        },
+        "score": {
+          "score": 2.6038739887979565,
+          "broad_enrich": 3.422160870258772,
+          "broad_recall": 0.5789473684210527,
+          "tight_enrich": 0.6667416984440012,
+          "tight_recall": 1.0
+        },
+        "delta": 0.7408052283474258,
+        "accepted": true,
+        "wallclock_s": 289.7176790237427
+      }
+    ],
+    "score_mode": "composite",
+    "best_iter": 1,
+    "best_score": 2.6038739887979565,
+    "best_enrichment": 3.422160870258772,
+    "best_recall": 0.5789473684210527,
+    "baseline_score": 1.8630687604505307,
+    "improvement_pct": 39.76263485671259
+  },
+  "w10_comsol_gap": {
+    "surrogate_enrichment": 4.928192450624578,
+    "comsol_final_enrichment": 3.422160870258772,
+    "gap_absolute": 1.5060315803658058,
+    "gap_relative": 0.30559512345645873,
+    "status": "ok"
+  }
+}
