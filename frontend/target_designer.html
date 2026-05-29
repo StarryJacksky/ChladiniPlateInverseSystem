@@ -1941,6 +1941,112 @@
         grid-template-columns: 1fr; /* 样式设置 / Style setting */
       } /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
+
+    /* 均匀板画廊样式 / Uniform-plate gallery styles */
+    .gallery-grid { /* 画廊网格 / Gallery grid */
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+      padding: 4px 0;
+    }
+    .gallery-card { /* 单卡片 / Single card */
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px;
+      cursor: pointer;
+      display: grid;
+      gap: 4px;
+      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+      user-select: none;
+    }
+    .gallery-card:hover { /* 悬停效果 / Hover effect */
+      border-color: var(--accent);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 23, 22, 0.10);
+    }
+    .gallery-card.selected { /* 选中卡片 / Selected card */
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(18, 111, 100, 0.30);
+    }
+    .gallery-card img { /* 缩略图 / Thumbnail */
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      display: block;
+      object-fit: contain;
+    }
+    .gallery-card .gallery-card-head { /* 卡片头 / Card head */
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--muted);
+      gap: 4px;
+    }
+    .gallery-card .gallery-card-mode { /* 模态编号 / Mode index */
+      font-weight: 700;
+      color: var(--ink-soft);
+    }
+    .gallery-card .gallery-card-freq { /* 频率 / Frequency */
+      color: var(--accent-dark);
+      font-variant-numeric: tabular-nums;
+    }
+    .gallery-card .gallery-card-family { /* 家族标签 / Family tag */
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .gallery-perturb { /* 微扰布局 / Perturbation layout */
+      display: grid;
+      grid-template-columns: minmax(160px, 220px) 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+    @media (max-width: 760px) { /* 窄屏 / Narrow screen */
+      .gallery-perturb { grid-template-columns: 1fr; }
+    }
+    .gallery-preview { /* 预览框 / Preview box */
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 4px;
+      aspect-ratio: 1 / 1;
+      display: grid;
+      place-items: center;
+    }
+    .gallery-preview img { /* 预览图 / Preview image */
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+    }
+    .gallery-controls { /* 控件容器 / Controls container */
+      display: grid;
+      gap: 4px;
+    }
+    .gallery-slider { /* 单滑块 / Single slider */
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 4px 8px;
+      font-size: 0.78rem;
+      color: var(--ink-soft);
+    }
+    .gallery-slider input[type=range] { /* range / range input */
+      grid-column: 1 / 3;
+      width: 100%;
+      margin: 0;
+    }
+    .gallery-value { /* 数值显示 / Value display */
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      font-size: 0.75rem;
+      min-width: 32px;
+      text-align: right;
+    }
   </style> <!-- 结束样式区 / End style section -->
 </head> <!-- 页面结构 / Page structure -->
 <body> <!-- 页面结构 / Page structure -->
@@ -2044,6 +2150,7 @@
           <button class="tab-button" type="button" data-tab-target="tune">Tune</button> <!-- 页面结构 / Page structure -->
           <button class="tab-button" type="button" data-tab-target="results">Results</button> <!-- 页面结构 / Page structure -->
           <button class="tab-button" type="button" data-tab-target="run">Run</button> <!-- 页面结构 / Page structure -->
+          <button class="tab-button" type="button" data-tab-target="gallery" title="Browse uniform-plate baseline patterns and apply small perturbations. / 浏览均匀板基础图样并做参数化微扰。">Gallery</button> <!-- 页面结构 / Page structure -->
         </nav> <!-- 页面结构 / Page structure -->
         <div class="tab-panel active" data-tab-panel="target"> <!-- 页面结构 / Page structure -->
         <section class="panel"> <!-- 页面结构 / Page structure -->
@@ -2248,6 +2355,51 @@
           </div> <!-- 页面结构 / Page structure -->
         </section> <!-- 页面结构 / Page structure -->
         </div> <!-- 页面结构 / Page structure -->
+        <div class="tab-panel" data-tab-panel="gallery"> <!-- 均匀板图样画廊面板 / Uniform-plate gallery panel -->
+          <section class="panel"> <!-- 介绍面板 / Intro panel -->
+            <h2>Uniform-plate Gallery / 均匀板图样画廊</h2>
+            <p class="field-hint" style="font-size:0.86em;opacity:0.78;margin:0 0 8px 0">
+              These are the nodal-line patterns a <strong>uniform 2 mm</strong> plate with your current material would naturally produce — no thickness shaping needed. Pick one, apply small perturbations (X/Y stretch, rotate, scale, shear, translate, Gaussian bump), then send the result to the main inverse-design pipeline. / 这些是 <strong>2 mm 均匀厚度</strong> 板用你当前材料能"自然"震出的节点线图案——板不需要做任何加工。挑一个、做微扰（XY 拉伸、旋转、缩放、切变、平移、高斯隆起），再把结果送进主流水线即可。
+            </p>
+            <div class="panel-actions"> <!-- 顶部按钮 / Top actions -->
+              <button id="galleryRefreshButton" type="button">Rebuild gallery</button> <!-- 重建按钮 / Rebuild -->
+              <span id="gallerySummary" class="field-hint" style="font-size:0.85em;opacity:0.7">Loading gallery...</span> <!-- 计数 / Count -->
+            </div>
+          </section>
+          <section class="panel"> <!-- 画廊主面板 / Gallery main panel -->
+            <h2>Baseline Patterns / 基础图样</h2>
+            <div id="galleryGrid" class="gallery-grid">Loading gallery...</div> <!-- 画廊网格 / Gallery grid -->
+          </section>
+          <section class="panel" id="galleryPerturbPanel" hidden> <!-- 微扰面板（选中后显示） / Perturbation panel (visible after pick) -->
+            <h2>Perturb &amp; Preview / 微扰与预览</h2>
+            <div class="gallery-perturb"> <!-- 微扰区 / Perturbation area -->
+              <div class="gallery-preview-block"> <!-- 预览块 / Preview block -->
+                <div class="gallery-preview"> <!-- 预览图容器 / Preview holder -->
+                  <img id="galleryPreviewImage" alt="perturbed pattern preview" /> <!-- 预览 PNG / Preview PNG -->
+                </div>
+                <div id="galleryPreviewMeta" class="field-hint" style="font-size:0.85em;opacity:0.75">No mode selected</div> <!-- 元信息 / Meta -->
+              </div>
+              <div class="gallery-controls"> <!-- 控制器 / Controls -->
+                <label class="gallery-slider"><span>Stretch X / 横向拉伸</span><span class="gallery-value" id="galleryStretchXValue">1.00</span><input id="galleryStretchX" type="range" min="0.30" max="3.00" step="0.01" value="1.00" /></label>
+                <label class="gallery-slider"><span>Stretch Y / 纵向拉伸</span><span class="gallery-value" id="galleryStretchYValue">1.00</span><input id="galleryStretchY" type="range" min="0.30" max="3.00" step="0.01" value="1.00" /></label>
+                <label class="gallery-slider"><span>Rotate / 旋转 (°)</span><span class="gallery-value" id="galleryRotateValue">0</span><input id="galleryRotate" type="range" min="-180" max="180" step="1" value="0" /></label>
+                <label class="gallery-slider"><span>Scale / 整体缩放</span><span class="gallery-value" id="galleryScaleValue">1.00</span><input id="galleryScale" type="range" min="0.50" max="2.00" step="0.01" value="1.00" /></label>
+                <label class="gallery-slider"><span>Shear / 切变</span><span class="gallery-value" id="galleryShearValue">0.00</span><input id="galleryShear" type="range" min="-0.50" max="0.50" step="0.01" value="0.00" /></label>
+                <label class="gallery-slider"><span>Translate X / X 平移</span><span class="gallery-value" id="galleryTranslateXValue">0.00</span><input id="galleryTranslateX" type="range" min="-0.40" max="0.40" step="0.01" value="0.00" /></label>
+                <label class="gallery-slider"><span>Translate Y / Y 平移</span><span class="gallery-value" id="galleryTranslateYValue">0.00</span><input id="galleryTranslateY" type="range" min="-0.40" max="0.40" step="0.01" value="0.00" /></label>
+                <label class="gallery-slider"><span>Bump amplitude / 隆起幅度</span><span class="gallery-value" id="galleryBumpAmpValue">0.00</span><input id="galleryBumpAmp" type="range" min="-1.0" max="1.0" step="0.01" value="0.00" /></label>
+                <label class="gallery-slider"><span>Bump X / 隆起 X</span><span class="gallery-value" id="galleryBumpXValue">0.00</span><input id="galleryBumpX" type="range" min="-1.0" max="1.0" step="0.01" value="0.00" /></label>
+                <label class="gallery-slider"><span>Bump Y / 隆起 Y</span><span class="gallery-value" id="galleryBumpYValue">0.00</span><input id="galleryBumpY" type="range" min="-1.0" max="1.0" step="0.01" value="0.00" /></label>
+                <label class="gallery-slider"><span>Bump sigma / 隆起范围</span><span class="gallery-value" id="galleryBumpSigmaValue">0.20</span><input id="galleryBumpSigma" type="range" min="0.05" max="0.80" step="0.01" value="0.20" /></label>
+              </div>
+            </div>
+            <div class="panel-actions"> <!-- 微扰动作 / Perturbation actions -->
+              <button id="galleryResetButton" type="button">Reset perturbations</button> <!-- 复位 / Reset -->
+              <button id="galleryApplyButton" type="button" class="primary">Use as target / 作为目标</button> <!-- 落盘 / Apply -->
+            </div>
+            <div id="galleryApplyStatus" class="status" style="margin-top:6px" hidden>Idle</div> <!-- 状态 / Status -->
+          </section>
+        </div> <!-- 画廊面板结束 / End gallery panel -->
       </aside> <!-- 页面结构 / Page structure -->
     </section> <!-- 页面结构 / Page structure -->
 
@@ -7750,6 +7902,211 @@
     });
     // 前端逻辑 / Frontend logic
     stage.addEventListener("contextmenu", (event) => event.preventDefault());
+
+    // 均匀板画廊：状态与控件绑定 / Uniform-plate gallery: state & control wiring
+    const galleryState = { entries: [], selectedIndex: null, loaded: false, loading: false, debounceTimer: null, previewSeq: 0 };
+    const galleryGrid = document.getElementById("galleryGrid");
+    const gallerySummary = document.getElementById("gallerySummary");
+    const galleryRefreshButton = document.getElementById("galleryRefreshButton");
+    const galleryPerturbPanel = document.getElementById("galleryPerturbPanel");
+    const galleryPreviewImage = document.getElementById("galleryPreviewImage");
+    const galleryPreviewMeta = document.getElementById("galleryPreviewMeta");
+    const galleryApplyButton = document.getElementById("galleryApplyButton");
+    const galleryResetButton = document.getElementById("galleryResetButton");
+    const galleryApplyStatus = document.getElementById("galleryApplyStatus");
+    const gallerySliderIds = ["StretchX", "StretchY", "Rotate", "Scale", "Shear", "TranslateX", "TranslateY", "BumpAmp", "BumpX", "BumpY", "BumpSigma"];
+    const gallerySliderDefaults = { StretchX: 1.0, StretchY: 1.0, Rotate: 0, Scale: 1.0, Shear: 0.0, TranslateX: 0.0, TranslateY: 0.0, BumpAmp: 0.0, BumpX: 0.0, BumpY: 0.0, BumpSigma: 0.20 };
+    const gallerySliderPrecision = { Rotate: 0, BumpSigma: 2 };
+    const gallerySliderElems = Object.fromEntries(gallerySliderIds.map((key) => [key, { input: document.getElementById("gallery" + key), value: document.getElementById("gallery" + key + "Value") }]));
+
+    function gallerySliderValueText(key, raw) {
+      const precision = gallerySliderPrecision[key] !== undefined ? gallerySliderPrecision[key] : 2;
+      return Number(raw).toFixed(precision);
+    }
+
+    function readGalleryParams() {
+      return {
+        stretch_x: parseFloat(gallerySliderElems.StretchX.input.value),
+        stretch_y: parseFloat(gallerySliderElems.StretchY.input.value),
+        rotate_deg: parseFloat(gallerySliderElems.Rotate.input.value),
+        scale: parseFloat(gallerySliderElems.Scale.input.value),
+        shear: parseFloat(gallerySliderElems.Shear.input.value),
+        translate_x: parseFloat(gallerySliderElems.TranslateX.input.value),
+        translate_y: parseFloat(gallerySliderElems.TranslateY.input.value),
+        bump_amplitude: parseFloat(gallerySliderElems.BumpAmp.input.value),
+        bump_x: parseFloat(gallerySliderElems.BumpX.input.value),
+        bump_y: parseFloat(gallerySliderElems.BumpY.input.value),
+        bump_sigma: parseFloat(gallerySliderElems.BumpSigma.input.value)
+      };
+    }
+
+    function resetGallerySliders() {
+      gallerySliderIds.forEach((key) => {
+        const defaultValue = gallerySliderDefaults[key];
+        gallerySliderElems[key].input.value = String(defaultValue);
+        gallerySliderElems[key].value.textContent = gallerySliderValueText(key, defaultValue);
+      });
+    }
+
+    function updateGallerySliderText(key) {
+      const elems = gallerySliderElems[key];
+      elems.value.textContent = gallerySliderValueText(key, elems.input.value);
+    }
+
+    async function fetchGalleryCatalogue() {
+      try {
+        galleryState.loading = true;
+        gallerySummary.textContent = "Loading gallery... / 正在加载...";
+        galleryGrid.textContent = "Loading uniform-plate patterns... / 正在求解均匀板模态...";
+        const response = await fetch("/api/uniform-catalogue", { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        galleryState.entries = Array.isArray(payload.entries) ? payload.entries : [];
+        galleryState.loaded = true;
+        renderGalleryGrid();
+      } catch (error) {
+        galleryGrid.textContent = "Failed to load gallery: " + error.message;
+        gallerySummary.textContent = "Load failed / 加载失败";
+      } finally {
+        galleryState.loading = false;
+      }
+    }
+
+    function renderGalleryGrid() {
+      if (!galleryState.entries.length) {
+        galleryGrid.textContent = "Gallery is empty. Click 'Rebuild gallery'. / 画廊为空，请点击 'Rebuild gallery'。";
+        gallerySummary.textContent = "0 patterns / 0 个图样";
+        return;
+      }
+      gallerySummary.textContent = `${galleryState.entries.length} patterns · uniform 2 mm plate / ${galleryState.entries.length} 个图样 · 2 mm 均匀板`;
+      galleryGrid.innerHTML = "";
+      galleryState.entries.forEach((entry) => {
+        const card = document.createElement("div");
+        card.className = "gallery-card" + (galleryState.selectedIndex === entry.index ? " selected" : "");
+        card.dataset.modeIndex = String(entry.index);
+        const head = document.createElement("div");
+        head.className = "gallery-card-head";
+        const mode = document.createElement("span");
+        mode.className = "gallery-card-mode";
+        mode.textContent = `#${entry.index}`;
+        const freq = document.createElement("span");
+        freq.className = "gallery-card-freq";
+        freq.textContent = `${Number(entry.frequency_hz || 0).toFixed(1)} Hz`;
+        head.appendChild(mode);
+        head.appendChild(freq);
+        const img = document.createElement("img");
+        img.src = entry.thumbnail_url;
+        img.alt = `mode ${entry.index} nodal pattern`;
+        img.loading = "lazy";
+        const family = document.createElement("div");
+        family.className = "gallery-card-family";
+        family.textContent = entry.family || "";
+        card.appendChild(head);
+        card.appendChild(img);
+        card.appendChild(family);
+        card.addEventListener("click", () => selectGalleryMode(entry.index));
+        galleryGrid.appendChild(card);
+      });
+    }
+
+    async function selectGalleryMode(modeIndex) {
+      galleryState.selectedIndex = modeIndex;
+      Array.from(galleryGrid.querySelectorAll(".gallery-card")).forEach((card) => {
+        card.classList.toggle("selected", Number(card.dataset.modeIndex) === modeIndex);
+      });
+      galleryPerturbPanel.hidden = false;
+      const entry = galleryState.entries.find((item) => item.index === modeIndex);
+      if (entry) {
+        galleryPreviewMeta.textContent = `Mode #${entry.index} · ${Number(entry.frequency_hz).toFixed(1)} Hz · ${entry.family || ""}`;
+      }
+      requestGalleryPreview();
+    }
+
+    function scheduleGalleryPreview() {
+      if (galleryState.debounceTimer) clearTimeout(galleryState.debounceTimer);
+      galleryState.debounceTimer = setTimeout(requestGalleryPreview, 160);
+    }
+
+    async function requestGalleryPreview() {
+      if (galleryState.selectedIndex === null) return;
+      const params = readGalleryParams();
+      const seq = ++galleryState.previewSeq;
+      try {
+        const response = await fetch("/api/uniform-perturb", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode_index: galleryState.selectedIndex, params })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        if (seq !== galleryState.previewSeq) return;
+        galleryPreviewImage.src = payload.preview_data_url;
+        galleryPreviewMeta.textContent = `Mode #${payload.mode_index} · ${Number(payload.frequency_hz).toFixed(1)} Hz · ${payload.family || ""}`;
+      } catch (error) {
+        if (seq !== galleryState.previewSeq) return;
+        galleryPreviewMeta.textContent = "Preview failed: " + error.message;
+      }
+    }
+
+    async function applyGalleryTarget() {
+      if (galleryState.selectedIndex === null) {
+        galleryApplyStatus.hidden = false;
+        galleryApplyStatus.textContent = "Pick a pattern first. / 请先选择一个图样。";
+        return;
+      }
+      galleryApplyButton.disabled = true;
+      galleryApplyStatus.hidden = false;
+      galleryApplyStatus.textContent = "Saving target... / 正在保存目标...";
+      try {
+        const response = await fetch("/api/uniform-apply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mode_index: galleryState.selectedIndex, params: readGalleryParams(), preprocess: true })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        galleryApplyStatus.textContent = "Saved as target. Switching to Target tab. / 已保存为目标，切到 Target 页签。";
+        if (typeof loadExistingTarget === "function") {
+          try { await loadExistingTarget(); } catch (_) { /* ignore */ }
+        }
+        if (typeof loadTargetAnalysis === "function") {
+          try { await loadTargetAnalysis(); } catch (_) { /* ignore */ }
+        }
+        selectSidebarTab("target");
+        if (typeof setStatus === "function") {
+          const src = payload.source || {};
+          setStatus(`Target set from gallery mode #${src.mode_index || "?"} (${Number(src.frequency_hz || 0).toFixed(1)} Hz). / 已从画廊模态 #${src.mode_index || "?"} 设为目标。`, "good");
+        }
+      } catch (error) {
+        galleryApplyStatus.textContent = "Apply failed: " + error.message;
+      } finally {
+        galleryApplyButton.disabled = false;
+      }
+    }
+
+    gallerySliderIds.forEach((key) => {
+      const elems = gallerySliderElems[key];
+      if (!elems || !elems.input) return;
+      elems.input.addEventListener("input", () => {
+        updateGallerySliderText(key);
+        scheduleGalleryPreview();
+      });
+    });
+    galleryRefreshButton.addEventListener("click", () => fetchGalleryCatalogue());
+    galleryResetButton.addEventListener("click", () => {
+      resetGallerySliders();
+      requestGalleryPreview();
+    });
+    galleryApplyButton.addEventListener("click", applyGalleryTarget);
+    tabButtons.forEach((button) => {
+      if (button.dataset.tabTarget === "gallery") {
+        button.addEventListener("click", () => {
+          if (!galleryState.loaded && !galleryState.loading) {
+            fetchGalleryCatalogue();
+          }
+        });
+      }
+    });
 
     // 前端逻辑 / Frontend logic
     fillWhite();

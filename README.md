@@ -17,6 +17,7 @@ Chladni Studio 是一个用于 Chladni 板的本地逆向设计工具。用户�
 - [Algorithm Breakthrough Plan / 算法突破规划](./reports/algorithm_breakthrough_plan.zh-CN.md) ([中文](./reports/algorithm_breakthrough_plan.zh-CN.md) | [English](./reports/algorithm_breakthrough_plan.en.md))
 - [Algorithm Trial History (350+ experiments) / 算法 350+ 次试错全史](./reports/algorithm_trial_full_history.zh-CN.md)
 - [Remaining Work Plan / 后续任务规划](./reports/remaining_work_plan.md) ([中文](./reports/remaining_work_plan.zh-CN.md) | [English](./reports/remaining_work_plan.en.md))
+- [Uniform Pattern Gallery (easy-mode branch) / 均匀板图样画廊（轻量分支）](./docs/uniform_pattern_gallery.zh-CN.md) — pick a baseline mode and perturb it instead of drawing from scratch / 挑一个基础模态再微扰，比从零绘制更容易
 
 ## Production Pipeline (Recommended Path) / 生产流水线（推荐入口）
 

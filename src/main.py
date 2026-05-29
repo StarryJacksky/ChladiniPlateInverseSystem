@@ -13,7 +13,7 @@ from src.optimisation.random_search import score_available_candidates  # 导入�
 
 def build_parser() -> argparse.ArgumentParser:  # 创建命令行解析器 / Build command-line parser
     parser = argparse.ArgumentParser(description="Chladni inverse design MVP. / Chladni 逆向设计 MVP。")  # 初始化解析器 / Initialise parser
-    commands = ["prepare-target", "target-ui", "run-workflow", "generate-candidates", "generate-previews", "simulate-candidate", "simulate-forced-response", "simulate-batch", "render-mode-previews", "audit-comsol-model", "apply-comsol-design-contract", "discover-comsol", "apply-comsol-discovery", "diagnose-comsol", "diagnose-feasibility", "self-test", "validate-comsol-exports", "score-candidates"]  # 定义可用命令 / Define available commands
+    commands = ["prepare-target", "target-ui", "run-workflow", "generate-candidates", "generate-previews", "simulate-candidate", "simulate-forced-response", "simulate-batch", "render-mode-previews", "audit-comsol-model", "apply-comsol-design-contract", "discover-comsol", "apply-comsol-discovery", "diagnose-comsol", "diagnose-feasibility", "self-test", "validate-comsol-exports", "score-candidates", "build-uniform-catalogue"]  # 定义可用命令 / Define available commands
     parser.add_argument("command", choices=commands, help="Workflow command. / 工作流命令。")  # 添加命令参数 / Add command argument
     parser.add_argument("--config", default="config.yaml", help="Config file path. / 配置文件路径。")  # 添加配置路径参数 / Add config path argument
     parser.add_argument("--host", default="127.0.0.1", help="Target UI host. / 目标 UI 主机。")  # 添加 UI 主机参数 / Add UI host argument
@@ -25,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:  # 创建命令行解析器 / Bui
     parser.add_argument("--num-modes", type=int, default=0, help="Number of COMSOL modes to export. / COMSOL 导出模态数量。")  # 添加模态数量参数 / Add mode-count argument
     parser.add_argument("--limit", type=int, default=0, help="Preview render limit. / 预览渲染数量上限。")  # 添加预览数量参数 / Add preview limit argument
     parser.add_argument("--iterations", type=int, default=0, help="Optimisation generations to run. / 要运行的优化代数。")  # 添加迭代次数参数 / Add iteration-count argument
+    parser.add_argument("--proxy-grid", type=int, default=51, help="Proxy grid size for uniform-plate eigensolve. / 均匀板本征求解的代理网格尺寸。")  # 代理网格参数 / Proxy grid argument
     return parser  # 返回解析器 / Return parser
 
 
@@ -138,6 +139,20 @@ def main() -> None:  # 主程序入口 / Main program entry
         target_binary = np.load(target_path).astype(bool)  # 读取目标二值图 / Load target binary map
         ranking = score_available_candidates(config, target_binary, args.candidate_id or None, args.generation)  # 评分已有候选 / Score available candidates
         print(ranking if ranking else "No scored candidates yet. / 暂无可评分候选。")  # 打印排名或提示 / Print ranking or message
+    if args.command == "build-uniform-catalogue":  # 判断是否构建均匀板图样目录 / Check uniform-catalogue build command
+        from src.uniform_pattern.catalogue import build_uniform_catalogue  # 延迟导入目录构建 / Lazily import catalogue builder
+        from src.uniform_pattern.catalogue import catalogue_default_dir  # 延迟导入默认目录 / Lazily import default directory
+        from src.uniform_pattern.render import save_pattern_png  # 延迟导入 PNG 渲染 / Lazily import PNG renderer
+        out_dir = catalogue_default_dir(config)  # 计算缓存目录 / Compute cache directory
+        num_modes = args.num_modes or int(config.get("simulation", {}).get("num_modes", 30))  # 选择模态数 / Select mode count
+        result = build_uniform_catalogue(config, num_modes=num_modes, proxy_grid_size=int(args.proxy_grid), output_dir=out_dir)  # 构建目录 / Build catalogue
+        plate_length_mm = float(config["project"]["plate_length_mm"])  # 板长度 / Plate length
+        centre_clamp_radius_mm = float(config["project"]["center_clamp_radius_mm"])  # 中心夹持 / Centre clamp
+        line_width_px = int(config["nodal_extraction"]["target_line_width_px"])  # 目标线宽 / Target line width
+        for entry in result["entries"]:  # 遍历模态 / Iterate modes
+            save_pattern_png(entry.mode_field, out_dir / f"mode_{entry.index:03d}_preview.png", output_size=512, line_width_px=line_width_px, plate_length_mm=plate_length_mm, centre_clamp_radius_mm=centre_clamp_radius_mm)  # 保存 512 PNG / Save 512 PNG
+            save_pattern_png(entry.mode_field, out_dir / f"mode_{entry.index:03d}_thumb.png", output_size=160, line_width_px=max(1, line_width_px // 2), plate_length_mm=plate_length_mm, centre_clamp_radius_mm=centre_clamp_radius_mm)  # 保存缩略图 / Save thumbnail
+        print(f"Built uniform catalogue: {len(result['entries'])} modes -> {out_dir} / 已构建均匀板图样目录：{len(result['entries'])} 个模态 -> {out_dir}")  # 打印结果 / Print result
 
 
 if __name__ == "__main__":  # 判断是否直接运行 / Check direct execution

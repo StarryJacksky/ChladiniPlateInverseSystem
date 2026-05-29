@@ -22,6 +22,15 @@ from PIL import Image  # 导入图像库 / Import image library
 from src.config import load_config  # 导入配置读取函数 / Import configuration loader
 from src.target.analyse_target import save_target_analysis  # 导入目标分析保存函数 / Import target-analysis saver
 from src.target.preprocess_target import preprocess_target  # 导入目标预处理函数 / Import target preprocessing function
+from src.uniform_pattern.catalogue import build_uniform_catalogue  # 导入均匀板目录构建器 / Import uniform-catalogue builder
+from src.uniform_pattern.catalogue import catalogue_default_dir  # 导入默认缓存目录 / Import default cache dir
+from src.uniform_pattern.catalogue import load_catalogue  # 导入目录读取 / Import catalogue loader
+from src.uniform_pattern.catalogue import load_catalogue_entry  # 导入单条加载 / Import entry loader
+from src.uniform_pattern.perturb import apply_perturbation  # 导入微扰应用 / Import perturbation applier
+from src.uniform_pattern.perturb import normalise_params  # 导入参数规范化 / Import parameter validator
+from src.uniform_pattern.perturb import params_summary  # 导入参数摘要 / Import parameter summary
+from src.uniform_pattern.render import render_pattern_bytes  # 导入图样字节渲染 / Import bytes renderer
+from src.uniform_pattern.render import save_pattern_png  # 导入图样保存 / Import pattern saver
 
 
 CANDIDATE_ID_RE = re.compile(r"^candidate_\d{3}_\d{4}$")  # 定义候选编号格式 / Define candidate-id format
@@ -1659,6 +1668,48 @@ def prepare_target_outputs(config: dict, target_mode_override: str | None = None
     return analysis  # 返回分析摘要 / Return analysis summary
 
 
+UNIFORM_CATALOGUE_DEFAULT_MODES = 30  # 默认目录模态数量 / Default catalogue mode count
+UNIFORM_CATALOGUE_DEFAULT_PROXY_GRID = 51  # 默认代理网格 / Default proxy grid
+UNIFORM_PREVIEW_PX = 512  # 默认预览像素 / Default preview pixel size
+UNIFORM_THUMB_PX = 160  # 默认缩略图像素 / Default thumbnail pixel size
+
+
+def uniform_catalogue_dir(config: dict) -> Path:  # 计算均匀板目录路径 / Compute uniform-catalogue directory
+    return catalogue_default_dir(config)  # 委托给目录模块 / Delegate to catalogue module
+
+
+def uniform_catalogue_summary(config: dict) -> dict:  # 读取或构建目录摘要 / Read or build catalogue summary
+    cache_dir = uniform_catalogue_dir(config)  # 缓存目录 / Cache directory
+    summary = load_catalogue(cache_dir)  # 尝试读取缓存 / Try to load cache
+    metadata = (summary or {}).get("metadata", {}) if summary else {}  # 读取元信息 / Read metadata
+    plate_length_mm = float(config["project"]["plate_length_mm"])  # 板长度 / Plate length
+    centre_clamp_radius_mm = float(config["project"]["center_clamp_radius_mm"])  # 中心夹持 / Centre clamp
+    if not summary or metadata.get("plate_length_mm") != plate_length_mm or metadata.get("thickness_mm") != float(config.get("thickness", {}).get("default_mm", 2.0)) or metadata.get("material") != config.get("material", {}):  # 检查缓存是否过期 / Check whether cache is stale
+        summary = rebuild_uniform_catalogue(config, cache_dir)  # 缓存失效则重建 / Rebuild when stale
+    return summary  # 返回摘要 / Return summary
+
+
+def rebuild_uniform_catalogue(config: dict, cache_dir: Path) -> dict:  # 重建目录并落盘 / Rebuild catalogue and persist
+    plate_length_mm = float(config["project"]["plate_length_mm"])  # 板长度 / Plate length
+    centre_clamp_radius_mm = float(config["project"]["center_clamp_radius_mm"])  # 中心夹持 / Centre clamp
+    line_width_px = int(config["nodal_extraction"]["target_line_width_px"])  # 目标线宽 / Target line width
+    result = build_uniform_catalogue(config, num_modes=UNIFORM_CATALOGUE_DEFAULT_MODES, proxy_grid_size=UNIFORM_CATALOGUE_DEFAULT_PROXY_GRID, output_dir=cache_dir)  # 构建目录 / Build catalogue
+    for entry in result["entries"]:  # 渲染 PNG / Render PNGs
+        save_pattern_png(entry.mode_field, cache_dir / f"mode_{entry.index:03d}_preview.png", output_size=UNIFORM_PREVIEW_PX, line_width_px=line_width_px, plate_length_mm=plate_length_mm, centre_clamp_radius_mm=centre_clamp_radius_mm)  # 大图 / Full size
+        save_pattern_png(entry.mode_field, cache_dir / f"mode_{entry.index:03d}_thumb.png", output_size=UNIFORM_THUMB_PX, line_width_px=max(1, line_width_px // 2), plate_length_mm=plate_length_mm, centre_clamp_radius_mm=centre_clamp_radius_mm)  # 缩略图 / Thumbnail
+    return load_catalogue(cache_dir) or {"metadata": {}, "entries": []}  # 返回最新缓存 / Return latest cache
+
+
+def validate_uniform_index(raw: str, max_index: int) -> int:  # 校验模态编号 / Validate mode index
+    try:  # 防转换失败 / Guard conversion failure
+        value = int(raw)  # 转整型 / Convert to int
+    except (TypeError, ValueError) as exc:  # 处理无效输入 / Handle invalid input
+        raise ValueError("Invalid mode index. / 模态编号无效。") from exc  # 抛出格式错误 / Raise format error
+    if value < 1 or value > int(max_index):  # 范围检查 / Range check
+        raise ValueError(f"Mode index out of range (1..{int(max_index)}). / 模态编号超出范围。")  # 超界 / Out of range
+    return value  # 返回编号 / Return index
+
+
 def image_bytes(path: Path) -> bytes:  # 读取或生成目标 PNG 字节 / Read or create target PNG bytes
     if path.exists():  # 判断目标图是否存在 / Check whether target image exists
         return path.read_bytes()  # 返回现有目标图 / Return existing target image
@@ -1845,6 +1896,42 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                     return  # 结束请求 / Finish request
                 self.send_file(Path(config["paths"]["comsol_exports_dir"]) / candidate_id / folder_name / asset_name, "image/png")  # 返回导出资源 / Return export asset
                 return  # 结束请求 / Finish request
+            if route == "/api/uniform-catalogue":  # 均匀板目录摘要 / Uniform-catalogue summary
+                try:  # 捕获目录构建错误 / Catch catalogue errors
+                    summary = uniform_catalogue_summary(config)  # 读取或重建 / Read or rebuild
+                    entries = summary.get("entries", [])  # 取条目 / Get entries
+                    enriched = []  # 增强字段 / Enriched list
+                    for record in entries:  # 遍历条目 / Iterate entries
+                        item = dict(record)  # 复制 / Copy
+                        idx = int(item.get("index", 0))  # 编号 / Index
+                        item["thumbnail_url"] = f"/api/uniform-catalogue/{idx}/thumb.png"  # 缩略图 / Thumbnail URL
+                        item["preview_url"] = f"/api/uniform-catalogue/{idx}/preview.png"  # 预览图 / Preview URL
+                        enriched.append(item)  # 加入 / Append
+                    self.send_json({"metadata": summary.get("metadata", {}), "entries": enriched})  # 返回 JSON / Return JSON
+                except Exception as exc:  # 处理异常 / Handle exception
+                    self.send_json({"error": str(exc), "metadata": {}, "entries": []}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束请求 / Finish request
+            if route.startswith("/api/uniform-catalogue/"):  # 单个模态资源 / Single-mode asset
+                parts = route.split("/")  # 拆分路径 / Split path
+                if len(parts) == 5 and parts[4] in {"thumb.png", "preview.png", "field.npy"}:  # /api/uniform-catalogue/<id>/<asset> / Asset path
+                    try:  # 校验编号 / Validate index
+                        summary = uniform_catalogue_summary(config)  # 读取目录 / Read catalogue
+                        max_index = len(summary.get("entries", [])) or UNIFORM_CATALOGUE_DEFAULT_MODES  # 最大编号 / Max index
+                        index = validate_uniform_index(parts[3], max_index)  # 校验 / Validate
+                    except ValueError as exc:  # 错误编号 / Invalid index
+                        self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                        return  # 结束 / Finish
+                    cache_dir = uniform_catalogue_dir(config)  # 缓存目录 / Cache directory
+                    if parts[4] == "thumb.png":  # 缩略图 / Thumbnail
+                        self.send_file(cache_dir / f"mode_{index:03d}_thumb.png", "image/png")  # 返回缩略图 / Return thumbnail
+                        return  # 结束 / Finish
+                    if parts[4] == "preview.png":  # 预览图 / Preview
+                        self.send_file(cache_dir / f"mode_{index:03d}_preview.png", "image/png")  # 返回预览 / Return preview
+                        return  # 结束 / Finish
+                    self.send_file(cache_dir / f"mode_{index:03d}_field.npy", "application/octet-stream")  # 返回位移场 / Return field
+                    return  # 结束 / Finish
+                self.send_json({"error": "Asset not found. / 资源不存在。"}, HTTPStatus.NOT_FOUND)  # 404 / 404
+                return  # 结束 / Finish
             if route == "/api/target.png":  # 判断是否请求目标图 / Check target image request
                 self.send_bytes(image_bytes(target_path), "image/png")  # 返回目标 PNG / Return target PNG
                 return  # 结束请求 / Finish request
@@ -2014,6 +2101,62 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 except Exception as exc:  # 处理异常 / Handle exception
                     self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
                 return  # 结束请求 / Finish request
+            if route == "/api/uniform-perturb":  # 微扰预览（不落盘目标） / Perturb preview (no target write)
+                try:  # 捕获错误 / Catch errors
+                    length = int(self.headers.get("Content-Length", "0"))  # 请求体长度 / Body length
+                    payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 解析 JSON / Parse JSON
+                    summary = uniform_catalogue_summary(config)  # 读取目录 / Read catalogue
+                    max_index = len(summary.get("entries", [])) or UNIFORM_CATALOGUE_DEFAULT_MODES  # 最大编号 / Max index
+                    index = validate_uniform_index(payload.get("mode_index", payload.get("index", 0)), max_index)  # 校验编号 / Validate index
+                    entry = load_catalogue_entry(uniform_catalogue_dir(config), index)  # 加载条目 / Load entry
+                    if entry is None:  # 条目缺失 / Entry missing
+                        raise FileNotFoundError(f"Catalogue entry {index} missing. / 目录条目 {index} 缺失。")  # 抛错 / Raise
+                    field, _ = entry  # 解包 / Unpack
+                    params = normalise_params(dict(payload.get("params", payload)))  # 校验微扰参数 / Validate perturbation params
+                    perturbed_field = apply_perturbation(field, params)  # 应用微扰 / Apply perturbation
+                    plate_length_mm = float(config["project"]["plate_length_mm"])  # 板长度 / Plate length
+                    centre_clamp_radius_mm = float(config["project"]["center_clamp_radius_mm"])  # 中心夹持 / Centre clamp
+                    line_width_px = int(config["nodal_extraction"]["target_line_width_px"])  # 目标线宽 / Target line width
+                    png_bytes = render_pattern_bytes(perturbed_field, output_size=UNIFORM_PREVIEW_PX, line_width_px=line_width_px, plate_length_mm=plate_length_mm, centre_clamp_radius_mm=centre_clamp_radius_mm)  # 渲染 PNG / Render PNG
+                    data_url = "data:image/png;base64," + base64.b64encode(png_bytes).decode("ascii")  # 编码 data URL / Encode data URL
+                    base_entry = next((e for e in summary.get("entries", []) if int(e.get("index", -1)) == index), {})  # 取基础元信息 / Take base metadata
+                    self.send_json({"mode_index": index, "frequency_hz": float(base_entry.get("frequency_hz", 0.0)), "family": base_entry.get("family", "unknown"), "params": params_summary(params), "preview_data_url": data_url})  # 返回结果 / Return result
+                except FileNotFoundError as exc:  # 资源缺失 / Resource missing
+                    self.send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)  # 404 / 404
+                except ValueError as exc:  # 参数错误 / Bad params
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                except Exception as exc:  # 其他异常 / Other
+                    self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束 / Finish
+            if route == "/api/uniform-apply":  # 把微扰图样落盘为活动目标 / Save perturbed pattern as active target
+                try:  # 捕获错误 / Catch errors
+                    length = int(self.headers.get("Content-Length", "0"))  # 请求体长度 / Body length
+                    payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 解析 JSON / Parse JSON
+                    summary = uniform_catalogue_summary(config)  # 读取目录 / Read catalogue
+                    max_index = len(summary.get("entries", [])) or UNIFORM_CATALOGUE_DEFAULT_MODES  # 最大编号 / Max index
+                    index = validate_uniform_index(payload.get("mode_index", payload.get("index", 0)), max_index)  # 校验编号 / Validate index
+                    entry = load_catalogue_entry(uniform_catalogue_dir(config), index)  # 加载条目 / Load entry
+                    if entry is None:  # 条目缺失 / Entry missing
+                        raise FileNotFoundError(f"Catalogue entry {index} missing. / 目录条目 {index} 缺失。")  # 抛错 / Raise
+                    field, _ = entry  # 解包 / Unpack
+                    params = normalise_params(dict(payload.get("params", payload)))  # 校验微扰参数 / Validate perturbation params
+                    perturbed_field = apply_perturbation(field, params)  # 应用微扰 / Apply perturbation
+                    plate_length_mm = float(config["project"]["plate_length_mm"])  # 板长度 / Plate length
+                    centre_clamp_radius_mm = float(config["project"]["center_clamp_radius_mm"])  # 中心夹持 / Centre clamp
+                    line_width_px = int(config["nodal_extraction"]["target_line_width_px"])  # 目标线宽 / Target line width
+                    png_bytes = render_pattern_bytes(perturbed_field, output_size=UNIFORM_PREVIEW_PX, line_width_px=line_width_px, plate_length_mm=plate_length_mm, centre_clamp_radius_mm=centre_clamp_radius_mm)  # 渲染 PNG / Render PNG
+                    normalise_target_image(png_bytes, target_path)  # 写入活动目标 PNG / Write active target PNG
+                    target_mode = str(payload.get("target_mode", config["nodal_extraction"].get("target_mode", "chladni")))  # 读取目标模式 / Read target mode
+                    analysis = prepare_target_outputs(config, target_mode) if payload.get("preprocess", True) else {}  # 可选预处理 / Optional preprocessing
+                    base_entry = next((e for e in summary.get("entries", []) if int(e.get("index", -1)) == index), {})  # 基础元信息 / Base metadata
+                    self.send_json({"saved_at": datetime.now().isoformat(timespec="seconds"), "target_path": str(target_path), "processed_targets_dir": str(processed_dir), "analysis": analysis, "source": {"mode_index": index, "frequency_hz": float(base_entry.get("frequency_hz", 0.0)), "family": base_entry.get("family", "unknown"), "params": params_summary(params)}})  # 返回结果 / Return result
+                except FileNotFoundError as exc:  # 资源缺失 / Resource missing
+                    self.send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)  # 404 / 404
+                except ValueError as exc:  # 参数错误 / Bad params
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                except Exception as exc:  # 其他异常 / Other
+                    self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束 / Finish
             if route != "/api/save-target":  # 检查保存路由 / Check save route
                 self.send_json({"error": "Not found. / 未找到。"}, HTTPStatus.NOT_FOUND)  # 返回 404 / Return 404
                 return  # 结束请求 / Finish request
