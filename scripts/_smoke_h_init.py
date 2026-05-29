@@ -66,7 +66,6 @@ def main() -> None:
         opt = W10AnisotropyConfig(
             num_steps=60,
             plateau_patience=200,  # disable plateau for clean comparison
-            theta_seed=42,
             h_init_mm=h_init,
         )
 

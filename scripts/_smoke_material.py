@@ -1,7 +1,7 @@
 """Material A/B smoke: how much does the (stiffness_ratio, shear_ratio) pair
 affect W10's ability to fit the current target?
 
-Holds everything else fixed (H init = mid-range, theta_seed=42, 80 steps).
+Holds everything else fixed (H init = mid-range, 80 steps).
 Compares 4 cases:
   1. tier0_iso_PLA      sr=1.0 gr=1.0 E=3.5 GPa — school FDM PLA, isotropic
   2. tier0_iso_PETG     sr=1.0 gr=1.0 E=2.0 GPa — school FDM PETG
@@ -58,7 +58,6 @@ def main() -> None:
         opt = W10AnisotropyConfig(
             num_steps=80,
             plateau_patience=200,
-            theta_seed=42,
             # h_init_mm=None → mid-range (1.3 mm) — the fix
             stiffness_ratio=sr,
             shear_ratio=gr,

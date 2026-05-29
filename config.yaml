@@ -51,8 +51,7 @@ production:
   shear_ratio: 1.0 # / Default shear
   w10_num_steps: 300 # surrogate Adam 步数 / Surrogate Adam steps
   w10_lr_h: 0.05 # H 学习率 / H learning rate
-  w10_lr_theta: 0.10 # θ 学习率（角度） / θ learning rate (radians)
-  w10_num_frequencies: 6 # 联合频率数 K / Joint frequency count K
+  w10_num_frequencies: 6 # 联合频率数 K / Joint frequency count K (theta optimisation removed 2026-05; see BATTERY_FINDINGS.md)
   w10_f_min_hz: 120.0 # / Frequency lower bound
   w10_f_max_hz: 1200.0 # / Frequency upper bound
   w10_sigma_anneal_start: 0.20 # Sigma 退火起点（防止细线 target 梯度悬崖）/ Sigma annealing start; protects against thin-target gradient cliff
@@ -72,7 +71,6 @@ production:
   phase2_max_iters: 3 # 信任域外层迭代数（0 = 跳过 Phase 2；旧默认 1 实质 delta=0） / Trust-region outer iters (was 1, raised so P2 can actually escape the P1 basin)
   phase2_inner_steps: 200 # 每次 Phase 2 内层 W10 步数（旧默认 80 太短） / Inner W10 steps per Phase 2 iter (was 80)
   phase2_lr_h_init: 0.025 # / Trust-region H LR initial
-  phase2_lr_theta_init: 0.05 # / Trust-region θ LR initial
   phase2_freeze_freq_first_steps: 20 # P2 内层冻结 freq/weight 步数（W10 默认 60，对 P2 短步数太长） / Freeze freq/weight first-N steps in P2 (W10 default 60 is too long for short P2 inner runs)
 
 # COMSOL 仿真设置 / COMSOL simulation settings

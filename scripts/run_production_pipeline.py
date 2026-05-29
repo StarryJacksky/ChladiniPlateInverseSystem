@@ -37,7 +37,6 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--shear-ratio", type=float, default=1.0)
     p.add_argument("--w10-num-steps", type=int, default=300)
     p.add_argument("--w10-lr-h", type=float, default=0.05)
-    p.add_argument("--w10-lr-theta", type=float, default=0.10)
     p.add_argument("--phase1-top-k-modes", type=int, default=6)
     p.add_argument("--magic-off-resonance-hz", default="165.0",
                      help="Comma-separated extra off-resonance freqs (default tier1 magic 165).")
@@ -46,17 +45,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--skip-comsol", action="store_true",
                      help="Fast preview: surrogate only, no COMSOL.")
     p.add_argument("--multistart-n", type=int, default=1,
-                     help="Number of W10 seeds (1=off; 4-8 to escape local minima). "
-                          "Always includes seed=42 baseline + anti-regression 5%% uplift guard.")
+                     help="DEPRECATED: kept for compatibility. Since theta optimisation was "
+                          "removed the W10 surrogate is deterministic, so N>1 is a no-op.")
     p.add_argument("--multistart-uplift-threshold", type=float, default=0.05,
-                     help="Min relative score improvement over seed=42 for a multi-start winner "
-                          "to be promoted (default 0.05 = +5%%).")
-    # θ optimisation control. Default = freeze (battery confirmed θ parasitic
-    # because surrogate operates in ω²M >> K regime). /
-    # θ 优化：默认冻结
-    p.add_argument("--enable-theta", action="store_true",
-                     help="Enable θ optimisation in W10 surrogate + Phase 2 (default OFF — "
-                          "battery showed θ is parasitic since surrogate is in ω²M >> K regime).")
+                     help="DEPRECATED: kept for compatibility (multistart is now a no-op).")
     return p.parse_args()
 
 
@@ -71,7 +63,6 @@ def main() -> int:
         shear_ratio=args.shear_ratio,
         w10_num_steps=args.w10_num_steps,
         w10_lr_h=args.w10_lr_h,
-        w10_lr_theta=args.w10_lr_theta,
         phase1_top_k_modes=args.phase1_top_k_modes,
         magic_off_resonance_hz=magic_freqs,
         phase2_max_iters=args.phase2_max_iters,
@@ -79,7 +70,6 @@ def main() -> int:
         skip_comsol=args.skip_comsol,
         multistart_n=args.multistart_n,
         multistart_uplift_threshold=args.multistart_uplift_threshold,
-        enable_theta=bool(args.enable_theta),
     )
 
     def progress_printer(event: dict) -> None:
