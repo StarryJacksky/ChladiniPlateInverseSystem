@@ -1941,6 +1941,191 @@
         grid-template-columns: 1fr; /* 样式设置 / Style setting */
       } /* 样式设置 / Style setting */
     } /* 样式设置 / Style setting */
+
+    /* 均匀板画廊样式 / Uniform-plate gallery styles */
+    .gallery-grid { /* 画廊网格 / Gallery grid */
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+      padding: 4px 0;
+    }
+    .gallery-card { /* 单卡片 / Single card */
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px;
+      cursor: pointer;
+      display: grid;
+      gap: 4px;
+      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+      user-select: none;
+      position: relative; /* 用于角标定位 / For badge positioning */
+    }
+    .gallery-card:hover { /* 悬停效果 / Hover effect */
+      border-color: var(--accent);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(16, 23, 22, 0.10);
+    }
+    .gallery-card.selected { /* 选中卡片 / Selected card */
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(18, 111, 100, 0.30);
+    }
+    .gallery-card img { /* 缩略图 / Thumbnail */
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      display: block;
+      object-fit: contain;
+    }
+    .gallery-card .gallery-card-head { /* 卡片头 / Card head */
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--muted);
+      gap: 4px;
+    }
+    .gallery-card .gallery-card-mode { /* 模态编号 / Mode index */
+      font-weight: 700;
+      color: var(--ink-soft);
+    }
+    .gallery-card .gallery-card-freq { /* 频率 / Frequency */
+      color: var(--accent-dark);
+      font-variant-numeric: tabular-nums;
+    }
+    .gallery-card .gallery-card-family { /* 家族标签 / Family tag */
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .gallery-card .gallery-card-reach { /* 中心驱动参与度徽标 / Centre-drive reach badge */
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-size: 0.66rem;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+      color: #fff;
+      background: rgba(50, 50, 50, 0.78);
+      pointer-events: none;
+    }
+    .gallery-card .gallery-card-reach.reach-high { background: rgba(40, 130, 50, 0.92); } /* 高可达性 / High reach */
+    .gallery-card .gallery-card-reach.reach-mid { background: rgba(180, 140, 30, 0.92); } /* 中可达性 / Medium reach */
+    .gallery-card .gallery-card-reach.reach-low { background: rgba(170, 60, 60, 0.92); } /* 低可达性 / Low reach */
+    .gallery-card.gallery-card-low { /* 低可达性卡片整体降饱和 / Low-reach card de-emphasis */
+      opacity: 0.55;
+    }
+    .gallery-card.gallery-card-low::after { /* 警示斜纹 / Warning stripes */
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(45deg, rgba(170,60,60,0.0) 0 12px, rgba(170,60,60,0.10) 12px 14px);
+      border-radius: 6px;
+    }
+    .gallery-tier-controls { /* 档位控制行 / Tier control row */
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .gallery-tier-field { /* 档位字段 / Tier field */
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 220px;
+    }
+    .gallery-tier-field > span { /* 字段标签 / Field label */
+      font-size: 0.78em;
+      opacity: 0.72;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .gallery-tier-field select { /* 下拉框 / Select box */
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--panel);
+      color: var(--ink);
+      font-size: 0.92em;
+    }
+    .gallery-tier-meta { /* 档位说明 / Tier meta */
+      flex: 1;
+      min-width: 220px;
+    }
+    .gallery-match-list { /* 自动匹配备选 / Auto-match alternatives */
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+    .gallery-match-chip { /* 备选 chip / Alternative chip */
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      cursor: pointer;
+      background: var(--panel);
+      color: var(--ink);
+      font-size: 0.82em;
+      transition: background 0.15s ease;
+    }
+    .gallery-match-chip:hover { background: var(--panel-hover, rgba(0,0,0,0.04)); }
+    .gallery-match-chip.active { border-color: var(--accent, #4c8bf5); color: var(--accent, #4c8bf5); }
+    .gallery-perturb { /* 微扰布局 / Perturbation layout */
+      display: grid;
+      grid-template-columns: minmax(160px, 220px) 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+    @media (max-width: 760px) { /* 窄屏 / Narrow screen */
+      .gallery-perturb { grid-template-columns: 1fr; }
+    }
+    .gallery-preview { /* 预览框 / Preview box */
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 4px;
+      aspect-ratio: 1 / 1;
+      display: grid;
+      place-items: center;
+    }
+    .gallery-preview img { /* 预览图 / Preview image */
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+    }
+    .gallery-controls { /* 控件容器 / Controls container */
+      display: grid;
+      gap: 4px;
+    }
+    .gallery-slider { /* 单滑块 / Single slider */
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 4px 8px;
+      font-size: 0.78rem;
+      color: var(--ink-soft);
+    }
+    .gallery-slider input[type=range] { /* range / range input */
+      grid-column: 1 / 3;
+      width: 100%;
+      margin: 0;
+    }
+    .gallery-value { /* 数值显示 / Value display */
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+      font-size: 0.75rem;
+      min-width: 32px;
+      text-align: right;
+    }
   </style> <!-- 结束样式区 / End style section -->
 </head> <!-- 页面结构 / Page structure -->
 <body> <!-- 页面结构 / Page structure -->
@@ -2044,6 +2229,7 @@
           <button class="tab-button" type="button" data-tab-target="tune">Tune</button> <!-- 页面结构 / Page structure -->
           <button class="tab-button" type="button" data-tab-target="results">Results</button> <!-- 页面结构 / Page structure -->
           <button class="tab-button" type="button" data-tab-target="run">Run</button> <!-- 页面结构 / Page structure -->
+          <button class="tab-button" type="button" data-tab-target="gallery" title="Browse uniform-plate baseline patterns and apply small perturbations. / 浏览均匀板基础图样并做参数化微扰。">Gallery</button> <!-- 页面结构 / Page structure -->
         </nav> <!-- 页面结构 / Page structure -->
         <div class="tab-panel active" data-tab-panel="target"> <!-- 页面结构 / Page structure -->
         <section class="panel"> <!-- 页面结构 / Page structure -->
@@ -2249,6 +2435,108 @@
           </div> <!-- 页面结构 / Page structure -->
         </section> <!-- 页面结构 / Page structure -->
         </div> <!-- 页面结构 / Page structure -->
+        <div class="tab-panel" data-tab-panel="gallery"> <!-- 均匀板图样画廊面板 / Uniform-plate gallery panel -->
+          <section class="panel"> <!-- 介绍面板 / Intro panel -->
+            <h2>Uniform-plate Gallery / 均匀板图样画廊</h2>
+            <p class="field-hint" style="font-size:0.86em;opacity:0.78;margin:0 0 8px 0">
+              These are the nodal-line patterns a <strong>uniform 2 mm</strong> plate with your current material would naturally produce — no thickness shaping needed. Pick one, apply small perturbations (X/Y stretch, rotate, scale, shear, translate, Gaussian bump), then send the result to the main inverse-design pipeline. / 这些是 <strong>2 mm 均匀厚度</strong> 板用你当前材料能"自然"震出的节点线图案——板不需要做任何加工。挑一个、做微扰（XY 拉伸、旋转、缩放、切变、平移、高斯隆起），再把结果送进主流水线即可。
+            </p>
+            <div class="gallery-tier-controls"> <!-- 档位选择 / Tier selector -->
+              <label class="gallery-tier-field"> <!-- 已生成档位 / Known tiers -->
+                <span>Catalogue tier / 已生成档位</span>
+                <select id="galleryTierSelect"> <!-- 档位下拉 / Tier select -->
+                  <option value="">(loading…)</option>
+                </select>
+              </label>
+              <div class="gallery-tier-meta"> <!-- 档位说明 / Tier meta -->
+                <span id="galleryTierLabel" class="field-hint" style="font-size:0.82em;opacity:0.7">No tier loaded yet</span>
+              </div>
+            </div>
+            <div class="gallery-tier-controls" style="margin-top:8px"> <!-- 生成区 / Generate row -->
+              <label class="gallery-tier-field"> <!-- 模态数选择 / Mode count picker -->
+                <span>Modes / 模态数</span>
+                <select id="galleryNumModesSelect"> <!-- 模态数下拉 / Mode-count select -->
+                  <option value="20">20</option>
+                  <option value="30">30</option>
+                  <option value="40">40</option>
+                  <option value="50" selected>50 (default)</option>
+                  <option value="60">60</option>
+                  <option value="80">80</option>
+                  <option value="100">100</option>
+                  <option value="150">150</option>
+                  <option value="200">200</option>
+                </select>
+              </label>
+              <div class="panel-actions" style="margin-left:auto"> <!-- 生成按钮组 / Generate actions -->
+                <button id="galleryGenerateButton" type="button" class="primary">Generate for current material / 用当前材料生成</button> <!-- 显式重建 / Explicit rebuild -->
+                <button id="galleryRefreshButton" type="button">Reload list / 刷新列表</button> <!-- 仅刷新 / Refresh only -->
+              </div>
+            </div>
+            <div id="galleryGenerateStatus" class="status" style="margin-top:8px" hidden>Idle</div> <!-- 生成状态 / Generation status -->
+            <div class="gallery-tier-controls" style="margin-top:8px"> <!-- 物理过滤器 / Physical filter -->
+              <label class="gallery-tier-field" style="flex-direction:row;align-items:center;gap:6px">
+                <input id="galleryHideUnreachable" type="checkbox" checked /> <!-- 默认开启 / Default on -->
+                <span>Hide modes unreachable by centre drive / 隐藏中心驱动激不出来的模态</span>
+              </label>
+              <div class="gallery-tier-meta">
+                <span class="field-hint" style="font-size:0.78em;opacity:0.7">
+                  Each mode has a centre-drive participation 0–1: high = bulges right next to the centre clamp = excitable. Modes &lt; 0.10 are essentially silent under a centre piezo. / 每个模态都有 0–1 的中心驱动参与度，越高表示在夹持环边缘鼓得越大、越容易被中心激励器震出。&lt; 0.10 的模态在中心驱动下基本不响应。
+                </span>
+              </div>
+            </div>
+            <div class="gallery-tier-controls" style="margin-top:8px"> <!-- 自动匹配区 / Auto-match row -->
+              <div class="gallery-tier-meta" style="min-width:0;flex:1">
+                <span class="field-hint" style="font-size:0.82em;opacity:0.72">
+                  Have a target.png already? Let the gallery propose the closest pattern + rotation + stretch automatically. / 已有目标图？让画廊自动找最接近的图样并粗调旋转/拉伸。
+                </span>
+              </div>
+              <div class="panel-actions" style="margin-left:auto">
+                <button id="galleryMatchButton" type="button">Find closest to target / 自动匹配当前目标</button> <!-- 匹配按钮 / Match button -->
+              </div>
+            </div>
+            <div id="galleryMatchStatus" class="status" style="margin-top:6px" hidden>Idle</div> <!-- 匹配状态 / Match status -->
+            <div id="galleryMatchResults" style="margin-top:8px;display:none"> <!-- 备选匹配列表 / Match alternatives -->
+              <span class="field-hint" style="font-size:0.82em;opacity:0.72">Alternatives / 备选：</span>
+              <div id="galleryMatchAlternatives" class="gallery-match-list"></div>
+            </div>
+            <div style="margin-top:8px">
+              <span id="gallerySummary" class="field-hint" style="font-size:0.85em;opacity:0.7">No catalogue loaded</span> <!-- 计数 / Count -->
+            </div>
+          </section>
+          <section class="panel"> <!-- 画廊主面板 / Gallery main panel -->
+            <h2>Baseline Patterns / 基础图样</h2>
+            <div id="galleryGrid" class="gallery-grid">Loading gallery...</div> <!-- 画廊网格 / Gallery grid -->
+          </section>
+          <section class="panel" id="galleryPerturbPanel" hidden> <!-- 微扰面板（选中后显示） / Perturbation panel (visible after pick) -->
+            <h2>Perturb &amp; Preview / 微扰与预览</h2>
+            <div class="gallery-perturb"> <!-- 微扰区 / Perturbation area -->
+              <div class="gallery-preview-block"> <!-- 预览块 / Preview block -->
+                <div class="gallery-preview"> <!-- 预览图容器 / Preview holder -->
+                  <img id="galleryPreviewImage" alt="perturbed pattern preview" /> <!-- 预览 PNG / Preview PNG -->
+                </div>
+                <div id="galleryPreviewMeta" class="field-hint" style="font-size:0.85em;opacity:0.75">No mode selected</div> <!-- 元信息 / Meta -->
+              </div>
+              <div class="gallery-controls"> <!-- 控制器 / Controls -->
+                <label class="gallery-slider"><span>Stretch X / 横向拉伸</span><span class="gallery-value" id="galleryStretchXValue">1.00</span><input id="galleryStretchX" type="range" min="0.30" max="3.00" step="0.01" value="1.00" /></label>
+                <label class="gallery-slider"><span>Stretch Y / 纵向拉伸</span><span class="gallery-value" id="galleryStretchYValue">1.00</span><input id="galleryStretchY" type="range" min="0.30" max="3.00" step="0.01" value="1.00" /></label>
+                <label class="gallery-slider"><span>Rotate / 旋转 (°)</span><span class="gallery-value" id="galleryRotateValue">0</span><input id="galleryRotate" type="range" min="-180" max="180" step="1" value="0" /></label>
+                <label class="gallery-slider"><span>Scale / 整体缩放</span><span class="gallery-value" id="galleryScaleValue">1.00</span><input id="galleryScale" type="range" min="0.50" max="2.00" step="0.01" value="1.00" /></label>
+                <label class="gallery-slider"><span>Shear / 切变</span><span class="gallery-value" id="galleryShearValue">0.00</span><input id="galleryShear" type="range" min="-0.50" max="0.50" step="0.01" value="0.00" /></label>
+                <label class="gallery-slider"><span>Translate X / X 平移</span><span class="gallery-value" id="galleryTranslateXValue">0.00</span><input id="galleryTranslateX" type="range" min="-0.40" max="0.40" step="0.01" value="0.00" /></label>
+                <label class="gallery-slider"><span>Translate Y / Y 平移</span><span class="gallery-value" id="galleryTranslateYValue">0.00</span><input id="galleryTranslateY" type="range" min="-0.40" max="0.40" step="0.01" value="0.00" /></label>
+                <label class="gallery-slider"><span>Bump amplitude / 隆起幅度</span><span class="gallery-value" id="galleryBumpAmpValue">0.00</span><input id="galleryBumpAmp" type="range" min="-1.0" max="1.0" step="0.01" value="0.00" /></label>
+                <label class="gallery-slider"><span>Bump X / 隆起 X</span><span class="gallery-value" id="galleryBumpXValue">0.00</span><input id="galleryBumpX" type="range" min="-1.0" max="1.0" step="0.01" value="0.00" /></label>
+                <label class="gallery-slider"><span>Bump Y / 隆起 Y</span><span class="gallery-value" id="galleryBumpYValue">0.00</span><input id="galleryBumpY" type="range" min="-1.0" max="1.0" step="0.01" value="0.00" /></label>
+                <label class="gallery-slider"><span>Bump sigma / 隆起范围</span><span class="gallery-value" id="galleryBumpSigmaValue">0.20</span><input id="galleryBumpSigma" type="range" min="0.05" max="0.80" step="0.01" value="0.20" /></label>
+              </div>
+            </div>
+            <div class="panel-actions"> <!-- 微扰动作 / Perturbation actions -->
+              <button id="galleryResetButton" type="button">Reset perturbations</button> <!-- 复位 / Reset -->
+              <button id="galleryApplyButton" type="button" class="primary">Use as target / 作为目标</button> <!-- 落盘 / Apply -->
+            </div>
+            <div id="galleryApplyStatus" class="status" style="margin-top:6px" hidden>Idle</div> <!-- 状态 / Status -->
+          </section>
+        </div> <!-- 画廊面板结束 / End gallery panel -->
       </aside> <!-- 页面结构 / Page structure -->
     </section> <!-- 页面结构 / Page structure -->
 
@@ -7775,6 +8063,525 @@
     });
     // 前端逻辑 / Frontend logic
     stage.addEventListener("contextmenu", (event) => event.preventDefault());
+
+    // 均匀板画廊：状态与控件绑定 / Uniform-plate gallery: state & control wiring
+    const galleryState = { entries: [], selectedIndex: null, loaded: false, loading: false, debounceTimer: null, previewSeq: 0, tierId: "", tiers: [], currentDefaultTierId: "", currentLabelHint: "" };
+    const galleryGrid = document.getElementById("galleryGrid");
+    const gallerySummary = document.getElementById("gallerySummary");
+    const galleryRefreshButton = document.getElementById("galleryRefreshButton");
+    const galleryPerturbPanel = document.getElementById("galleryPerturbPanel");
+    const galleryPreviewImage = document.getElementById("galleryPreviewImage");
+    const galleryPreviewMeta = document.getElementById("galleryPreviewMeta");
+    const galleryApplyButton = document.getElementById("galleryApplyButton");
+    const galleryResetButton = document.getElementById("galleryResetButton");
+    const galleryApplyStatus = document.getElementById("galleryApplyStatus");
+    const galleryTierSelect = document.getElementById("galleryTierSelect");
+    const galleryTierLabel = document.getElementById("galleryTierLabel");
+    const galleryNumModesSelect = document.getElementById("galleryNumModesSelect");
+    const galleryGenerateButton = document.getElementById("galleryGenerateButton");
+    const galleryGenerateStatus = document.getElementById("galleryGenerateStatus");
+    const galleryMatchButton = document.getElementById("galleryMatchButton");
+    const galleryMatchStatus = document.getElementById("galleryMatchStatus");
+    const galleryMatchResults = document.getElementById("galleryMatchResults");
+    const galleryMatchAlternatives = document.getElementById("galleryMatchAlternatives");
+    const galleryHideUnreachable = document.getElementById("galleryHideUnreachable");
+    const gallerySliderIds = ["StretchX", "StretchY", "Rotate", "Scale", "Shear", "TranslateX", "TranslateY", "BumpAmp", "BumpX", "BumpY", "BumpSigma"];
+    const gallerySliderDefaults = { StretchX: 1.0, StretchY: 1.0, Rotate: 0, Scale: 1.0, Shear: 0.0, TranslateX: 0.0, TranslateY: 0.0, BumpAmp: 0.0, BumpX: 0.0, BumpY: 0.0, BumpSigma: 0.20 };
+    const gallerySliderPrecision = { Rotate: 0, BumpSigma: 2 };
+    const gallerySliderElems = Object.fromEntries(gallerySliderIds.map((key) => [key, { input: document.getElementById("gallery" + key), value: document.getElementById("gallery" + key + "Value") }]));
+
+    function gallerySliderValueText(key, raw) {
+      const precision = gallerySliderPrecision[key] !== undefined ? gallerySliderPrecision[key] : 2;
+      return Number(raw).toFixed(precision);
+    }
+
+    function readGalleryParams() {
+      return {
+        stretch_x: parseFloat(gallerySliderElems.StretchX.input.value),
+        stretch_y: parseFloat(gallerySliderElems.StretchY.input.value),
+        rotate_deg: parseFloat(gallerySliderElems.Rotate.input.value),
+        scale: parseFloat(gallerySliderElems.Scale.input.value),
+        shear: parseFloat(gallerySliderElems.Shear.input.value),
+        translate_x: parseFloat(gallerySliderElems.TranslateX.input.value),
+        translate_y: parseFloat(gallerySliderElems.TranslateY.input.value),
+        bump_amplitude: parseFloat(gallerySliderElems.BumpAmp.input.value),
+        bump_x: parseFloat(gallerySliderElems.BumpX.input.value),
+        bump_y: parseFloat(gallerySliderElems.BumpY.input.value),
+        bump_sigma: parseFloat(gallerySliderElems.BumpSigma.input.value)
+      };
+    }
+
+    function resetGallerySliders() {
+      gallerySliderIds.forEach((key) => {
+        const defaultValue = gallerySliderDefaults[key];
+        gallerySliderElems[key].input.value = String(defaultValue);
+        gallerySliderElems[key].value.textContent = gallerySliderValueText(key, defaultValue);
+      });
+    }
+
+    function updateGallerySliderText(key) {
+      const elems = gallerySliderElems[key];
+      elems.value.textContent = gallerySliderValueText(key, elems.input.value);
+    }
+
+    function findMatchingTierForCurrentConfig(preferredNumModes) {
+      // 在已知档位中找一个材料部分与当前 config 一致的；可选优先选定模态数
+      // Find an existing tier matching current material; if preferredNumModes given, prefer that exact mode count
+      if (!galleryState.tiers || !galleryState.tiers.length) return "";
+      const currentSig = galleryState.currentSignature || {};
+      const sameSig = galleryState.tiers.filter((t) => {
+        const s = t.signature || {};
+        if (s.plate_length_mm !== currentSig.plate_length_mm) return false;
+        if (s.plate_width_mm !== currentSig.plate_width_mm) return false;
+        if (s.thickness_mm !== currentSig.thickness_mm) return false;
+        const m1 = s.material || {}; const m2 = currentSig.material || {};
+        const keys = ["youngs_modulus_pa", "poisson_ratio", "density_kg_m3", "stiffness_ratio", "shear_ratio"];
+        for (const k of keys) { if (Number(m1[k] || 0) !== Number(m2[k] || 0)) return false; }
+        return true;
+      });
+      if (!sameSig.length) return "";
+      const want = Number(preferredNumModes || 0);
+      if (want > 0) {
+        const exact = sameSig.find((t) => Number(t.num_modes || 0) === want);
+        if (exact) return exact.tier_id || "";
+      }
+      sameSig.sort((a, b) => Number(b.num_modes || 0) - Number(a.num_modes || 0));
+      return sameSig[0].tier_id || "";
+    }
+
+    function renderGalleryTierSelect() {
+      // 重新填充档位下拉 / Repopulate the tier dropdown
+      const tiers = galleryState.tiers || [];
+      const desired = galleryState.tierId || "";
+      galleryTierSelect.innerHTML = "";
+      if (!tiers.length) {
+        const opt = document.createElement("option");
+        opt.value = ""; opt.textContent = "(no catalogues yet — click Generate)";
+        galleryTierSelect.appendChild(opt);
+        galleryTierLabel.textContent = galleryState.currentLabelHint
+          ? `Current config: ${galleryState.currentLabelHint} — not built yet. / 当前配置尚未生成。`
+          : "No catalogue available yet.";
+        return;
+      }
+      tiers.forEach((t) => {
+        const opt = document.createElement("option");
+        opt.value = t.tier_id;
+        const star = t.tier_id === galleryState.currentDefaultTierId ? " ★ current" : "";
+        opt.textContent = `${t.label || t.tier_id}${star}`;
+        if (t.tier_id === desired) opt.selected = true;
+        galleryTierSelect.appendChild(opt);
+      });
+      if (!desired || !tiers.some((t) => t.tier_id === desired)) {
+        galleryTierSelect.selectedIndex = 0;
+        galleryState.tierId = galleryTierSelect.value || "";
+      }
+      const active = tiers.find((t) => t.tier_id === galleryState.tierId);
+      if (active) {
+        galleryTierLabel.textContent = `${active.label || active.tier_id} · updated ${active.updated_at || "n/a"}`;
+      }
+    }
+
+    function syncModesSelectToTier(tier) {
+      // 把 Modes 下拉同步到当前激活的档位 / Sync Modes dropdown to active tier's num_modes
+      if (!galleryNumModesSelect || !tier) return;
+      const want = String(tier.num_modes || "");
+      if (!want) return;
+      const opt = Array.from(galleryNumModesSelect.options).find((o) => o.value === want);
+      if (opt) galleryNumModesSelect.value = want;
+    }
+
+    async function fetchGalleryTiers({ preserveSelection = true } = {}) {
+      try {
+        const response = await fetch("/api/uniform-catalogue/tiers", { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        galleryState.tiers = Array.isArray(payload.tiers) ? payload.tiers : [];
+        galleryState.currentDefaultTierId = payload.current_default_tier_id || "";
+        galleryState.currentLabelHint = payload.current_label_hint || "";
+        galleryState.currentSignature = payload.current_signature || {};
+        if (!preserveSelection || !galleryState.tierId || !galleryState.tiers.some((t) => t.tier_id === galleryState.tierId)) {
+          // 优先精确匹配 Modes 下拉的值，再回退到当前材料最大模态档位
+          // Prefer tier whose num_modes matches the Modes dropdown; fall back to largest matching tier
+          const preferred = galleryNumModesSelect ? parseInt(galleryNumModesSelect.value, 10) : 0;
+          galleryState.tierId = findMatchingTierForCurrentConfig(preferred) || (galleryState.tiers[0] ? galleryState.tiers[0].tier_id : "");
+        }
+        const active = galleryState.tiers.find((t) => t.tier_id === galleryState.tierId);
+        if (active) syncModesSelectToTier(active);
+        renderGalleryTierSelect();
+        return galleryState.tiers;
+      } catch (error) {
+        galleryTierLabel.textContent = "Failed to list tiers: " + error.message;
+        return [];
+      }
+    }
+
+    async function fetchGalleryCatalogue() {
+      try {
+        galleryState.loading = true;
+        gallerySummary.textContent = "Loading gallery... / 正在加载...";
+        galleryGrid.textContent = "Loading uniform-plate patterns... / 正在加载图样...";
+        await fetchGalleryTiers();
+        if (!galleryState.tierId) {
+          galleryGrid.textContent = "No catalogue exists for this material yet. Click 'Generate' to build one. / 当前材料还没有图样档位，点击 'Generate' 生成。";
+          gallerySummary.textContent = "0 patterns / 0 个图样";
+          galleryState.entries = [];
+          galleryState.loaded = true;
+          return;
+        }
+        const url = `/api/uniform-catalogue?tier_id=${encodeURIComponent(galleryState.tierId)}`;
+        const response = await fetch(url, { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        galleryState.entries = Array.isArray(payload.entries) ? payload.entries : [];
+        galleryState.tierId = payload.tier_id || galleryState.tierId;
+        galleryState.loaded = true;
+        renderGalleryGrid();
+      } catch (error) {
+        galleryGrid.textContent = "Failed to load gallery: " + error.message;
+        gallerySummary.textContent = "Load failed / 加载失败";
+      } finally {
+        galleryState.loading = false;
+      }
+    }
+
+    async function generateGalleryForCurrentMaterial() {
+      const numModes = parseInt(galleryNumModesSelect.value, 10) || 50;
+      galleryGenerateStatus.hidden = false;
+      galleryGenerateStatus.textContent = `Generating ${numModes} modes for current material… this can take 10–60 s. / 正在为当前材料生成 ${numModes} 个模态，约 10–60 秒…`;
+      galleryGenerateButton.disabled = true;
+      galleryRefreshButton.disabled = true;
+      try {
+        const response = await fetch("/api/uniform-catalogue/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ num_modes: numModes })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        galleryGenerateStatus.textContent = `Done: tier ${payload.tier_id} · ${payload.num_entries} modes · ${payload.label}. / 已完成。`;
+        galleryState.tierId = payload.tier_id;
+        galleryState.selectedIndex = null;
+        galleryPerturbPanel.hidden = true;
+        await fetchGalleryCatalogue();
+      } catch (error) {
+        galleryGenerateStatus.textContent = "Generate failed: " + error.message;
+      } finally {
+        galleryGenerateButton.disabled = false;
+        galleryRefreshButton.disabled = false;
+      }
+    }
+
+    const EXCITABILITY_HARD_FLOOR = 0.10;  // 与后端阈值保持一致 / Mirror backend hard floor
+    const EXCITABILITY_HIGH = 0.30;  // 高可达性着色阈值 / High-reach colour threshold
+
+    function reachClass(p) {
+      if (p == null || isNaN(p)) return "";
+      if (p >= EXCITABILITY_HIGH) return "reach-high";
+      if (p >= EXCITABILITY_HARD_FLOOR) return "reach-mid";
+      return "reach-low";
+    }
+
+    function reachValue(entry) {
+      // 缺字段返回 null（视为"未知，不过滤"），有字段返回数值 / Returns null for legacy entries (treat as unknown / pass-through)
+      const v = entry.centre_participation;
+      if (v === undefined || v === null) return null;
+      const n = Number(v);
+      return isNaN(n) ? null : n;
+    }
+
+    function renderGalleryGrid() {
+      if (!galleryState.entries.length) {
+        galleryGrid.textContent = "Gallery is empty. Click 'Generate' to build one for the current material. / 画廊为空，请点击 'Generate' 用当前材料生成。";
+        gallerySummary.textContent = "0 patterns / 0 个图样";
+        return;
+      }
+      const activeTier = (galleryState.tiers || []).find((t) => t.tier_id === galleryState.tierId);
+      const tierBlurb = activeTier ? activeTier.label : "uniform 2 mm plate";
+      const hideUnreach = !!(galleryHideUnreachable && galleryHideUnreachable.checked);
+      const anyHasField = galleryState.entries.some((e) => reachValue(e) != null);
+      const visible = (hideUnreach && anyHasField)
+        ? galleryState.entries.filter((e) => {
+            const p = reachValue(e);
+            return p == null || p >= EXCITABILITY_HARD_FLOOR;  // 没字段时放行（旧档位）/ Pass-through when field missing
+          })
+        : galleryState.entries.slice();
+      const hidden = galleryState.entries.length - visible.length;
+      const summaryBits = [`${visible.length} patterns`, tierBlurb];
+      if (hideUnreach && hidden > 0) summaryBits.push(`(+${hidden} hidden as unreachable / 已隐藏 ${hidden} 个不可激发)`);
+      if (hideUnreach && !anyHasField) summaryBits.push("(legacy tier — no participation data, filter disabled / 老档位无参与度数据，过滤暂时不生效)");
+      gallerySummary.textContent = summaryBits.join(" · ") + ` / 共 ${visible.length} 个图样`;
+      galleryGrid.innerHTML = "";
+      if (!visible.length) {
+        galleryGrid.textContent = `All ${galleryState.entries.length} modes were hidden by the centre-drive filter. Uncheck "Hide modes unreachable by centre drive" above to see them, or click Generate to refresh. / 全部 ${galleryState.entries.length} 个模态都被中心驱动可达性过滤掉了。取消上方勾选或重新 Generate 即可。`;
+        return;
+      }
+      visible.forEach((entry) => {
+        const part = reachValue(entry);
+        const reach = part == null ? "" : reachClass(part);
+        const lowReach = part != null && part < EXCITABILITY_HARD_FLOOR;
+        const card = document.createElement("div");
+        card.className = "gallery-card"
+          + (galleryState.selectedIndex === entry.index ? " selected" : "")
+          + (lowReach ? " gallery-card-low" : "");
+        card.dataset.modeIndex = String(entry.index);
+        const head = document.createElement("div");
+        head.className = "gallery-card-head";
+        const mode = document.createElement("span");
+        mode.className = "gallery-card-mode";
+        mode.textContent = `#${entry.index}`;
+        const freq = document.createElement("span");
+        freq.className = "gallery-card-freq";
+        freq.textContent = `${Number(entry.frequency_hz || 0).toFixed(1)} Hz`;
+        head.appendChild(mode);
+        head.appendChild(freq);
+        const img = document.createElement("img");
+        img.src = entry.thumbnail_url;
+        img.alt = `mode ${entry.index} nodal pattern`;
+        img.loading = "lazy";
+        const family = document.createElement("div");
+        family.className = "gallery-card-family";
+        family.textContent = entry.family || "";
+        if (part != null) {
+          const reachBadge = document.createElement("span");
+          reachBadge.className = "gallery-card-reach " + reach;
+          reachBadge.textContent = "p " + part.toFixed(2);
+          reachBadge.title = `Centre-drive participation = ${part.toFixed(3)} (≥ ${EXCITABILITY_HIGH.toFixed(2)} excitable, < ${EXCITABILITY_HARD_FLOOR.toFixed(2)} essentially silent). / 中心驱动参与度。`;
+          card.appendChild(reachBadge);
+        }
+        card.appendChild(head);
+        card.appendChild(img);
+        card.appendChild(family);
+        card.addEventListener("click", () => selectGalleryMode(entry.index));
+        galleryGrid.appendChild(card);
+      });
+    }
+
+    async function selectGalleryMode(modeIndex) {
+      galleryState.selectedIndex = modeIndex;
+      Array.from(galleryGrid.querySelectorAll(".gallery-card")).forEach((card) => {
+        card.classList.toggle("selected", Number(card.dataset.modeIndex) === modeIndex);
+      });
+      galleryPerturbPanel.hidden = false;
+      const entry = galleryState.entries.find((item) => item.index === modeIndex);
+      if (entry) {
+        galleryPreviewMeta.textContent = `Mode #${entry.index} · ${Number(entry.frequency_hz).toFixed(1)} Hz · ${entry.family || ""}`;
+      }
+      requestGalleryPreview();
+    }
+
+    function scheduleGalleryPreview() {
+      if (galleryState.debounceTimer) clearTimeout(galleryState.debounceTimer);
+      galleryState.debounceTimer = setTimeout(requestGalleryPreview, 160);
+    }
+
+    async function requestGalleryPreview() {
+      if (galleryState.selectedIndex === null) return;
+      const params = readGalleryParams();
+      const seq = ++galleryState.previewSeq;
+      try {
+        const response = await fetch("/api/uniform-perturb", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tier_id: galleryState.tierId || "", mode_index: galleryState.selectedIndex, params })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        if (seq !== galleryState.previewSeq) return;
+        galleryPreviewImage.src = payload.preview_data_url;
+        galleryPreviewMeta.textContent = `Mode #${payload.mode_index} · ${Number(payload.frequency_hz).toFixed(1)} Hz · ${payload.family || ""}`;
+      } catch (error) {
+        if (seq !== galleryState.previewSeq) return;
+        galleryPreviewMeta.textContent = "Preview failed: " + error.message;
+      }
+    }
+
+    function applyGalleryParamsToSliders(params) {
+      // 把后端返回的 params dict 写回滑块 / Push backend-recommended params into the sliders
+      if (!params) return;
+      const map = {
+        StretchX: "stretch_x", StretchY: "stretch_y", Rotate: "rotate_deg",
+        Scale: "scale", Shear: "shear",
+        TranslateX: "translate_x", TranslateY: "translate_y",
+        BumpAmp: "bump_amplitude", BumpX: "bump_x", BumpY: "bump_y", BumpSigma: "bump_sigma",
+      };
+      gallerySliderIds.forEach((key) => {
+        const sliderKey = map[key];
+        if (!(sliderKey in params)) return;
+        const value = Number(params[sliderKey]);
+        if (!Number.isFinite(value)) return;
+        const elems = gallerySliderElems[key];
+        if (!elems || !elems.input) return;
+        const clamped = Math.max(Number(elems.input.min), Math.min(Number(elems.input.max), value));
+        elems.input.value = String(clamped);
+        elems.value.textContent = gallerySliderValueText(key, clamped);
+      });
+    }
+
+    async function applyMatchResult(match) {
+      // 选中模态 + 写参数 + 刷新预览 / Select mode, set sliders, refresh preview
+      if (!match || typeof match.mode_index !== "number") return;
+      const card = galleryGrid.querySelector(`.gallery-card[data-mode-index="${match.mode_index}"]`);
+      if (card && typeof card.scrollIntoView === "function") {
+        try { card.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch (_) { /* ignore */ }
+      }
+      await selectGalleryMode(match.mode_index);
+      applyGalleryParamsToSliders(match.params);
+      requestGalleryPreview();
+      Array.from(galleryMatchAlternatives.querySelectorAll(".gallery-match-chip")).forEach((chip) => {
+        chip.classList.toggle("active", Number(chip.dataset.modeIndex) === Number(match.mode_index));
+      });
+    }
+
+    function renderMatchAlternatives(matches) {
+      galleryMatchAlternatives.innerHTML = "";
+      if (!matches || !matches.length) {
+        galleryMatchResults.style.display = "none";
+        return;
+      }
+      matches.forEach((m, idx) => {
+        const chip = document.createElement("span");
+        chip.className = "gallery-match-chip" + (idx === 0 ? " active" : "");
+        chip.dataset.modeIndex = String(m.mode_index);
+        const p = m.params || {};
+        const part = m.centre_participation == null ? null : Number(m.centre_participation);
+        const partTxt = part == null ? "" : ` · p ${part.toFixed(2)}`;
+        chip.textContent = `#${m.mode_index} · score ${Number(m.score).toFixed(2)} · rot ${Number(p.rotate_deg || 0).toFixed(0)}°${partTxt}`;
+        if (part != null) chip.title = `Centre-drive participation = ${part.toFixed(3)}. / 中心驱动参与度。`;
+        chip.addEventListener("click", () => applyMatchResult(m));
+        galleryMatchAlternatives.appendChild(chip);
+      });
+      galleryMatchResults.style.display = "block";
+    }
+
+    async function findClosestGalleryMatch() {
+      if (!galleryState.tierId) {
+        galleryMatchStatus.hidden = false;
+        galleryMatchStatus.textContent = "Pick a tier first (or click Generate). / 请先选档位（或点 Generate）。";
+        return;
+      }
+      galleryMatchStatus.hidden = false;
+      galleryMatchStatus.textContent = "Comparing target against catalogue... / 正在比对目标与画廊...";
+      galleryMatchButton.disabled = true;
+      try {
+        const response = await fetch("/api/uniform-catalogue/match-target", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tier_id: galleryState.tierId, top_k: 5 }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        const matches = Array.isArray(payload.matches) ? payload.matches : [];
+        if (!matches.length) {
+          galleryMatchStatus.textContent = "No match found — catalogue may be empty. / 没有匹配，画廊可能为空。";
+          renderMatchAlternatives([]);
+          return;
+        }
+        const top = matches[0];
+        const p = top.params || {};
+        galleryMatchStatus.textContent =
+          `Best: mode #${top.mode_index} (score ${Number(top.score).toFixed(2)}) — rot ${Number(p.rotate_deg || 0).toFixed(0)}°, ` +
+          `stretch (${Number(p.stretch_x || 1).toFixed(2)}, ${Number(p.stretch_y || 1).toFixed(2)}). ` +
+          `Sliders set, you can refine then click Use as target. / 最佳：#${top.mode_index}（分数 ${Number(top.score).toFixed(2)}）。滑块已自动写入，可微调后点 Use as target。`;
+        renderMatchAlternatives(matches);
+        await applyMatchResult(top);
+      } catch (error) {
+        galleryMatchStatus.textContent = "Match failed: " + error.message;
+        renderMatchAlternatives([]);
+      } finally {
+        galleryMatchButton.disabled = false;
+      }
+    }
+
+    async function applyGalleryTarget() {
+      if (galleryState.selectedIndex === null) {
+        galleryApplyStatus.hidden = false;
+        galleryApplyStatus.textContent = "Pick a pattern first. / 请先选择一个图样。";
+        return;
+      }
+      galleryApplyButton.disabled = true;
+      galleryApplyStatus.hidden = false;
+      galleryApplyStatus.textContent = "Saving target... / 正在保存目标...";
+      try {
+        const response = await fetch("/api/uniform-apply", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tier_id: galleryState.tierId || "", mode_index: galleryState.selectedIndex, params: readGalleryParams(), preprocess: true })
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        galleryApplyStatus.textContent = "Saved as target. Switching to Target tab. / 已保存为目标，切到 Target 页签。";
+        if (typeof loadExistingTarget === "function") {
+          try { await loadExistingTarget(); } catch (_) { /* ignore */ }
+        }
+        if (typeof loadTargetAnalysis === "function") {
+          try { await loadTargetAnalysis(); } catch (_) { /* ignore */ }
+        }
+        selectSidebarTab("target");
+        if (typeof setStatus === "function") {
+          const src = payload.source || {};
+          setStatus(`Target set from gallery mode #${src.mode_index || "?"} (${Number(src.frequency_hz || 0).toFixed(1)} Hz). / 已从画廊模态 #${src.mode_index || "?"} 设为目标。`, "good");
+        }
+      } catch (error) {
+        galleryApplyStatus.textContent = "Apply failed: " + error.message;
+      } finally {
+        galleryApplyButton.disabled = false;
+      }
+    }
+
+    gallerySliderIds.forEach((key) => {
+      const elems = gallerySliderElems[key];
+      if (!elems || !elems.input) return;
+      elems.input.addEventListener("input", () => {
+        updateGallerySliderText(key);
+        scheduleGalleryPreview();
+      });
+    });
+    galleryRefreshButton.addEventListener("click", () => fetchGalleryCatalogue());
+    galleryGenerateButton.addEventListener("click", () => generateGalleryForCurrentMaterial());
+    galleryMatchButton.addEventListener("click", () => findClosestGalleryMatch());
+    if (galleryHideUnreachable) galleryHideUnreachable.addEventListener("change", () => renderGalleryGrid());
+    galleryTierSelect.addEventListener("change", () => {
+      galleryState.tierId = galleryTierSelect.value || "";
+      galleryState.selectedIndex = null;
+      galleryPerturbPanel.hidden = true;
+      const active = (galleryState.tiers || []).find((t) => t.tier_id === galleryState.tierId);
+      if (active) {
+        galleryTierLabel.textContent = `${active.label || active.tier_id} · updated ${active.updated_at || "n/a"}`;
+        syncModesSelectToTier(active);
+      }
+      fetchGalleryCatalogue();
+    });
+    if (galleryNumModesSelect) galleryNumModesSelect.addEventListener("change", () => {
+      // Modes 下拉变更：若当前材料下已有该模态数档位，立刻切换查看
+      // Modes change: if a tier exists for current material at this mode count, switch view
+      const want = parseInt(galleryNumModesSelect.value, 10) || 0;
+      const matched = findMatchingTierForCurrentConfig(want);
+      if (matched && matched !== galleryState.tierId) {
+        galleryState.tierId = matched;
+        galleryState.selectedIndex = null;
+        galleryPerturbPanel.hidden = true;
+        fetchGalleryCatalogue();
+      } else if (!matched) {
+        if (galleryGenerateStatus) {
+          galleryGenerateStatus.hidden = false;
+          galleryGenerateStatus.textContent = `No catalogue exists yet for current material at ${want} modes — click Generate. / 当前材料还没有 ${want} 模态档位，点 Generate 生成。`;
+        }
+      }
+    });
+    galleryResetButton.addEventListener("click", () => {
+      resetGallerySliders();
+      requestGalleryPreview();
+    });
+    galleryApplyButton.addEventListener("click", applyGalleryTarget);
+    tabButtons.forEach((button) => {
+      if (button.dataset.tabTarget === "gallery") {
+        button.addEventListener("click", () => {
+          if (!galleryState.loaded && !galleryState.loading) {
+            fetchGalleryCatalogue();
+          }
+        });
+      }
+    });
 
     // 前端逻辑 / Frontend logic
     fillWhite();

@@ -22,6 +22,23 @@ from PIL import Image  # 导入图像库 / Import image library
 from src.config import load_config  # 导入配置读取函数 / Import configuration loader
 from src.target.analyse_target import save_target_analysis  # 导入目标分析保存函数 / Import target-analysis saver
 from src.target.preprocess_target import preprocess_target  # 导入目标预处理函数 / Import target preprocessing function
+from src.uniform_pattern.catalogue import backfill_centre_participation  # 导入参与度回填 / Import participation back-fill
+from src.uniform_pattern.catalogue import build_uniform_catalogue  # 导入均匀板目录构建器 / Import uniform-catalogue builder
+from src.uniform_pattern.catalogue import catalogue_default_dir  # 导入基础缓存目录 / Import base cache dir
+from src.uniform_pattern.catalogue import catalogue_tier_dir  # 导入档位缓存目录 / Import per-tier cache dir
+from src.uniform_pattern.catalogue import compute_tier_id  # 导入档位 ID 计算 / Import tier-id computation
+from src.uniform_pattern.catalogue import compute_tier_label  # 导入档位标签 / Import tier-label helper
+from src.uniform_pattern.catalogue import compute_tier_signature  # 导入档位签名 / Import tier signature helper
+from src.uniform_pattern.catalogue import list_known_tiers  # 导入档位列表 / Import tier list helper
+from src.uniform_pattern.catalogue import load_catalogue  # 导入目录读取 / Import catalogue loader
+from src.uniform_pattern.catalogue import load_catalogue_entry  # 导入单条加载 / Import entry loader
+from src.uniform_pattern.catalogue import register_tier  # 导入档位注册 / Import tier registration
+from src.uniform_pattern.match import find_closest_matches  # 导入图样匹配 / Import gallery matcher
+from src.uniform_pattern.perturb import apply_perturbation  # 导入微扰应用 / Import perturbation applier
+from src.uniform_pattern.perturb import normalise_params  # 导入参数规范化 / Import parameter validator
+from src.uniform_pattern.perturb import params_summary  # 导入参数摘要 / Import parameter summary
+from src.uniform_pattern.render import render_pattern_bytes  # 导入图样字节渲染 / Import bytes renderer
+from src.uniform_pattern.render import save_pattern_png  # 导入图样保存 / Import pattern saver
 
 
 CANDIDATE_ID_RE = re.compile(r"^candidate_\d{3}_\d{4}$")  # 定义候选编号格式 / Define candidate-id format
@@ -1660,6 +1677,86 @@ def prepare_target_outputs(config: dict, target_mode_override: str | None = None
     return analysis  # 返回分析摘要 / Return analysis summary
 
 
+UNIFORM_CATALOGUE_DEFAULT_MODES = 50  # 默认目录模态数量 / Default catalogue mode count
+UNIFORM_CATALOGUE_DEFAULT_PROXY_GRID = 51  # 默认代理网格 / Default proxy grid
+UNIFORM_PREVIEW_PX = 512  # 默认预览像素 / Default preview pixel size
+UNIFORM_THUMB_PX = 160  # 默认缩略图像素 / Default thumbnail pixel size
+
+
+UNIFORM_CATALOGUE_MIN_MODES = 10  # 模态数下限 / Mode-count lower bound
+UNIFORM_CATALOGUE_MAX_MODES = 200  # 模态数上限 / Mode-count upper bound
+
+
+def _coerce_num_modes(value, default: int = UNIFORM_CATALOGUE_DEFAULT_MODES) -> int:  # 校验并钳制模态数 / Validate and clamp mode count
+    try:  # 防转换失败 / Guard conversion failure
+        n = int(value) if value is not None else int(default)  # 取整 / Coerce int
+    except (TypeError, ValueError):  # 非法输入 / Invalid input
+        n = int(default)  # 回退默认 / Fall back to default
+    return max(UNIFORM_CATALOGUE_MIN_MODES, min(UNIFORM_CATALOGUE_MAX_MODES, n))  # 钳制范围 / Clamp range
+
+
+def uniform_catalogue_base_dir(config: dict) -> Path:  # 基础目录 / Base directory
+    return catalogue_default_dir(config)  # 委托给目录模块 / Delegate to catalogue module
+
+
+def uniform_catalogue_dir(config: dict, tier_id: str | None = None, num_modes: int | None = None) -> Path:  # 计算档位缓存目录 / Compute tier cache directory
+    if tier_id:  # 优先使用给定档位 / Prefer explicit tier
+        return catalogue_tier_dir(config, tier_id=tier_id)  # 返回档位目录 / Return tier dir
+    return catalogue_tier_dir(config, num_modes=num_modes)  # 否则按当前 config + 模态数计算 / Otherwise compute from config + num_modes
+
+
+def _resolve_tier(config: dict, tier_id: str | None) -> tuple[str | None, dict | None, Path]:  # 解析档位元信息 / Resolve tier metadata
+    if tier_id:  # 已指定档位 ID / Tier ID provided
+        index = list_known_tiers(uniform_catalogue_base_dir(config))  # 列出全部 / List all
+        match = next((t for t in index if t.get("tier_id") == tier_id), None)  # 查找匹配 / Find match
+        cache_dir = catalogue_tier_dir(config, tier_id=tier_id)  # 档位目录 / Tier dir
+        return tier_id, match, cache_dir  # 返回 (id, 注册条目, 路径) / Return (id, entry, path)
+    cache_dir = catalogue_tier_dir(config, num_modes=UNIFORM_CATALOGUE_DEFAULT_MODES)  # 当前 + 默认模态数 / Current + default modes
+    current_id = compute_tier_id(config, UNIFORM_CATALOGUE_DEFAULT_MODES)  # 当前档位 ID / Current tier ID
+    return current_id, None, cache_dir  # 默认走当前 / Default to current
+
+
+def uniform_catalogue_summary(config: dict, tier_id: str | None = None) -> dict:  # 读取或构建目录摘要 / Read or build catalogue summary
+    effective_id, _entry, cache_dir = _resolve_tier(config, tier_id)  # 解析档位 / Resolve tier
+    summary = load_catalogue(cache_dir)  # 尝试读取缓存 / Try to load cache
+    if summary is None and tier_id is None:  # 默认档位缺失则按当前 config 自动构建 / Auto-build current config tier when missing
+        summary = rebuild_uniform_catalogue(config, num_modes=UNIFORM_CATALOGUE_DEFAULT_MODES)  # 构建默认档位 / Build default tier
+    if summary is None:  # 指定档位但找不到 / Requested tier not found
+        raise ValueError(f"Catalogue tier '{tier_id}' not found. / 未找到档位 '{tier_id}'。")  # 报错 / Raise
+    if backfill_centre_participation(cache_dir):  # 老档位缺失字段则就地回填 / Back-fill legacy tiers in place
+        summary = load_catalogue(cache_dir) or summary  # 重新读取最新结果 / Reload after back-fill
+    summary.setdefault("metadata", {})["tier_id"] = effective_id  # 注入档位 ID / Inject tier id
+    return summary  # 返回摘要 / Return summary
+
+
+def rebuild_uniform_catalogue(config: dict, num_modes: int = UNIFORM_CATALOGUE_DEFAULT_MODES) -> dict:  # 为指定模态数构建当前 config 档位 / Build catalogue for current config at given mode count
+    num_modes_eff = _coerce_num_modes(num_modes)  # 校验模态数 / Validate mode count
+    tier_id = compute_tier_id(config, num_modes_eff)  # 计算档位 ID / Compute tier id
+    cache_dir = catalogue_tier_dir(config, tier_id=tier_id)  # 档位目录 / Tier directory
+    base_dir = uniform_catalogue_base_dir(config)  # 基础目录 / Base directory
+    plate_length_mm = float(config["project"]["plate_length_mm"])  # 板长度 / Plate length
+    centre_clamp_radius_mm = float(config["project"]["center_clamp_radius_mm"])  # 中心夹持 / Centre clamp
+    line_width_px = int(config["nodal_extraction"]["target_line_width_px"])  # 目标线宽 / Target line width
+    result = build_uniform_catalogue(config, num_modes=num_modes_eff, proxy_grid_size=UNIFORM_CATALOGUE_DEFAULT_PROXY_GRID, output_dir=cache_dir)  # 构建目录 / Build catalogue
+    for entry in result["entries"]:  # 渲染 PNG / Render PNGs
+        save_pattern_png(entry.mode_field, cache_dir / f"mode_{entry.index:03d}_preview.png", output_size=UNIFORM_PREVIEW_PX, line_width_px=line_width_px, plate_length_mm=plate_length_mm, centre_clamp_radius_mm=centre_clamp_radius_mm)  # 大图 / Full size
+        save_pattern_png(entry.mode_field, cache_dir / f"mode_{entry.index:03d}_thumb.png", output_size=UNIFORM_THUMB_PX, line_width_px=max(1, line_width_px // 2), plate_length_mm=plate_length_mm, centre_clamp_radius_mm=centre_clamp_radius_mm)  # 缩略图 / Thumbnail
+    register_tier(base_dir, tier_id, compute_tier_label(config, num_modes_eff), compute_tier_signature(config, num_modes_eff), len(result["entries"]))  # 写入档位索引 / Register tier in index
+    summary = load_catalogue(cache_dir) or {"metadata": {}, "entries": []}  # 读取持久化摘要 / Load persisted summary
+    summary.setdefault("metadata", {})["tier_id"] = tier_id  # 注入档位 ID / Inject tier id
+    return summary  # 返回 / Return
+
+
+def validate_uniform_index(raw: str, max_index: int) -> int:  # 校验模态编号 / Validate mode index
+    try:  # 防转换失败 / Guard conversion failure
+        value = int(raw)  # 转整型 / Convert to int
+    except (TypeError, ValueError) as exc:  # 处理无效输入 / Handle invalid input
+        raise ValueError("Invalid mode index. / 模态编号无效。") from exc  # 抛出格式错误 / Raise format error
+    if value < 1 or value > int(max_index):  # 范围检查 / Range check
+        raise ValueError(f"Mode index out of range (1..{int(max_index)}). / 模态编号超出范围。")  # 超界 / Out of range
+    return value  # 返回编号 / Return index
+
+
 def image_bytes(path: Path) -> bytes:  # 读取或生成目标 PNG 字节 / Read or create target PNG bytes
     if path.exists():  # 判断目标图是否存在 / Check whether target image exists
         return path.read_bytes()  # 返回现有目标图 / Return existing target image
@@ -1846,6 +1943,71 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                     return  # 结束请求 / Finish request
                 self.send_file(Path(config["paths"]["comsol_exports_dir"]) / candidate_id / folder_name / asset_name, "image/png")  # 返回导出资源 / Return export asset
                 return  # 结束请求 / Finish request
+            if route == "/api/uniform-catalogue/tiers":  # 列出已知档位 / List known tiers
+                try:  # 捕获索引读取错误 / Catch index errors
+                    base_dir = uniform_catalogue_base_dir(config)  # 基础目录 / Base directory
+                    tiers = list_known_tiers(base_dir)  # 读取索引 / List tiers
+                    current_id = compute_tier_id(config, UNIFORM_CATALOGUE_DEFAULT_MODES)  # 当前默认档位 ID / Current default tier id
+                    payload = {  # 返回结构 / Return structure
+                        "tiers": tiers,  # 全部档位 / All tiers
+                        "current_default_tier_id": current_id,  # 当前 config + 默认模态数对应 ID / Current config + default-modes id
+                        "current_signature": compute_tier_signature(config, UNIFORM_CATALOGUE_DEFAULT_MODES),  # 当前签名 / Current signature
+                        "current_label_hint": compute_tier_label(config, UNIFORM_CATALOGUE_DEFAULT_MODES),  # 当前标签提示 / Current label hint
+                        "default_num_modes": UNIFORM_CATALOGUE_DEFAULT_MODES,  # 默认模态数 / Default mode count
+                        "min_num_modes": UNIFORM_CATALOGUE_MIN_MODES,  # 模态数下限 / Min modes
+                        "max_num_modes": UNIFORM_CATALOGUE_MAX_MODES,  # 模态数上限 / Max modes
+                    }
+                    self.send_json(payload)  # 返回 / Return
+                except Exception as exc:  # 处理异常 / Handle exception
+                    self.send_json({"error": str(exc), "tiers": []}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束 / Finish
+            if route == "/api/uniform-catalogue":  # 均匀板目录摘要 / Uniform-catalogue summary
+                try:  # 捕获目录构建错误 / Catch catalogue errors
+                    parsed_url = urlparse(self.path)  # 解析查询参数 / Parse query string
+                    query = parse_qs(parsed_url.query)  # 查询字典 / Query dict
+                    tier_id_raw = (query.get("tier_id", [None])[0] or "").strip() or None  # 提取档位 ID / Extract tier id
+                    summary = uniform_catalogue_summary(config, tier_id=tier_id_raw)  # 读取或重建 / Read or rebuild
+                    effective_tier = summary.get("metadata", {}).get("tier_id", "")  # 实际档位 ID / Effective tier id
+                    suffix = f"?tier_id={effective_tier}" if effective_tier else ""  # URL 后缀 / URL suffix
+                    entries = summary.get("entries", [])  # 取条目 / Get entries
+                    enriched = []  # 增强字段 / Enriched list
+                    for record in entries:  # 遍历条目 / Iterate entries
+                        item = dict(record)  # 复制 / Copy
+                        idx = int(item.get("index", 0))  # 编号 / Index
+                        item["thumbnail_url"] = f"/api/uniform-catalogue/{idx}/thumb.png{suffix}"  # 缩略图 / Thumbnail URL
+                        item["preview_url"] = f"/api/uniform-catalogue/{idx}/preview.png{suffix}"  # 预览图 / Preview URL
+                        enriched.append(item)  # 加入 / Append
+                    self.send_json({"metadata": summary.get("metadata", {}), "entries": enriched, "tier_id": effective_tier})  # 返回 JSON / Return JSON
+                except ValueError as exc:  # 档位不存在 / Tier missing
+                    self.send_json({"error": str(exc), "metadata": {}, "entries": []}, HTTPStatus.NOT_FOUND)  # 404 / 404
+                except Exception as exc:  # 处理异常 / Handle exception
+                    self.send_json({"error": str(exc), "metadata": {}, "entries": []}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束请求 / Finish request
+            if route.startswith("/api/uniform-catalogue/"):  # 单个模态资源 / Single-mode asset
+                parts = route.split("/")  # 拆分路径 / Split path
+                if len(parts) == 5 and parts[4] in {"thumb.png", "preview.png", "field.npy"}:  # /api/uniform-catalogue/<id>/<asset> / Asset path
+                    parsed_url = urlparse(self.path)  # 解析查询参数 / Parse query string
+                    query = parse_qs(parsed_url.query)  # 查询字典 / Query dict
+                    tier_id_raw = (query.get("tier_id", [None])[0] or "").strip() or None  # 提取档位 ID / Extract tier id
+                    try:  # 校验编号 / Validate index
+                        summary = uniform_catalogue_summary(config, tier_id=tier_id_raw)  # 读取目录 / Read catalogue
+                        max_index = len(summary.get("entries", [])) or UNIFORM_CATALOGUE_DEFAULT_MODES  # 最大编号 / Max index
+                        index = validate_uniform_index(parts[3], max_index)  # 校验 / Validate
+                    except ValueError as exc:  # 错误编号 / Invalid index
+                        self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                        return  # 结束 / Finish
+                    effective_tier = summary.get("metadata", {}).get("tier_id")  # 实际档位 / Effective tier
+                    cache_dir = uniform_catalogue_dir(config, tier_id=effective_tier)  # 缓存目录 / Cache directory
+                    if parts[4] == "thumb.png":  # 缩略图 / Thumbnail
+                        self.send_file(cache_dir / f"mode_{index:03d}_thumb.png", "image/png")  # 返回缩略图 / Return thumbnail
+                        return  # 结束 / Finish
+                    if parts[4] == "preview.png":  # 预览图 / Preview
+                        self.send_file(cache_dir / f"mode_{index:03d}_preview.png", "image/png")  # 返回预览 / Return preview
+                        return  # 结束 / Finish
+                    self.send_file(cache_dir / f"mode_{index:03d}_field.npy", "application/octet-stream")  # 返回位移场 / Return field
+                    return  # 结束 / Finish
+                self.send_json({"error": "Asset not found. / 资源不存在。"}, HTTPStatus.NOT_FOUND)  # 404 / 404
+                return  # 结束 / Finish
             if route == "/api/target.png":  # 判断是否请求目标图 / Check target image request
                 self.send_bytes(image_bytes(target_path), "image/png")  # 返回目标 PNG / Return target PNG
                 return  # 结束请求 / Finish request
@@ -2015,6 +2177,113 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 except Exception as exc:  # 处理异常 / Handle exception
                     self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
                 return  # 结束请求 / Finish request
+            if route == "/api/uniform-catalogue/generate":  # 显式触发当前 config + 指定模态数构建 / Explicit build for current config + given mode count
+                try:  # 捕获构建错误 / Catch build errors
+                    length = int(self.headers.get("Content-Length", "0"))  # 请求体长度 / Body length
+                    payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 解析 JSON / Parse JSON
+                    num_modes_eff = _coerce_num_modes(payload.get("num_modes"))  # 校验模态数 / Validate mode count
+                    summary = rebuild_uniform_catalogue(config, num_modes=num_modes_eff)  # 强制重建 / Force rebuild
+                    tier_id = summary.get("metadata", {}).get("tier_id", "")  # 档位 ID / Tier id
+                    base_dir = uniform_catalogue_base_dir(config)  # 基础目录 / Base directory
+                    tiers = list_known_tiers(base_dir)  # 刷新列表 / Refresh list
+                    self.send_json({"tier_id": tier_id, "num_modes": num_modes_eff, "label": compute_tier_label(config, num_modes_eff), "tiers": tiers, "metadata": summary.get("metadata", {}), "num_entries": len(summary.get("entries", []))})  # 返回结果 / Return result
+                except ValueError as exc:  # 参数错误 / Bad params
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                except Exception as exc:  # 其他异常 / Other
+                    self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束 / Finish
+            if route == "/api/uniform-catalogue/match-target":  # 在当前档位中找最接近当前 target.png 的图样 / Find catalogue patterns closest to current target.png
+                try:  # 捕获匹配错误 / Catch match errors
+                    import numpy as np  # 延迟导入 NumPy / Lazy import NumPy
+                    length = int(self.headers.get("Content-Length", "0"))  # 请求体长度 / Body length
+                    payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 解析 JSON / Parse JSON
+                    tier_id_raw = str(payload.get("tier_id") or "").strip() or None  # 提取 tier_id / Extract tier id
+                    top_k_raw = int(payload.get("top_k") or 5)  # 取前 K 个 / Top-K request
+                    top_k_eff = max(1, min(20, top_k_raw))  # 钳制范围 / Clamp range
+                    summary = uniform_catalogue_summary(config, tier_id=tier_id_raw)  # 读取目录 / Read catalogue
+                    effective_tier = summary.get("metadata", {}).get("tier_id")  # 实际档位 / Effective tier
+                    target_binary_path = Path(config["paths"]["processed_targets_dir"]) / "target_binary.npy"  # 目标二值掩膜路径 / Target binary mask path
+                    if not target_binary_path.exists():  # 目标缺失 / Target missing
+                        raise FileNotFoundError("No saved target — draw or import a target first. / 还没有目标，请先在 Target 标签里画或导入一张。")  # 抛错 / Raise
+                    target_mask = np.load(target_binary_path).astype(bool)  # 加载目标 / Load target
+                    cache_dir = uniform_catalogue_dir(config, tier_id=effective_tier)  # 档位目录 / Tier directory
+                    matches = find_closest_matches(  # 计算匹配 / Compute matches
+                        target_mask,
+                        summary.get("entries", []),
+                        cache_dir,
+                        line_width_px=int(config["nodal_extraction"]["target_line_width_px"]),
+                        plate_length_mm=float(config["project"]["plate_length_mm"]),
+                        centre_clamp_radius_mm=float(config["project"]["center_clamp_radius_mm"]),
+                        top_k=top_k_eff,
+                    )
+                    self.send_json({"tier_id": effective_tier, "matches": matches})  # 返回 / Return
+                except FileNotFoundError as exc:  # 资源缺失 / Resource missing
+                    self.send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)  # 404 / 404
+                except ValueError as exc:  # 参数错误 / Bad params
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                except Exception as exc:  # 其他异常 / Other
+                    self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束 / Finish
+            if route == "/api/uniform-perturb":  # 微扰预览（不落盘目标） / Perturb preview (no target write)
+                try:  # 捕获错误 / Catch errors
+                    length = int(self.headers.get("Content-Length", "0"))  # 请求体长度 / Body length
+                    payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 解析 JSON / Parse JSON
+                    tier_id_raw = str(payload.get("tier_id") or "").strip() or None  # 提取 tier_id / Extract tier id
+                    summary = uniform_catalogue_summary(config, tier_id=tier_id_raw)  # 读取目录 / Read catalogue
+                    effective_tier = summary.get("metadata", {}).get("tier_id")  # 实际档位 / Effective tier
+                    max_index = len(summary.get("entries", [])) or UNIFORM_CATALOGUE_DEFAULT_MODES  # 最大编号 / Max index
+                    index = validate_uniform_index(payload.get("mode_index", payload.get("index", 0)), max_index)  # 校验编号 / Validate index
+                    entry = load_catalogue_entry(uniform_catalogue_dir(config, tier_id=effective_tier), index)  # 加载条目 / Load entry
+                    if entry is None:  # 条目缺失 / Entry missing
+                        raise FileNotFoundError(f"Catalogue entry {index} missing. / 目录条目 {index} 缺失。")  # 抛错 / Raise
+                    field, _ = entry  # 解包 / Unpack
+                    params = normalise_params(dict(payload.get("params", payload)))  # 校验微扰参数 / Validate perturbation params
+                    perturbed_field = apply_perturbation(field, params)  # 应用微扰 / Apply perturbation
+                    plate_length_mm = float(config["project"]["plate_length_mm"])  # 板长度 / Plate length
+                    centre_clamp_radius_mm = float(config["project"]["center_clamp_radius_mm"])  # 中心夹持 / Centre clamp
+                    line_width_px = int(config["nodal_extraction"]["target_line_width_px"])  # 目标线宽 / Target line width
+                    png_bytes = render_pattern_bytes(perturbed_field, output_size=UNIFORM_PREVIEW_PX, line_width_px=line_width_px, plate_length_mm=plate_length_mm, centre_clamp_radius_mm=centre_clamp_radius_mm)  # 渲染 PNG / Render PNG
+                    data_url = "data:image/png;base64," + base64.b64encode(png_bytes).decode("ascii")  # 编码 data URL / Encode data URL
+                    base_entry = next((e for e in summary.get("entries", []) if int(e.get("index", -1)) == index), {})  # 取基础元信息 / Take base metadata
+                    self.send_json({"mode_index": index, "tier_id": effective_tier, "frequency_hz": float(base_entry.get("frequency_hz", 0.0)), "family": base_entry.get("family", "unknown"), "params": params_summary(params), "preview_data_url": data_url})  # 返回结果 / Return result
+                except FileNotFoundError as exc:  # 资源缺失 / Resource missing
+                    self.send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)  # 404 / 404
+                except ValueError as exc:  # 参数错误 / Bad params
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                except Exception as exc:  # 其他异常 / Other
+                    self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束 / Finish
+            if route == "/api/uniform-apply":  # 把微扰图样落盘为活动目标 / Save perturbed pattern as active target
+                try:  # 捕获错误 / Catch errors
+                    length = int(self.headers.get("Content-Length", "0"))  # 请求体长度 / Body length
+                    payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 解析 JSON / Parse JSON
+                    tier_id_raw = str(payload.get("tier_id") or "").strip() or None  # 提取 tier_id / Extract tier id
+                    summary = uniform_catalogue_summary(config, tier_id=tier_id_raw)  # 读取目录 / Read catalogue
+                    effective_tier = summary.get("metadata", {}).get("tier_id")  # 实际档位 / Effective tier
+                    max_index = len(summary.get("entries", [])) or UNIFORM_CATALOGUE_DEFAULT_MODES  # 最大编号 / Max index
+                    index = validate_uniform_index(payload.get("mode_index", payload.get("index", 0)), max_index)  # 校验编号 / Validate index
+                    entry = load_catalogue_entry(uniform_catalogue_dir(config, tier_id=effective_tier), index)  # 加载条目 / Load entry
+                    if entry is None:  # 条目缺失 / Entry missing
+                        raise FileNotFoundError(f"Catalogue entry {index} missing. / 目录条目 {index} 缺失。")  # 抛错 / Raise
+                    field, _ = entry  # 解包 / Unpack
+                    params = normalise_params(dict(payload.get("params", payload)))  # 校验微扰参数 / Validate perturbation params
+                    perturbed_field = apply_perturbation(field, params)  # 应用微扰 / Apply perturbation
+                    plate_length_mm = float(config["project"]["plate_length_mm"])  # 板长度 / Plate length
+                    centre_clamp_radius_mm = float(config["project"]["center_clamp_radius_mm"])  # 中心夹持 / Centre clamp
+                    line_width_px = int(config["nodal_extraction"]["target_line_width_px"])  # 目标线宽 / Target line width
+                    png_bytes = render_pattern_bytes(perturbed_field, output_size=UNIFORM_PREVIEW_PX, line_width_px=line_width_px, plate_length_mm=plate_length_mm, centre_clamp_radius_mm=centre_clamp_radius_mm)  # 渲染 PNG / Render PNG
+                    normalise_target_image(png_bytes, target_path)  # 写入活动目标 PNG / Write active target PNG
+                    target_mode = str(payload.get("target_mode", config["nodal_extraction"].get("target_mode", "chladni")))  # 读取目标模式 / Read target mode
+                    analysis = prepare_target_outputs(config, target_mode) if payload.get("preprocess", True) else {}  # 可选预处理 / Optional preprocessing
+                    base_entry = next((e for e in summary.get("entries", []) if int(e.get("index", -1)) == index), {})  # 基础元信息 / Base metadata
+                    self.send_json({"saved_at": datetime.now().isoformat(timespec="seconds"), "target_path": str(target_path), "processed_targets_dir": str(processed_dir), "analysis": analysis, "source": {"tier_id": effective_tier, "mode_index": index, "frequency_hz": float(base_entry.get("frequency_hz", 0.0)), "family": base_entry.get("family", "unknown"), "params": params_summary(params)}})  # 返回结果 / Return result
+                except FileNotFoundError as exc:  # 资源缺失 / Resource missing
+                    self.send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)  # 404 / 404
+                except ValueError as exc:  # 参数错误 / Bad params
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                except Exception as exc:  # 其他异常 / Other
+                    self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束 / Finish
             if route != "/api/save-target":  # 检查保存路由 / Check save route
                 self.send_json({"error": "Not found. / 未找到。"}, HTTPStatus.NOT_FOUND)  # 返回 404 / Return 404
                 return  # 结束请求 / Finish request

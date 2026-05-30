@@ -5,6 +5,7 @@ __pycache__/
 venv/
 data/processed_targets/*
 data/comsol_exports/*
+data/uniform_catalogue/
 candidates/candidate_*
 candidates/bat_*
 candidates/prod_*
