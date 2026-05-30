@@ -2092,7 +2092,8 @@
               </optgroup>
               <optgroup label="Carbon-fibre composites (high anisotropy)">
                 <option value="onyx_chopped">Markforged Onyx (chopped CF, sr 1.71)</option>
-                <option value="cf_petg_t1">CF-PETG (Tier 1, sr 2.80)</option>
+                <option value="bambu_petg_cf">Bambu PETG-CF (measured TDS, sr 1.87)</option>
+                <option value="cf_petg_t1">CF-PETG (Tier 1 placeholder, sr 2.80)</option>
                 <option value="onyx_continuous_cf_t2">Onyx + Continuous CF (Tier 2, sr 12.0)</option>
               </optgroup>
             </select></label> <!-- 页面结构 / Page structure -->
@@ -2544,6 +2545,7 @@
       petg_fdm: { density_kg_m3: 1270, youngs_modulus_pa: 1550000000, poisson_ratio: 0.40, thermal_conductivity_w_mk: 0.20, heat_capacity_j_kgk: 1400, thermal_expansion_1_k: 0.00007, stiffness_ratio: 1.67, shear_ratio: 0.85 },
       // 碳纤复合 — 高各向异性 / Carbon-fibre composites — high anisotropy (Yao 2020, Markforged TDS)
       onyx_chopped: { density_kg_m3: 1200, youngs_modulus_pa: 1830000000, poisson_ratio: 0.40, thermal_conductivity_w_mk: 0.20, heat_capacity_j_kgk: 1500, thermal_expansion_1_k: 0.00005, stiffness_ratio: 1.71, shear_ratio: 0.80 },
+      bambu_petg_cf: { density_kg_m3: 1250, youngs_modulus_pa: 2910000000, poisson_ratio: 0.40, thermal_conductivity_w_mk: 0.25, heat_capacity_j_kgk: 1400, thermal_expansion_1_k: 0.00005, stiffness_ratio: 1.87, shear_ratio: 1.0 },
       cf_petg_t1: { density_kg_m3: 1300, youngs_modulus_pa: 3700000000, poisson_ratio: 0.38, thermal_conductivity_w_mk: 0.25, heat_capacity_j_kgk: 1400, thermal_expansion_1_k: 0.00005, stiffness_ratio: 2.80, shear_ratio: 0.75 },
       onyx_continuous_cf_t2: { density_kg_m3: 1400, youngs_modulus_pa: 17320000000, poisson_ratio: 0.32, thermal_conductivity_w_mk: 0.80, heat_capacity_j_kgk: 1200, thermal_expansion_1_k: 0.000002, stiffness_ratio: 12.0, shear_ratio: 0.55 }
     // 前端逻辑 / Frontend logic
