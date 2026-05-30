@@ -2230,6 +2230,7 @@
           <button class="tab-button" type="button" data-tab-target="results">Results</button> <!-- 页面结构 / Page structure -->
           <button class="tab-button" type="button" data-tab-target="run">Run</button> <!-- 页面结构 / Page structure -->
           <button class="tab-button" type="button" data-tab-target="gallery" title="Browse uniform-plate baseline patterns and apply small perturbations. / 浏览均匀板基础图样并做参数化微扰。">Gallery</button> <!-- 页面结构 / Page structure -->
+          <button class="tab-button" type="button" data-tab-target="export" title="Export the optimised plate as a printable STL; choose Phase 1 or Phase 2 design. / 把优化板导出为可打印 STL，可选 Phase 1 或 Phase 2 设计。">Export</button> <!-- 页面结构 / Page structure -->
         </nav> <!-- 页面结构 / Page structure -->
         <div class="tab-panel active" data-tab-panel="target"> <!-- 页面结构 / Page structure -->
         <section class="panel"> <!-- 页面结构 / Page structure -->
@@ -2537,6 +2538,39 @@
             <div id="galleryApplyStatus" class="status" style="margin-top:6px" hidden>Idle</div> <!-- 状态 / Status -->
           </section>
         </div> <!-- 画廊面板结束 / End gallery panel -->
+        <div class="tab-panel" data-tab-panel="export"> <!-- 3D 打印导出面板 / 3D-printing export panel -->
+          <section class="panel"> <!-- 导出主面板 / Export main panel -->
+            <h2>Export for 3D Printing</h2>
+            <p class="field-hint" style="font-size:0.85em;opacity:0.78;margin:0 0 8px 0">Turn the optimised 15×15 thickness field into a printable stepped-plate STL. Pick a completed run, then choose whether to print the <strong>Phase 1</strong> (initial) or <strong>Phase 2</strong> (refined) design — open both in COMSOL first (Results → Open .mph) to decide which pattern you prefer. / 把优化后的 15×15 厚度场导出成可打印的阶梯板 STL。先选一个已完成的运行，再决定打印 <strong>Phase 1</strong>（初始）还是 <strong>Phase 2</strong>（精修）设计——建议先在 Results 里用 COMSOL 打开两者的 .mph，挑你更满意的图案。</p>
+            <label class="field"><span>Production run / 运行</span><select id="exportRunSelect"></select></label>
+            <div class="toggle-list" style="margin-top:6px"> <!-- 阶段选择 / Phase choice -->
+              <label class="toggle"><input type="radio" name="exportPhase" value="phase2" checked> Phase 2 — refined design / 精修设计</label>
+              <label class="toggle"><input type="radio" name="exportPhase" value="phase1"> Phase 1 — initial design / 初始设计</label>
+            </div>
+            <label class="toggle" style="margin-top:4px" title="Gaussian-soften the 1 mm steps between cells for easier printing (changes geometry slightly). / 高斯柔化相邻 cell 的 1mm 台阶，更易打印（会轻微改变几何）。">Smooth steps (gaussian) / 柔化台阶 <input id="exportSmooth" type="checkbox"></label>
+            <div id="exportStats" class="meta" style="margin-top:8px;font-size:0.85em;line-height:1.5"></div> <!-- 几何摘要 / Geometry summary -->
+            <div class="panel-actions" style="margin-top:8px"> <!-- 动作 / Actions -->
+              <button id="exportDownloadButton" type="button" class="primary">Download STL</button> <!-- 下载 STL / Download STL -->
+              <button id="exportRefreshButton" type="button">Refresh</button> <!-- 刷新 / Refresh -->
+            </div>
+            <div id="exportStatus" class="status" style="margin-top:6px" hidden>Idle</div> <!-- 状态 / Status -->
+          </section>
+          <section class="panel"> <!-- 切片参考 / Slicing reference -->
+            <h2>FDM slicing reference</h2>
+            <p class="field-hint" style="font-size:0.82em;opacity:0.78;margin:0 0 6px 0">No fibre-orientation (θ) control needed for the current isotropic workflow, so this is just the geometry-fidelity recipe to reproduce the 15×15 thickness map faithfully. / 当前各向同性工作流不需要纤维取向（θ）控制，这里只列出忠实复刻 15×15 厚度图的几何精度配方。</p>
+            <ul class="field-hint" style="font-size:0.82em;line-height:1.55;padding-left:18px;margin:0">
+              <li><strong>Plate:</strong> 150 × 150 mm, 15×15 cells of 10 mm, thickness per cell from the STL (≈0.6–2.0 mm). / 板 150×150mm，10mm 见方 cell。</li>
+              <li><strong>layer_height:</strong> 0.12–0.15 mm — thin enough that even the ~0.6 mm cells get several layers. / 薄层。</li>
+              <li><strong>nozzle / line_width:</strong> 0.4 / 0.42 mm (0.3 nozzle if you have one, for sharper steps). / 喷头线宽。</li>
+              <li><strong>fill_density:</strong> 100%, <strong>fill_pattern:</strong> rectilinear; <strong>top/bottom layers:</strong> 4. / 100% 实心。</li>
+              <li><strong>Disable "detect thin walls" / "small perimeters"</strong> — otherwise the slicer switches 10 mm cells to concentric infill and distorts the thickness map. / 关闭薄壁检测，避免小 cell 被改成同心环。</li>
+              <li><strong>Print orientation:</strong> flat on the bed (bottom = z 0 plane) so the stepped top faces up and each cell thickness is built layer-by-layer. / 平放打印，阶梯朝上。</li>
+              <li><strong>Material:</strong> the run's modelled material (current default Bambu PETG-CF, sr≈1.87). Verify printed E with a cantilever test before trusting the Chladni prediction. / 用建模所用材料，先做悬臂梁验证。</li>
+              <li><strong>First powder test:</strong> sprinkle and drive one low mode; check the pattern matches the COMSOL prediction before the full frequency sweep. / 先撒粉测单个低阶频率核对。</li>
+            </ul>
+            <p class="field-hint" style="font-size:0.8em;opacity:0.6;margin:8px 0 0 0">If you later re-enable anisotropy (θ), you additionally need per-cell infill_direction via modifier meshes, perimeters=1, infill_anchor=0, and disable per-layer 90° infill rotation. / 若日后重启各向异性（θ），还需 modifier mesh 控方向、perimeters=1、infill_anchor=0、关闭逐层 90° 旋转。</p>
+          </section>
+        </div> <!-- 导出面板结束 / End export panel -->
       </aside> <!-- 页面结构 / Page structure -->
     </section> <!-- 页面结构 / Page structure -->
 
@@ -2869,6 +2903,8 @@
       tabButtons.forEach((button) => button.classList.toggle("active", button.dataset.tabTarget === name));
       // 前端逻辑 / Frontend logic
       tabPanels.forEach((panel) => panel.classList.toggle("active", panel.dataset.tabPanel === name));
+      // 切到 Export 选页时加载运行列表 / Load runs when the Export tab opens
+      if (name === "export") { loadExportRuns(); }
     // 前端逻辑 / Frontend logic
     }
 
@@ -5360,9 +5396,17 @@
       // 按钮区：只在真的有 .mph 时才显示 Open in COMSOL，避免 surrogate-only 跑出来一片"没找到"红字 / Only show Open in COMSOL when a .mph actually exists; surrogate-only runs hide it cleanly
       const comsolAvailable = Boolean(detail.comsol_available);
       // 前端逻辑 / Frontend logic
+      // Phase 2 跑过时给两个按钮，让客户自己对比 Phase 1 / Phase 2 哪个图案更好；
+      // 没跑 Phase 2（surrogate 或仅 Phase 1）时只给一个 "best" 按钮。
+      // Two buttons when Phase 2 ran so customers can compare Phase 1 vs Phase 2 themselves.
+      const hasPhase2 = Boolean(detail.summary && detail.summary.phase2);
+      const cidEnc = encodeURIComponent(detail.candidate_id);
+      const mphCountSuffix = detail.comsol_mph_count > 1 ? ` (${detail.comsol_mph_count} saved)` : "";
+      const finalLabel = hasPhase2 ? "Open Phase 2 best .mph in COMSOL" : "Open best .mph in COMSOL";
       const comsolButtonHtml = comsolAvailable
         // 前端逻辑 / Frontend logic
-        ? `<button class="download-link" type="button" data-action="open-in-comsol" data-candidate-id="${encodeURIComponent(detail.candidate_id)}">Open best .mph in COMSOL${detail.comsol_mph_count > 1 ? ` (${detail.comsol_mph_count} saved)` : ""}</button>`
+        ? `<button class="download-link" type="button" data-action="open-in-comsol" data-phase="phase2" data-candidate-id="${cidEnc}">${finalLabel}${mphCountSuffix}</button>`
+          + (hasPhase2 ? `<button class="download-link" type="button" data-action="open-in-comsol" data-phase="phase1" data-candidate-id="${cidEnc}">Open Phase 1 best .mph in COMSOL</button>` : "")
         // 前端逻辑 / Frontend logic
         : `<span class="candidate-actions-note" title="Surrogate-only runs never invoke COMSOL, so no .mph is saved. Run the pipeline with COMSOL enabled to generate one.">No COMSOL .mph (surrogate-only run)</span>`;
       // 状态条放在 candidate-head 之外，避免被纳入 flex 流挤动按钮 / Place status banner OUTSIDE candidate-head so toggling it can't shift the button row
@@ -5772,7 +5816,7 @@
             <!-- 模板内容 / Template content --><div class="candidate-actions">
               <!-- 模板内容 / Template content --><a class="download-link" href="/api/candidate-report?id=${encodeURIComponent(detail.candidate_id)}" target="_blank" rel="noreferrer">Report</a>
               <!-- 模板内容 / Template content --><a class="download-link" href="/api/candidate-package?id=${encodeURIComponent(detail.candidate_id)}">Package</a>
-              <!-- 模板内容 / Template content --><button class="download-link" type="button" data-action="open-in-comsol" data-candidate-id="${encodeURIComponent(detail.candidate_id)}">Open in COMSOL</button>
+              <!-- 模板内容 / Template content --><button class="download-link" type="button" data-action="open-in-comsol" data-phase="phase2" data-candidate-id="${encodeURIComponent(detail.candidate_id)}">Open in COMSOL</button>
             <!-- 模板内容 / Template content --></div>
             <!-- 模板内容 / Template content --><div id="comsolOpenStatus" class="status" hidden></div>
           <!-- 模板内容 / Template content --></div>
@@ -7429,14 +7473,16 @@
       productionResult.hidden = false;
     }
 
-    async function openCandidateInComsol(candidateId) {
+    async function openCandidateInComsol(candidateId, phase) {
+      const stage = phase === "phase1" ? "phase1" : "phase2";
+      const stageLabel = stage === "phase1" ? "Phase 1 best" : "Phase 2 best";
       const statusEl = document.getElementById("comsolOpenStatus");
-      if (statusEl) { statusEl.hidden = false; statusEl.textContent = "Opening best COMSOL model..."; }
+      if (statusEl) { statusEl.hidden = false; statusEl.textContent = `Opening ${stageLabel} COMSOL model...`; }
       try {
         const openRes = await fetch("/api/open-in-comsol", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ candidate_id: candidateId })
+          body: JSON.stringify({ candidate_id: candidateId, phase: stage })
         });
         const openJson = await openRes.json();
         if (!openRes.ok) { throw new Error(openJson.error || "Failed to launch COMSOL"); }
@@ -7451,7 +7497,7 @@
       const btn = event.target.closest('[data-action="open-in-comsol"]');
       if (!btn) return;
       event.preventDefault();
-      openCandidateInComsol(decodeURIComponent(btn.dataset.candidateId));
+      openCandidateInComsol(decodeURIComponent(btn.dataset.candidateId), btn.dataset.phase || "phase2");
     });
     // 前端逻辑 / Frontend logic
     cancelWorkflowButton.addEventListener("click", cancelWorkflow);
@@ -7495,6 +7541,95 @@
     resetResultFiltersButton.addEventListener("click", resetResultFilters);
     // 前端逻辑 / Frontend logic
     tabButtons.forEach((button) => button.addEventListener("click", () => selectSidebarTab(button.dataset.tabTarget)));
+
+    // === Export tab: thickness field → printable STL === / Export 选页：厚度场→可打印 STL
+    let exportInfoCache = null;
+    function exportSelectedPhase() {
+      const checked = document.querySelector('input[name="exportPhase"]:checked');
+      return checked ? checked.value : "phase2";
+    }
+    function setExportStatus(text, tone = "") {
+      const el = document.getElementById("exportStatus");
+      if (!el) return;
+      el.hidden = false; el.textContent = text; el.className = `status ${tone}`.trim();
+    }
+    async function loadExportRuns() {
+      const select = document.getElementById("exportRunSelect");
+      if (!select) return;
+      try {
+        const res = await fetch("/api/production-runs");
+        const data = await res.json();
+        const runs = (data.runs || []).slice();
+        const prev = select.value;
+        if (!runs.length) {
+          select.innerHTML = `<option value="">No completed runs / 暂无完成的运行</option>`;
+          document.getElementById("exportStats").innerHTML = "";
+          setExportStatus("Run the pipeline (with or without COMSOL) first to produce a thickness field. / 先跑一次流水线生成厚度场。", "warn");
+          return;
+        }
+        select.innerHTML = runs.map((r) => {
+          const label = `${r.candidate_id} · stage ${r.stage_reached || "?"} · ${r.modified_at || ""}`;
+          return `<option value="${encodeURIComponent(r.candidate_id)}">${escapeText(label)}</option>`;
+        }).join("");
+        if (prev && runs.some((r) => encodeURIComponent(r.candidate_id) === prev)) { select.value = prev; }
+        await refreshExportInfo();
+      } catch (err) {
+        setExportStatus("Failed to load runs: " + err.message, "fail");
+      }
+    }
+    async function refreshExportInfo() {
+      const select = document.getElementById("exportRunSelect");
+      const statsEl = document.getElementById("exportStats");
+      if (!select || !select.value) { if (statsEl) statsEl.innerHTML = ""; return; }
+      const id = decodeURIComponent(select.value);
+      try {
+        const res = await fetch(`/api/export-info?id=${encodeURIComponent(id)}`);
+        const info = await res.json();
+        if (!res.ok) { throw new Error(info.error || "export-info failed"); }
+        exportInfoCache = info;
+        // 禁用没有 Phase 2 的运行的 Phase 2 选项 / Disable Phase 2 radio when the run has none
+        const p1 = info.phases.phase1 || {}; const p2 = info.phases.phase2 || {};
+        const phase2Radio = document.querySelector('input[name="exportPhase"][value="phase2"]');
+        const phase1Radio = document.querySelector('input[name="exportPhase"][value="phase1"]');
+        if (phase2Radio) { phase2Radio.disabled = !info.has_phase2; if (!info.has_phase2 && phase2Radio.checked && phase1Radio) phase1Radio.checked = true; }
+        renderExportStats();
+      } catch (err) {
+        if (statsEl) statsEl.innerHTML = `<div class="status fail">${escapeText(err.message)}</div>`;
+        exportInfoCache = null;
+      }
+    }
+    function renderExportStats() {
+      const statsEl = document.getElementById("exportStats");
+      if (!statsEl || !exportInfoCache) return;
+      const phase = exportSelectedPhase();
+      const entry = (exportInfoCache.phases || {})[phase] || {};
+      if (!entry.available) {
+        statsEl.innerHTML = `<div class="status warn">${escapeText(entry.source || "Not available")}</div>`;
+        return;
+      }
+      const s = entry.stats || {};
+      const fallback = entry.is_fallback ? `<div class="status warn" style="margin-bottom:6px">${escapeText(entry.source)}</div>` : "";
+      statsEl.innerHTML = `${fallback}
+        <div>Plate / 板: <strong>${exportInfoCache.plate_length_mm} × ${exportInfoCache.plate_length_mm} mm</strong> · ${exportInfoCache.grid_size}×${exportInfoCache.grid_size} cells (${exportInfoCache.cell_mm} mm)</div>
+        <div>Thickness / 厚度: <strong>${s.thickness_min_mm}–${s.thickness_max_mm} mm</strong> (mean ${s.thickness_mean_mm})</div>
+        <div>Material volume / 材料体积: <strong>${s.volume_cm3} cm³</strong></div>
+        <div style="opacity:0.7">Source / 来源: ${escapeText(entry.source)}</div>`;
+    }
+    function downloadExportStl() {
+      const select = document.getElementById("exportRunSelect");
+      if (!select || !select.value) { setExportStatus("Pick a run first. / 先选择一个运行。", "warn"); return; }
+      const id = decodeURIComponent(select.value);
+      const phase = exportSelectedPhase();
+      const smooth = document.getElementById("exportSmooth").checked ? "1" : "0";
+      const url = `/api/export-stl?id=${encodeURIComponent(id)}&phase=${encodeURIComponent(phase)}&smooth=${smooth}`;
+      setExportStatus(`Downloading ${phase} STL… (if your browser shows nothing, check the downloads bar) / 正在下载 ${phase} STL…`, "");
+      window.location.href = url;
+    }
+    document.getElementById("exportRunSelect").addEventListener("change", refreshExportInfo);
+    document.querySelectorAll('input[name="exportPhase"]').forEach((r) => r.addEventListener("change", renderExportStats));
+    document.getElementById("exportRefreshButton").addEventListener("click", loadExportRuns);
+    document.getElementById("exportDownloadButton").addEventListener("click", downloadExportStl);
+
     // 前端逻辑 / Frontend logic
     resultsList.addEventListener("click", (event) => {
       // 优先路由 production runs 到 detail loader / Route production rows to the production detail loader first

@@ -268,12 +268,21 @@ def _production_summary_for_candidate(candidate_id: str) -> dict | None:
         return None
 
 
-def select_best_candidate_mph_file(candidate_id: str) -> dict:
+def select_best_candidate_mph_file(candidate_id: str, phase: str = "phase2") -> dict:
+    # phase="phase2" (默认) 打开最终(Phase 2 最佳)受迫响应模型；phase="phase1" 打开
+    # 初始设计 Phase 1 最佳单频模型，方便客户自行对比 Phase 1 与 Phase 2 哪个更好。
+    # phase="phase2" (default) opens the final (best Phase-2) forced-response model;
+    # phase="phase1" opens the Phase-1 best single-tone model on the initial design so
+    # customers can compare Phase 1 vs Phase 2 themselves.
+    phase = "phase1" if str(phase).strip().lower() in ("phase1", "p1", "1") else "phase2"
+    phase_word = "Phase 1" if phase == "phase1" else "Phase 2"
+    phase_word_zh = "Phase 1" if phase == "phase1" else "Phase 2"
     files = discover_candidate_mph_files(candidate_id)
     if not files:
         raise FileNotFoundError(f"No .mph saved for candidate {candidate_id}. Re-run with COMSOL enabled to generate one. / 候选 {candidate_id} 没有保存的 .mph 文件，请在启用 COMSOL 的情况下重新运行以生成。")
     if len(files) == 1:
         chosen = dict(files[0])
+        chosen["phase"] = phase
         chosen["selection_reason"] = "Only saved COMSOL model for this candidate. / 该候选唯一保存的 COMSOL 模型。"
         return chosen
 
@@ -281,9 +290,15 @@ def select_best_candidate_mph_file(candidate_id: str) -> dict:
     design_id = candidate_id
     target_freq = None
     if summary:
-        selected_entry = _best_phase2_entry(summary)
-        design_id = str((selected_entry or {}).get("candidate_id") or summary.get("candidate_id") or candidate_id)
-        target_freq = _best_forced_frequency(summary, selected_entry, design_id)
+        if phase == "phase1":
+            # Phase 1 uses the initial (un-refined) design; pick the best single drive
+            # frequency from phase1.best_composite. / Phase 1 用初始设计，从 phase1 最佳合成里挑最佳单频
+            design_id = str(summary.get("candidate_id") or candidate_id)
+            target_freq = _best_forced_frequency(summary, None, design_id)
+        else:
+            selected_entry = _best_phase2_entry(summary)
+            design_id = str((selected_entry or {}).get("candidate_id") or summary.get("candidate_id") or candidate_id)
+            target_freq = _best_forced_frequency(summary, selected_entry, design_id)
 
     design_files = [file for file in files if _variant_matches_design(str(file.get("variant_dir", "")), design_id)] or files
     forced = [file for file in design_files if file.get("kind") == "forced_response"]
@@ -291,24 +306,137 @@ def select_best_candidate_mph_file(candidate_id: str) -> dict:
         if target_freq is not None:
             chosen = min(forced, key=lambda file: (abs((_frequency_from_variant_dir(str(file.get("variant_dir", ""))) or target_freq) - target_freq), -Path(str(file["path"])).stat().st_mtime))
             chosen = dict(chosen)
-            chosen["selection_reason"] = f"Best production forced-response model near {target_freq:g} Hz. / 打开最接近最佳频率 {target_freq:g} Hz 的强迫响应模型。"
+            chosen["phase"] = phase
+            chosen["selection_reason"] = f"{phase_word} best single-tone forced-response model near {target_freq:g} Hz. / 打开 {phase_word_zh} 最接近最佳频率 {target_freq:g} Hz 的单频强迫响应模型。"
             return chosen
         chosen = max(forced, key=lambda file: Path(str(file["path"])).stat().st_mtime)
         chosen = dict(chosen)
-        chosen["selection_reason"] = "Most recent forced-response COMSOL model. / 最新的强迫响应 COMSOL 模型。"
+        chosen["phase"] = phase
+        chosen["selection_reason"] = f"Most recent {phase_word} forced-response COMSOL model. / 最新的 {phase_word_zh} 强迫响应 COMSOL 模型。"
         return chosen
 
     eigen = [file for file in design_files if file.get("kind") == "eigenfrequency"]
     if eigen:
         chosen = max(eigen, key=lambda file: Path(str(file["path"])).stat().st_mtime)
         chosen = dict(chosen)
+        chosen["phase"] = phase
         chosen["selection_reason"] = "No forced-response model found; opening the eigenfrequency model. / 未找到强迫响应模型，打开特征频率模型。"
         return chosen
 
     chosen = max(files, key=lambda file: Path(str(file["path"])).stat().st_mtime)
     chosen = dict(chosen)
+    chosen["phase"] = phase
     chosen["selection_reason"] = "Fallback to the most recent saved COMSOL model. / 回退打开最新保存的 COMSOL 模型。"
     return chosen
+
+
+# === 3D-printing export: thickness field (Phase 1 / Phase 2) → STL === /
+# === 3D 打印导出：厚度场（Phase 1 / Phase 2）→ STL === /
+
+def _resolve_phase_h_csv(config: dict, candidate_id: str, phase: str) -> dict:
+    """Locate the thickness-field CSV for a given run + phase. /
+    定位某次运行某阶段的厚度场 CSV。
+
+    Returns a dict with ``path`` (str|None), ``resolved_phase`` (the phase that
+    actually produced the file — may differ from the request if it fell back),
+    ``source`` (human label), and ``best_iter`` when relevant. /
+    返回 path / resolved_phase / source / best_iter。
+    """
+    valid = validate_production_candidate_id(candidate_id)
+    phase = "phase1" if str(phase).strip().lower() in ("phase1", "p1", "1") else "phase2"
+    prod_dir = project_root() / "reports" / "production" / valid
+    cand_dir = Path(config["paths"]["candidates_dir"]) / valid
+    summary = _production_summary_for_candidate(valid)
+
+    if phase == "phase2":
+        best_iter = ((summary or {}).get("phase2") or {}).get("best_iter")
+        # 1) the run-local copy the pipeline now persists / 管线落盘的本地副本
+        local = prod_dir / "phase2_best_H.csv"
+        if local.exists():
+            return {"path": str(local), "resolved_phase": "phase2",
+                    "source": f"Phase 2 best refined design (iter {best_iter}). / Phase 2 最佳精修设计（iter {best_iter}）。",
+                    "best_iter": best_iter}
+        # 2) the surviving Phase-2 iteration candidate dir / 仍在的 Phase 2 迭代候选目录
+        if best_iter is not None:
+            pc = Path(config["paths"]["candidates_dir"]) / f"{valid}_p2it{best_iter}" / "H.csv"
+            if pc.exists():
+                return {"path": str(pc), "resolved_phase": "phase2",
+                        "source": f"Phase 2 best refined design (iter {best_iter}). / Phase 2 最佳精修设计（iter {best_iter}）。",
+                        "best_iter": best_iter}
+        # 3) fall back to the Phase-1 / initial design / 回退到 Phase 1 初始设计
+
+    for cand_path in (prod_dir / "H.csv", cand_dir / "H.csv"):
+        if cand_path.exists():
+            note = ("Phase 1 initial design. / Phase 1 初始设计。" if phase == "phase1"
+                    else "Phase 2 design not found; using the Phase 1 initial design. / 未找到 Phase 2 设计，回退 Phase 1 初始设计。")
+            return {"path": str(cand_path), "resolved_phase": "phase1", "source": note, "best_iter": None}
+
+    return {"path": None, "resolved_phase": phase, "source": "No thickness field (H.csv) found for this run. / 未找到该运行的厚度场 H.csv。", "best_iter": None}
+
+
+def build_export_info(config: dict, candidate_id: str) -> dict:
+    """Per-phase availability + geometry stats for the Export tab. /
+    Export 选页用的：各阶段是否可用 + 几何摘要。"""
+    import numpy as np
+    from src.export import h_field_stats
+
+    valid = validate_production_candidate_id(candidate_id)
+    plate_length_mm = float(config["project"]["plate_length_mm"])
+    grid_size = int(config["project"]["grid_size"])
+    summary = _production_summary_for_candidate(valid)
+    has_phase2 = bool((summary or {}).get("phase2"))
+
+    phases: dict = {}
+    for phase in ("phase1", "phase2"):
+        info = _resolve_phase_h_csv(config, valid, phase)
+        entry: dict = {
+            "requested_phase": phase,
+            "resolved_phase": info["resolved_phase"],
+            "source": info["source"],
+            "available": bool(info["path"]),
+            "is_fallback": bool(info["path"]) and info["resolved_phase"] != phase,
+        }
+        if info["path"]:
+            try:
+                H = np.loadtxt(info["path"], delimiter=",")
+                entry["stats"] = h_field_stats(H, plate_length_mm)
+            except Exception as exc:  # noqa: BLE001
+                entry["available"] = False
+                entry["source"] = f"Failed to read H.csv: {exc} / 读取 H.csv 失败：{exc}"
+        phases[phase] = entry
+
+    return {
+        "candidate_id": valid,
+        "plate_length_mm": plate_length_mm,
+        "grid_size": grid_size,
+        "cell_mm": round(plate_length_mm / grid_size, 4),
+        "has_phase2": has_phase2,
+        "phases": phases,
+    }
+
+
+def build_plate_stl(config: dict, candidate_id: str, phase: str = "phase2",
+                    smooth: bool = False, min_thickness_mm: float = 0.0) -> tuple[bytes, str]:
+    """Build a binary STL of the stepped plate for a run + phase. /
+    为某次运行某阶段构建阶梯板二进制 STL。"""
+    import numpy as np
+    from src.export import h_field_to_stl_bytes
+
+    valid = validate_production_candidate_id(candidate_id)
+    plate_length_mm = float(config["project"]["plate_length_mm"])
+    info = _resolve_phase_h_csv(config, valid, phase)
+    if not info["path"]:
+        raise FileNotFoundError(info["source"])
+    H = np.loadtxt(info["path"], delimiter=",")
+    stl_bytes = h_field_to_stl_bytes(
+        H, plate_length_mm,
+        min_thickness_mm=float(min_thickness_mm),
+        smooth_sigma_cells=0.6 if smooth else 0.0,
+        header=f"ChladniPlate {valid} {info['resolved_phase']}",
+    )
+    suffix = "_smoothed" if smooth else ""
+    filename = f"{valid}_{info['resolved_phase']}_plate{suffix}.stl"
+    return stl_bytes, filename
 
 
 def _usable_command_path(command: str) -> str:
@@ -1869,6 +1997,31 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                 except Exception as exc:  # 处理异常 / Handle exception
                     self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 返回错误信息 / Return error message
                 return  # 结束请求 / Finish request
+            if route == "/api/export-info":  # 3D 打印导出信息（各阶段是否可用 + 几何） / 3D-print export info
+                try:  # 容错 / Tolerate
+                    candidate_id = query.get("id", [""])[0]  # 读取编号 / Read id
+                    self.send_json(build_export_info(config, candidate_id))  # 返回 / Return
+                except FileNotFoundError as exc:  # 不存在 / Missing
+                    self.send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)  # 404 / 404
+                except ValueError as exc:  # 编号无效 / Invalid id
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                except Exception as exc:  # 其他 / Other
+                    self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束 / Finish
+            if route == "/api/export-stl":  # 下载阶梯板 STL（按阶段） / Download stepped-plate STL by phase
+                try:  # 容错 / Tolerate
+                    candidate_id = query.get("id", [""])[0]  # 读取编号 / Read id
+                    phase = str(query.get("phase", ["phase2"])[0])  # 阶段 / Phase
+                    smooth = str(query.get("smooth", ["0"])[0]).lower() in {"1", "true", "yes", "on"}  # 平滑 / Smooth flag
+                    body, filename = build_plate_stl(config, candidate_id, phase=phase, smooth=smooth)  # 构建 STL / Build STL
+                    self.send_download(body, filename, "model/stl")  # 发送下载 / Send download
+                except FileNotFoundError as exc:  # 无 H 场 / No H field
+                    self.send_json({"error": str(exc)}, HTTPStatus.NOT_FOUND)  # 404 / 404
+                except ValueError as exc:  # 编号/数据无效 / Invalid id or data
+                    self.send_json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)  # 400 / 400
+                except Exception as exc:  # 其他 / Other
+                    self.send_json({"error": str(exc)}, HTTPStatus.INTERNAL_SERVER_ERROR)  # 500 / 500
+                return  # 结束 / Finish
             if route == "/api/candidate-package":  # 判断是否请求候选结果包 / Check candidate-package request
                 try:  # 捕获打包错误 / Catch packaging errors
                     candidate_id = query.get("id", [""])[0]  # 读取候选编号 / Read candidate id
@@ -2081,12 +2234,13 @@ def make_handler(config: dict):  # 创建绑定配置的处理类 / Create confi
                     length = int(self.headers.get("Content-Length", "0"))  # 请求体长度 / Body length
                     payload = json.loads(self.rfile.read(length).decode("utf-8")) if length else {}  # 解析 JSON / Parse JSON
                     mph_path = str(payload.get("path", "")).strip()  # 读取路径 / Read path
+                    phase = str(payload.get("phase", "phase2")).strip() or "phase2"  # 阶段：phase1 / phase2 / Stage selector
                     auto_selected_mph = None  # 自动选择的模型 / Auto-selected model
                     if not mph_path:  # 缺失 / Missing
                         candidate_id = str(payload.get("candidate_id", "")).strip()  # 候选编号 / Candidate id
                         if not candidate_id:  # 完全无线索 / No clue
                             raise ValueError("Provide either 'path' or 'candidate_id'. / 必须提供 path 或 candidate_id。")  # / Reject
-                        auto_selected_mph = select_best_candidate_mph_file(candidate_id)  # 选择最佳模型 / Select best model
+                        auto_selected_mph = select_best_candidate_mph_file(candidate_id, phase=phase)  # 选择最佳模型 / Select best model
                         mph_path = str(auto_selected_mph["path"])  # 使用最佳模型 / Use best model
                     result = open_mph_in_comsol(config, mph_path)  # 启动 / Launch
                     if auto_selected_mph is not None:  # 候选自动选择时附带选择理由 / Include selection metadata for candidate auto-pick

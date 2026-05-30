@@ -1030,6 +1030,19 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
         np.save(output_dir / "phase2_best_powder_broad.npy", chladni_powder_density(best_amp, sigma_rel=0.05))
         np.save(output_dir / "phase2_best_powder_sharp.npy", chladni_powder_density(best_amp, sigma_rel=0.025))
 
+        # Persist the Phase-2 best (refined) thickness field next to the run so the
+        # 3D-printing export can build a Phase-2 STL without depending on the
+        # candidates/ working dirs surviving. /
+        # 把 Phase 2 最佳（精修）厚度场落盘到本次运行目录，让 3D 打印导出不依赖
+        # candidates/ 工作目录是否保留。
+        best_h_csv = project_root / "candidates" / f"{cfg.candidate_id}_p2it{best_iter}" / "H.csv"
+        if best_h_csv.exists():
+            shutil.copy2(best_h_csv, output_dir / "phase2_best_H.csv")
+            for extra in ("theta_continuous_rad.csv", "theta_continuous_deg.csv"):
+                src_extra = best_h_csv.parent / extra
+                if src_extra.exists():
+                    shutil.copy2(src_extra, output_dir / f"phase2_best_{extra}")
+
         baseline_score = float(history[0]["score"]["score"])
         improvement_pct = float((best_score - baseline_score) / max(baseline_score, 1e-9) * 100)
         final["stage_reached"] = "phase2"
