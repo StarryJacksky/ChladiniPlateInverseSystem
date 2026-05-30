@@ -28,29 +28,37 @@ design_variables:
 
 # 材料参数 / Material parameters
 material:
-  # 默认材料 = FDM CF-PETG (tier1, sr=2.8)。实测发现：各向异性 sr 对图案质量至关重要
-  # —— 同一十字目标，CF-PETG(sr=3) COMSOL broad enr≈9.8，而准各向同性 PLA(sr=1.45) 只有
-  # ≈4.6，且 PLA 单频只出中心一坨、CF-PETG 单频能出近似十字。注意区分：被移除的是「θ 逐格
-  # 角度优化」(寄生)，而「材料各向异性 sr」本身有用，故默认回到 CF-PETG。匹配前端预设
-  # cf_petg_t1。/ Default = FDM CF-PETG (tier1). Empirically the anisotropy ratio sr is
-  # essential to pattern quality: on the same cross target CF-PETG(sr≈3) gives COMSOL
-  # broad enr≈9.8 vs ≈4.6 for near-isotropic PLA(sr=1.45). What was removed is per-cell
-  # θ-ANGLE optimisation (parasitic); the material's sr anisotropy itself helps, so the
-  # default reverts to CF-PETG. Matches frontend preset cf_petg_t1.
-  density_kg_m3: 1300 # 密度 / Density
-  poisson_ratio: 0.38 # 泊松比 / Poisson ratio
-  youngs_modulus_pa: 3700000000 # 杨氏模量 / Young's modulus
-  thermal_conductivity_w_mk: 0.25 # 导热系数 / Thermal conductivity
-  heat_capacity_j_kgk: 1400 # 定压热容 / Heat capacity
-  thermal_expansion_1_k: 0.00005 # 热膨胀系数 / Thermal expansion coefficient
+  # 默认材料 = Bambu Lab PETG-CF（实测 TDS V3.0，UK 现货）。用弯曲模量(ISO 178)而非拉伸模量，
+  # 因为 Chladni 是板弯曲振动。youngs_modulus_pa 取面内弯曲模量 X-Y=2910MPa（作为 E∥/E⊥ 的
+  # 几何平均代理）。重要：实测发现「能否出十字」由共振点驱动(phase1_off_resonance_hz=0)决定，
+  # 不是 sr —— sr=1.87 与 sr=2.8 都能出干净十字（sr=1.87 的 COMSOL MAX 合成 enr 11.5×/rec0.95
+  # 甚至更好），故无需追高 sr。/ Default = Bambu Lab PETG-CF (measured TDS V3.0). Uses FLEXURAL
+  # modulus (ISO 178), not tensile, because Chladni is plate bending. The cross's reachability
+  # is governed by on-resonance driving (phase1_off_resonance_hz=0), NOT by sr: both sr=1.87
+  # and sr=2.8 give clean crosses (sr=1.87 actually scores higher, MAX enr 11.5×/rec0.95).
+  density_kg_m3: 1250 # 密度 ISO 1183 / Density (measured)
+  poisson_ratio: 0.40 # 泊松比（Bambu 未公布，取 PETG 典型值，待测）/ Poisson (NOT published; PETG-typical, to be measured)
+  youngs_modulus_pa: 2910000000 # 面内弯曲模量 X-Y, ISO 178 (2910±260 MPa)；用弯曲而非拉伸(2460) 因为是板弯曲 / In-plane FLEXURAL modulus (bending-relevant)
+  thermal_conductivity_w_mk: 0.25 # 导热系数（PETG 典型，Bambu 未公布）/ Thermal conductivity (typical)
+  heat_capacity_j_kgk: 1400 # 定压热容（PETG 典型，Bambu 未公布）/ Heat capacity (typical)
+  thermal_expansion_1_k: 0.00005 # 热膨胀系数（PETG 典型）/ Thermal expansion (typical)
+  # ⚠ 实验侧警告：Bambu PETG-CF 的 Tg=HDT=68°C 偏低；持续激励发热会软化板、模量下降。
+  # 实测时控板表面温度<50°C 或间歇冷却。/ LAB WARNING: Tg=HDT=68°C is low; sustained excitation
+  # heats & softens the plate. Keep surface temp <50°C or pause to cool during real runs.
   # 正交各向异性参数 / Orthotropic anisotropy
   # 材料档位参考 / Material tier reference:
   #   tier0 (SLA grey resin)   : sr ≈ 1.05, near-isotropic
-  #   FDM PLA                  : sr ≈ 1.45 — 学校常备但准各向同性，图案质量明显更差 / common but near-isotropic, worse patterns
-  #   tier1 (FDM CF-PETG, 默认) : sr ≈ 2.8-3.0 — 各向异性，magic 165 即按此档校准 / anisotropic, magic 165 calibrated here
+  #   FDM PLA                  : sr ≈ 1.45 — 学校常备但准各向同性 / common but near-isotropic
+  #   Bambu PETG-CF (默认)      : sr ≈ 1.87 — 见下方说明 / see note below
   #   tier2 (Continuous CF)    : sr ≈ 12.0 — surrogate 上限，工程难制造 / surrogate ceiling, hard to manufacture
-  stiffness_ratio: 2.80 # E_||/E_⊥（沿主刚度方向 vs 垂直），1.0 = 各向同性 / E_||/E_perp, 1.0 = isotropic
-  shear_ratio: 0.75 # G_pp / G_iso 剪切模量相对各向同性比 / Shear modulus ratio vs isotropic
+  # sr=1.87 来自 Bambu 公布的弯曲模量 X-Y/Z = 2910/1560。注意这是【层间】各向异性(Z=穿层)，
+  # 而 Chladni 板需要的是【面内】0°/90° infill 各向异性——Bambu 未公布，估计 1.5–2.0。1.87 作为
+  # 合理代理上界。建议打 0°/45°/90° 弯曲试样(ISO 178)实测面内 E∥/E⊥ 再回填。/ sr=1.87 = Bambu's
+  # flexural X-Y/Z. NOTE this is LAYER anisotropy (Z=through-thickness); Chladni needs IN-PLANE
+  # 0°/90° anisotropy which Bambu does NOT publish (est. 1.5–2.0). 1.87 is a proxy upper bound;
+  # measure 0°/45°/90° flexural beams (ISO 178) and update. The cross does NOT need a high sr.
+  stiffness_ratio: 1.87 # E_||/E_⊥；面内值待实测 / E_||/E_perp; in-plane value to be measured
+  shear_ratio: 1.0 # G_pp / G_iso（Bambu 未公布 G12，取各向同性 1.0，待测）/ G12 NOT published; isotropic assumption, to be measured
 
 # 生产 pipeline 配置 / Production pipeline configuration
 # 经过 350+ 次实验后验证的最佳路径：W10 surrogate → COMSOL eigfreq → Phase 1 IC-likeness → Phase 2 trust-region
@@ -74,7 +82,7 @@ production:
   phase1_top_k_modes: 6 # IC-likeness 选 top-K 模态 / Top-K IC-likeness modes
   phase1_off_resonance_hz: 0.0 # 本征模态共振点驱动(0=on-resonance)；2%阻尼下响应有限且模态最纯，偏1.5Hz会把图案搞糊掉recall(已验证 sr3 十字模态 on-res enr2.68/rec0.54 vs +1.5 enr2.21/rec0.42) / Drive eigenmodes on-resonance; detune smears the figure
   magic_off_resonance_hz: [165.0] # CF-PETG tier1(sr≈3) 经验 magic 频率；battery 实测它能把十字打出来。换材料/目标请用前端"Pre-sweep magic freqs"重扫或关 enable_magic_freqs / tier1 CF-PETG magic freq (battery confirmed it yields the cross); re-sweep for other materials/targets or disable
-  enable_magic_freqs: true # 是否把 magic 加入 Phase 1 drive；非 tier1 材料建议改 false / Whether to include magic freqs in P1 drive list
+  enable_magic_freqs: false # 默认材料已是 Bambu PETG-CF(sr=1.87)，165 是 sr=3 校准的不适用；且 E3 共振点驱动下十字来自本征模态、无需 magic。换回 tier1 或为新材料重扫后再开 / Default material is now Bambu PETG-CF; magic 165 was sr=3-calibrated and the on-resonance eigenmodes already yield the cross, so magic is off. Re-enable after re-sweeping for the active material
   phase1_w10_topn: 3 # Phase 1 drive 列表里追加 W10 训练频率的 top-N（按 W10 权重排序）；0 关闭 / Include top-N W10-trained freqs in P1 drive list (sorted by W10 weight)
   eig_n_modes: 30 # COMSOL eigenfreq 求解阶数 / COMSOL eigenfrequency modes
   phase1_band_slack_hz: 20.0 # Phase 1 选频允许超出 W10 设计带宽的 slack；防止低频"中心一坨"基频混进 drive 列表 / Slack for Phase 1 in-band gate (rejects out-of-band fundamentals like 72 Hz central blobs)
