@@ -72,7 +72,7 @@ production:
   multistart_uplift_threshold: 0.05 # 赢家相对 seed=42 最少 +5% 复合 score 才会被采纳（防退化）/ Anti-regression uplift threshold
   phase2_score_mode: composite # composite (enr·√rec, 防塌陷) | enrich_only (legacy) / Phase 2 acceptance score mode
   phase1_top_k_modes: 6 # IC-likeness 选 top-K 模态 / Top-K IC-likeness modes
-  phase1_off_resonance_hz: 1.5 # 偏离本征频率的驱动偏移 / Off-resonance offset
+  phase1_off_resonance_hz: 0.0 # 本征模态共振点驱动(0=on-resonance)；2%阻尼下响应有限且模态最纯，偏1.5Hz会把图案搞糊掉recall(已验证 sr3 十字模态 on-res enr2.68/rec0.54 vs +1.5 enr2.21/rec0.42) / Drive eigenmodes on-resonance; detune smears the figure
   magic_off_resonance_hz: [165.0] # CF-PETG tier1(sr≈3) 经验 magic 频率；battery 实测它能把十字打出来。换材料/目标请用前端"Pre-sweep magic freqs"重扫或关 enable_magic_freqs / tier1 CF-PETG magic freq (battery confirmed it yields the cross); re-sweep for other materials/targets or disable
   enable_magic_freqs: true # 是否把 magic 加入 Phase 1 drive；非 tier1 材料建议改 false / Whether to include magic freqs in P1 drive list
   phase1_w10_topn: 3 # Phase 1 drive 列表里追加 W10 训练频率的 top-N（按 W10 权重排序）；0 关闭 / Include top-N W10-trained freqs in P1 drive list (sorted by W10 weight)

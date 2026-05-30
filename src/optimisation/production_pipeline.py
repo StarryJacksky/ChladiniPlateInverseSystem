@@ -120,7 +120,7 @@ def build_default_pipeline_config(config_yaml_path: str | Path = "config.yaml",
         multistart_uplift_threshold=float(take("multistart_uplift_threshold", 0.05)),
         phase2_score_mode=str(take("phase2_score_mode", "composite")),
         phase1_top_k_modes=int(take("phase1_top_k_modes", 6)),
-        phase1_off_resonance_hz=float(take("phase1_off_resonance_hz", 1.5)),
+        phase1_off_resonance_hz=float(take("phase1_off_resonance_hz", 0.0)),
         magic_off_resonance_hz=magic,
         enable_magic_freqs=bool(take("enable_magic_freqs", True)),
         phase1_w10_topn=int(take("phase1_w10_topn", 3)),
@@ -190,7 +190,15 @@ class ProductionPipelineConfig:
 
     # Phase 1 selection
     phase1_top_k_modes: int = 6
-    phase1_off_resonance_hz: float = 1.5
+    # Drive eigenmodes ON resonance (offset 0). A small +Hz detune was used to
+    # "avoid the resonance singularity", but with 2% damping the on-resonance
+    # response is finite and gives the PUREST single mode; even a +1.5 Hz detune
+    # measurably smears the figure and drops recall (verified on a sr=3 cross
+    # mode: on-res 329.5 Hz enr 2.68/rec 0.54 vs +1.5 Hz 331.0 Hz enr 2.21/rec
+    # 0.42). Keep configurable for diagnostics. /
+    # 本征模态共振点驱动（偏移 0）。原来的 +Hz 偏置是为"躲共振奇点"，但有 2% 阻尼时
+    # 共振点响应有限且模态最纯；偏 1.5Hz 会把图案搞糊、掉 recall（已验证）
+    phase1_off_resonance_hz: float = 0.0
     magic_off_resonance_hz: tuple[float, ...] = (165.0,)
     # Magic freqs are tier1 (sr=3.0) empirical values; off by default for
     # other materials. When True, also adds them to the drive list. /
