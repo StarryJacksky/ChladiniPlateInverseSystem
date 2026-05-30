@@ -141,10 +141,15 @@ def main() -> None:  # 主程序入口 / Main program entry
         print(ranking if ranking else "No scored candidates yet. / 暂无可评分候选。")  # 打印排名或提示 / Print ranking or message
     if args.command == "build-uniform-catalogue":  # 判断是否构建均匀板图样目录 / Check uniform-catalogue build command
         from src.uniform_pattern.catalogue import build_uniform_catalogue  # 延迟导入目录构建 / Lazily import catalogue builder
-        from src.uniform_pattern.catalogue import catalogue_default_dir  # 延迟导入默认目录 / Lazily import default directory
+        from src.uniform_pattern.catalogue import catalogue_tier_dir  # 延迟导入档位目录 / Lazily import tier directory
+        from src.uniform_pattern.catalogue import compute_tier_id  # 档位 ID / Tier ID
+        from src.uniform_pattern.catalogue import compute_tier_label  # 档位标签 / Tier label
+        from src.uniform_pattern.catalogue import compute_tier_signature  # 档位签名 / Tier signature
+        from src.uniform_pattern.catalogue import register_tier  # 档位注册 / Tier registration
         from src.uniform_pattern.render import save_pattern_png  # 延迟导入 PNG 渲染 / Lazily import PNG renderer
-        out_dir = catalogue_default_dir(config)  # 计算缓存目录 / Compute cache directory
-        num_modes = args.num_modes or int(config.get("simulation", {}).get("num_modes", 30))  # 选择模态数 / Select mode count
+        num_modes = args.num_modes or 50  # 默认 50 模态 / Default to 50 modes
+        tier_id = compute_tier_id(config, num_modes)  # 计算档位 ID / Compute tier id
+        out_dir = catalogue_tier_dir(config, tier_id=tier_id)  # 计算档位缓存目录 / Compute tier cache directory
         result = build_uniform_catalogue(config, num_modes=num_modes, proxy_grid_size=int(args.proxy_grid), output_dir=out_dir)  # 构建目录 / Build catalogue
         plate_length_mm = float(config["project"]["plate_length_mm"])  # 板长度 / Plate length
         centre_clamp_radius_mm = float(config["project"]["center_clamp_radius_mm"])  # 中心夹持 / Centre clamp
@@ -152,7 +157,8 @@ def main() -> None:  # 主程序入口 / Main program entry
         for entry in result["entries"]:  # 遍历模态 / Iterate modes
             save_pattern_png(entry.mode_field, out_dir / f"mode_{entry.index:03d}_preview.png", output_size=512, line_width_px=line_width_px, plate_length_mm=plate_length_mm, centre_clamp_radius_mm=centre_clamp_radius_mm)  # 保存 512 PNG / Save 512 PNG
             save_pattern_png(entry.mode_field, out_dir / f"mode_{entry.index:03d}_thumb.png", output_size=160, line_width_px=max(1, line_width_px // 2), plate_length_mm=plate_length_mm, centre_clamp_radius_mm=centre_clamp_radius_mm)  # 保存缩略图 / Save thumbnail
-        print(f"Built uniform catalogue: {len(result['entries'])} modes -> {out_dir} / 已构建均匀板图样目录：{len(result['entries'])} 个模态 -> {out_dir}")  # 打印结果 / Print result
+        register_tier(out_dir.parent, tier_id, compute_tier_label(config, num_modes), compute_tier_signature(config, num_modes), len(result["entries"]))  # 注册到全局索引 / Register in global index
+        print(f"Built uniform catalogue tier {tier_id}: {len(result['entries'])} modes -> {out_dir} / 已构建均匀板图样档位 {tier_id}：{len(result['entries'])} 个模态 -> {out_dir}")  # 打印结果 / Print result
 
 
 if __name__ == "__main__":  # 判断是否直接运行 / Check direct execution

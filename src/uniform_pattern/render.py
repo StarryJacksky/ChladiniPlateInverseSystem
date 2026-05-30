@@ -64,12 +64,16 @@ def _mask_centre_clamp(mask: np.ndarray, centre_clamp_radius_mm: float, plate_le
     return cleared  # 返回清理结果 / Return cleared mask
 
 
-def render_pattern_png(mode_field: np.ndarray, output_size: int = 512, line_width_px: int = 4, plate_length_mm: float = 150.0, centre_clamp_radius_mm: float = 8.0) -> Image.Image:  # 渲染节点线 PNG / Render nodal-line PNG
+def render_pattern_mask(mode_field: np.ndarray, output_size: int = 512, line_width_px: int = 4, plate_length_mm: float = 150.0, centre_clamp_radius_mm: float = 8.0) -> np.ndarray:  # 渲染为二值节点线掩膜 / Render to boolean nodal-line mask
     mask = _hi_res_nodal_mask(mode_field, int(output_size))  # 高分辨率节点线 / Hi-res nodal mask
     iterations = max(0, int(line_width_px) // 2)  # 膨胀次数 / Dilation iterations
     if iterations > 0:  # 是否膨胀 / Apply dilation?
         mask = _binary_dilate(mask, iterations)  # 加粗 / Thicken
-    mask = _mask_centre_clamp(mask, float(centre_clamp_radius_mm), float(plate_length_mm))  # 清中心 / Clear centre
+    return _mask_centre_clamp(mask, float(centre_clamp_radius_mm), float(plate_length_mm))  # 清中心 / Clear centre
+
+
+def render_pattern_png(mode_field: np.ndarray, output_size: int = 512, line_width_px: int = 4, plate_length_mm: float = 150.0, centre_clamp_radius_mm: float = 8.0) -> Image.Image:  # 渲染节点线 PNG / Render nodal-line PNG
+    mask = render_pattern_mask(mode_field, int(output_size), int(line_width_px), float(plate_length_mm), float(centre_clamp_radius_mm))  # 复用掩膜渲染 / Reuse mask renderer
     image = Image.new("L", (int(output_size), int(output_size)), color=255)  # 创建白底灰度图 / Create white grayscale image
     array = np.asarray(image).copy()  # 拷为可写数组 / Copy as writable array
     array[mask] = 0  # 节点线设为黑 / Set nodal lines to black
