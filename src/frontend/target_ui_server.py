@@ -420,7 +420,7 @@ def validate_production_payload(payload: dict, config: dict) -> dict:  # 校验�
     except ValueError:
         raise ValueError("magic_off_resonance_hz must be comma-separated numbers. / 魔法频率必须是逗号分隔的数字。")  # 解析错误 / Parse error
     if not magic_freqs:  # 至少一个 / At least one
-        magic_freqs = (165.0,)  # 默认 / Default
+        magic_freqs = (165.0,)  # 默认（CF-PETG tier1 校准值）/ Default (CF-PETG tier1 calibrated)
     candidate_id = str(payload.get("candidate_id", "production_design")).strip()  # 候选编号 / Candidate id
     if not candidate_id or any(ch in candidate_id for ch in "/\\:*?<>|\""):  # 合法字符 / Legal chars
         raise ValueError("candidate_id contains invalid characters. / 候选编号含非法字符。")  # 非法字符 / Bad chars
@@ -490,7 +490,7 @@ def run_production_pipeline_thread(config: dict, payload: dict) -> None:  # 后�
             if cancel_check():  # / Check cancel
                 raise WorkflowCancelled("Pipeline cancelled by user. / 用户已取消流水线。")  # / Cancel
             update_and_persist_workflow_state(config, event=event, stage=event.get("stage", ""), message=event.get("message", ""), result=event if event.get("stage") == "done" else workflow_snapshot().get("result"))  # / Update state
-        result = run_production_pipeline(cfg, progress=progress)  # 运行 pipeline / Run pipeline
+        result = run_production_pipeline(cfg, progress=progress, cancel_check=cancel_check)  # 运行 pipeline（带子进程级取消）/ Run pipeline (subprocess-level cancel)
         update_and_persist_workflow_state(config, running=False, cancel_requested=False, stage="done", message="Pipeline complete. / 流水线完成。", result=result, error="", current_candidate="", current_index=0, total=0)  # / Done
     except WorkflowCancelled as exc:  # 处理取消 / Handle cancel
         WORKFLOW_CANCEL_EVENT.clear()  # / Clear
@@ -505,7 +505,8 @@ def request_workflow_cancel(config: dict) -> dict:  # 请求取消工作流 / Re
     if not state.get("running"):  # 检查是否没有运行中工作流 / Check no running workflow
         raise RuntimeError("No workflow is running. / 当前没有运行中的工作流。")  # 抛出未运行错误 / Raise not-running error
     WORKFLOW_CANCEL_EVENT.set()  # 标记取消事件 / Mark cancellation event
-    update_and_persist_workflow_state(config, event={"stage": "cancelling", "message": "Cancel requested; stopping at the next safe checkpoint. / 已请求取消，将在下一个安全检查点停止。"}, cancel_requested=True, stage="cancelling", message="Cancel requested; stopping at the next safe checkpoint. / 已请求取消，将在下一个安全检查点停止。")  # 写入取消请求 / Store cancellation request
+    cancel_msg = "Cancel requested; terminating the running step (COMSOL/MATLAB killed within ~1s). / 已请求取消，正在终止当前步骤（COMSOL/MATLAB 约 1 秒内被杀）。"  # 取消提示 / Cancel message
+    update_and_persist_workflow_state(config, event={"stage": "cancelling", "message": cancel_msg}, cancel_requested=True, stage="cancelling", message=cancel_msg)  # 写入取消请求 / Store cancellation request
     return workflow_snapshot()  # 返回更新状态 / Return updated state
 
 

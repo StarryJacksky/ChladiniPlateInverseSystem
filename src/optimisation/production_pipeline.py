@@ -18,6 +18,7 @@ import itertools
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -30,6 +31,52 @@ import numpy as np
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+
+# Cooperative cancellation hook. The UI server installs a callable returning
+# True once the user clicks Stop; _run_subprocess polls it every
+# _CANCEL_POLL_INTERVAL_S so a long COMSOL/MATLAB child can be killed promptly
+# instead of forcing the user to wait for it to finish. Single-flight pipeline
+# (the server runs one job at a time) makes a module global safe here. /
+# 协作式取消钩子：UI 点 Stop 后服务器注入返回 True 的回调；_run_subprocess 每
+# _CANCEL_POLL_INTERVAL_S 轮询一次，从而能及时杀掉正在跑的 COMSOL/MATLAB 子进程，
+# 不必干等它跑完。pipeline 单飞（服务器一次只跑一个任务），用模块全局是安全的。
+_CANCEL_CHECK: Callable[[], bool] | None = None
+_CANCEL_POLL_INTERVAL_S = 0.3
+
+
+def _terminate_process_tree(proc: subprocess.Popen) -> None:
+    """Best-effort kill of a child process and everything it spawned.
+
+    The child is launched in its own process group/session (see
+    _run_subprocess), so signalling the group also reaches the MATLAB/COMSOL
+    grandchild. The independently-started mphserver daemon lives in a
+    different group and is intentionally left running. /
+    尽力杀掉子进程及其派生的整棵进程树。子进程以独立进程组启动，故对进程组
+    发信号能波及 MATLAB/COMSOL 孙进程；独立启动的常驻 mphserver 在另一个进程组，
+    刻意保留不杀。
+    """
+    if proc.poll() is not None:
+        return
+    try:
+        if os.name == "nt":
+            proc.send_signal(getattr(signal, "CTRL_BREAK_EVENT", signal.SIGTERM))
+        else:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+    try:
+        proc.wait(timeout=5.0)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        if os.name == "nt":
+            proc.kill()
+        else:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
 
 
 def _config_get(cfg: dict, key: str, default: Any) -> Any:
@@ -79,6 +126,7 @@ def build_default_pipeline_config(config_yaml_path: str | Path = "config.yaml",
         phase1_w10_topn=int(take("phase1_w10_topn", 3)),
         eig_n_modes=int(take("eig_n_modes", 30)),
         phase1_band_slack_hz=float(take("phase1_band_slack_hz", 20.0)),
+        phase1_offband_min_enrichment=float(take("phase1_offband_min_enrichment", 2.0)),
         phase2_max_iters=int(take("phase2_max_iters", 3)),
         phase2_inner_steps=int(take("phase2_inner_steps", 200)),
         phase2_lr_h_init=float(take("phase2_lr_h_init", 0.025)),
@@ -166,6 +214,20 @@ class ProductionPipelineConfig:
     # W10 设计带宽以外的 eigenmode（尤其低频"中心一坨"基频）会因 recall≈1
     # 在 IC-likeness 评分里轻易胜出，但根本和目标无关；此 slack 内才允许入选
     phase1_band_slack_hz: float = 20.0
+    # Quality escape hatch for the band gate above. A pure frequency cut also
+    # throws away genuinely good *low-order* eigenmodes — e.g. a ~64 Hz cross
+    # mode with enrichment≈6 — which is exactly what low-symmetry targets
+    # (cross / X / plus) need. Enrichment is the real discriminator: a
+    # central-blob fundamental has enrichment≈1 (no better than uniform) while
+    # a structured low mode has enrichment≫1. So an out-of-band eigenmode is
+    # still admitted *iff* its enrichment ≥ this threshold; blobs stay
+    # rejected, useful low modes get through. Set very high to restore the old
+    # hard-floor behaviour. /
+    # 频率硬门的质量旁路：纯按频率切会误杀优质低阶模态（如 ~64Hz 十字模态
+    # enr≈6），而这正是十字/叉/加号等低对称目标需要的。enrichment 才是判据：
+    # 中心一坨基频 enr≈1，结构化低频模态 enr≫1。带外模态仅当 enr≥此阈值才放行；
+    # 调到很大即恢复旧的硬下限行为
+    phase1_offband_min_enrichment: float = 2.0
 
     # Phase 2 trust-region (set max_iters=0 to skip).
     # Defaults bumped (2026-05): old (1 iter / 80 steps / freeze=60 from W10
@@ -197,19 +259,55 @@ def _emit(progress: Callable[[dict], None] | None, stage: str, message: str, **e
 
 
 def _run_subprocess(cmd: list[str], cwd: Path, label: str) -> subprocess.CompletedProcess:
+    from src.optimisation.workflow import WorkflowCancelled  # lazy import / 延迟导入，避免循环依赖
+
     env = os.environ.copy()
     existing_pythonpath = env.get("PYTHONPATH", "")
     project_path = str(cwd)
     env["PYTHONPATH"] = project_path if not existing_pythonpath else project_path + os.pathsep + existing_pythonpath
+
+    # Launch in its own process group/session so a cancel can signal the whole
+    # tree (this python child AND the MATLAB/COMSOL grandchild it spawns). /
+    # 用独立进程组/会话启动，便于取消时一次性杀掉 python 子进程及其 MATLAB/COMSOL 孙进程
+    popen_kwargs: dict[str, Any] = dict(
+        cwd=str(cwd), env=env,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    if os.name == "nt":
+        popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+    else:
+        popen_kwargs["start_new_session"] = True
+
     try:
-        res = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True, check=False, env=env)
+        proc = subprocess.Popen(cmd, **popen_kwargs)
     except FileNotFoundError as exc:
         raise FileNotFoundError(
             f"{label} could not start because the executable was not found: {cmd[0]!r}. "
             f"Full command: {' '.join(cmd)}"
         ) from exc
+
+    cancel_check = _CANCEL_CHECK
+    # Poll so a Stop click kills the child within ~_CANCEL_POLL_INTERVAL_S
+    # rather than waiting for the (minutes-long) COMSOL/MATLAB call to return. /
+    # 轮询：点 Stop 能在 ~_CANCEL_POLL_INTERVAL_S 内杀掉子进程，而不必等
+    # 长达数分钟的 COMSOL/MATLAB 调用自己返回
+    while True:
+        try:
+            stdout, stderr = proc.communicate(timeout=_CANCEL_POLL_INTERVAL_S)
+            break
+        except subprocess.TimeoutExpired:
+            if cancel_check is not None and cancel_check():
+                _terminate_process_tree(proc)
+                try:
+                    proc.communicate(timeout=5.0)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.communicate()
+                raise WorkflowCancelled(f"{label} cancelled by user. / 用户已取消（{label}）。")
+
+    res = subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
     if res.returncode != 0:
-        tail = ("\n".join(res.stdout.splitlines()[-25:]) + "\n" + "\n".join(res.stderr.splitlines()[-25:]))[-4000:]
+        tail = ("\n".join((res.stdout or "").splitlines()[-25:]) + "\n" + "\n".join((res.stderr or "").splitlines()[-25:]))[-4000:]
         raise RuntimeError(f"{label} failed (rc={res.returncode}):\n{tail}")
     return res
 
@@ -428,23 +526,50 @@ def _select_phase1_drive_freqs(rows: list[dict], cfg: ProductionPipelineConfig,
     slack = float(cfg.phase1_band_slack_hz)
     f_lo = float(cfg.w10_f_min_hz) - slack
     f_hi = float(cfg.w10_f_max_hz) + slack
-    in_band = [r for r in rows_valid if f_lo <= float(r["freq_hz"]) <= f_hi]
-    if not in_band and rows_valid:
+    offband_min_enr = float(getattr(cfg, "phase1_offband_min_enrichment", 2.0))
+
+    def _in_band(r: dict) -> bool:
+        return f_lo <= float(r["freq_hz"]) <= f_hi
+
+    # Eigenmodes eligible to become drive candidates: in-band always; an
+    # out-of-band mode only if its pattern quality (enrichment) clears
+    # ``offband_min_enr``. This keeps the band gate's intent (block low-freq
+    # central-blob fundamentals, enr≈1) while no longer discarding genuinely
+    # good low-order modes (e.g. a ~64 Hz cross mode, enr≈6) that low-symmetry
+    # targets depend on. /
+    # 可成为驱动候选的本征模态：带内全收；带外仅当 enrichment ≥ offband_min_enr
+    # 才收。既保留挡掉低频"中心一坨"基频（enr≈1）的本意，又不再误杀十字/叉这类
+    # 低对称目标依赖的优质低阶模态（如 ~64Hz 十字模态 enr≈6）
+    eligible: list[dict] = []
+    admitted_offband: list[dict] = []
+    for r in rows_valid:
+        if _in_band(r):
+            eligible.append(r)
+        elif float(r.get("enrichment", 0.0)) >= offband_min_enr:
+            eligible.append(r)
+            admitted_offband.append(r)
+
+    if not eligible and rows_valid:
         # Defensive fallback: should not happen with eig_n_modes >= 30 covering
         # the W10 band, but if it does, fall through to the legacy behaviour
         # with a loud warning so the user can investigate. /
         # 防御：30 阶 eigfreq 几乎不可能完全错过 W10 带宽；若发生则回退到全集并告警
-        rejected = sorted({round(float(r["freq_hz"]), 1) for r in rows_valid})
-        print(f"[Phase 1] WARNING: no eigenmodes within W10 design band [{f_lo:.0f},{f_hi:.0f}] Hz; "
-              f"falling back to full mode list. Eigenfreqs seen: {rejected}")
-        in_band = rows_valid
+        seen = sorted({round(float(r["freq_hz"]), 1) for r in rows_valid})
+        print(f"[Phase 1] WARNING: no eligible eigenmodes (band [{f_lo:.0f},{f_hi:.0f}] Hz, "
+              f"off-band enr≥{offband_min_enr}); falling back to full mode list. Eigenfreqs seen: {seen}")
+        eligible = rows_valid
     else:
-        out_of_band = sorted({round(float(r["freq_hz"]), 1) for r in rows_valid if r not in in_band})
-        if out_of_band:
-            print(f"[Phase 1] rejecting {len(out_of_band)} eigenmodes outside W10 band "
-                  f"[{f_lo:.0f},{f_hi:.0f}] Hz: {out_of_band[:6]}{'…' if len(out_of_band) > 6 else ''}")
-    in_band.sort(key=lambda r: -r["ic_score"])
-    top_rows = in_band[:cfg.phase1_top_k_modes]
+        if admitted_offband:
+            adm = sorted({round(float(r["freq_hz"]), 1) for r in admitted_offband})
+            print(f"[Phase 1] admitting {len(adm)} high-enrichment out-of-band eigenmode(s) "
+                  f"(enr≥{offband_min_enr}): {adm}")
+        rejected = sorted({round(float(r["freq_hz"]), 1) for r in rows_valid if r not in eligible})
+        if rejected:
+            print(f"[Phase 1] rejecting {len(rejected)} low-quality out-of-band eigenmode(s): "
+                  f"{rejected[:6]}{'…' if len(rejected) > 6 else ''}")
+
+    eligible.sort(key=lambda r: -r["ic_score"])
+    top_rows = eligible[:cfg.phase1_top_k_modes]
     drive = [r["freq_hz"] + cfg.phase1_off_resonance_hz for r in top_rows]
 
     # P1 bridge: add W10-trained frequencies (top-N by weight). /
@@ -600,6 +725,24 @@ def _evaluate_design(cfg: ProductionPipelineConfig, project_root: Path, candidat
     best = records[0]
     best_amp = _composite([amps[l] for l in best["subset"]], best["method"])
 
+    # Best SINGLE drive frequency. The MAX/SUM/RMS composite maximises broad
+    # enrichment, which rewards a compact high-contrast central blob and tends
+    # to smear distinct single-frequency figures (e.g. a clean cross at one
+    # eigenfrequency) into that blob. A single pure tone usually preserves the
+    # recognisable nodal figure, so we surface it alongside the composite.
+    # Ranked by IC-likeness (broad enrich × broad recall) rather than pure
+    # enrichment so a full-coverage cross beats a tiny over-concentrated dot. /
+    # 最佳"单频"驱动：MAX/SUM/RMS 合成最大化 broad 富集，会偏向中心一坨、把单频
+    # 本来干净的图案（如某个本征频率上的十字）糊掉。单一纯音通常能保住可辨认的
+    # 节线图案，故与合成图并列展示。按 IC-likeness(broad 富集×召回)排序而非纯富集，
+    # 让覆盖完整的十字胜过过度集中的小亮点
+    singles = [r for r in records if len(r["subset"]) == 1]
+    best_single = None
+    best_single_amp = None
+    if singles:
+        best_single = max(singles, key=lambda r: r["broad"]["enrich"] * r["broad"]["recall"])
+        best_single_amp = amps[best_single["subset"][0]]
+
     return {
         "candidate_id": candidate_id,
         "eig_dir": str(eig_dir),
@@ -609,8 +752,53 @@ def _evaluate_design(cfg: ProductionPipelineConfig, project_root: Path, candidat
         "per_freq": per_freq,
         "best_composite": best,
         "best_composite_amp": best_amp,
+        "best_single": best_single,
+        "best_single_amp": best_single_amp,
+        "single_freq_amps": amps,
         "top10_composites": [{k: v for k, v in r.items() if k != "best_composite_amp"} for r in records[:10]],
     }
+
+
+def _save_single_freq_gallery(amps: dict[str, np.ndarray], target: np.ndarray,
+                                per_freq: dict, composite_amp: np.ndarray, out_png: Path) -> None:
+    """Save a browsable gallery of every single-frequency powder figure plus the
+    composite, next to the target.
+
+    Rationale: no scalar score (enrichment / recall / IoU) reliably picks the
+    *most recognisable* figure — a compact central blob always out-scores a
+    spread-out cross. So instead of trusting a metric, we lay out all single
+    frequencies for the human eye to pick the recognisable one. /
+    存一张可浏览的图廊：所有单频 powder + 合成 + 目标。没有任何标量分数能可靠选出
+    "最像目标"的图（中心一坨总比铺开的十字分高），故全摆出来让人眼挑
+    """
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception:
+        return
+    items = sorted(amps.items(), key=lambda kv: float(kv[0]))
+    n = len(items) + 2  # + target + composite
+    cols = 4
+    rows = (n + cols - 1) // cols
+    fig, ax = plt.subplots(rows, cols, figsize=(cols * 3.0, rows * 3.0))
+    ax = np.atleast_1d(ax).ravel()
+    ax[0].imshow(target.astype(float), cmap="gray_r"); ax[0].set_title("TARGET"); ax[0].axis("off")
+    cpw = (composite_amp <= np.percentile(composite_amp, 12)).astype(float)
+    ax[1].imshow(cpw, cmap="gray_r"); ax[1].set_title("MAX composite"); ax[1].axis("off")
+    for i, (label, amp) in enumerate(items):
+        pw = (amp <= np.percentile(amp, 12)).astype(float)
+        b = per_freq.get(label, {}).get("broad", {})
+        title = f"{label}Hz"
+        if b:
+            title += f"\nenr={b.get('enrich', 0):.1f} rec={b.get('recall', 0):.2f}"
+        ax[i + 2].imshow(pw, cmap="gray_r"); ax[i + 2].set_title(title, fontsize=8); ax[i + 2].axis("off")
+    for j in range(n, len(ax)):
+        ax[j].axis("off")
+    fig.tight_layout()
+    out_png.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_png, dpi=85)
+    plt.close(fig)
 
 
 def _to_native(o: Any) -> Any:
@@ -628,9 +816,19 @@ def _to_native(o: Any) -> Any:
 
 
 def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | None = None,
-                              progress: Callable[[dict], None] | None = None) -> dict:
-    """End-to-end inverse design pipeline. Returns deliverables dict."""
+                              progress: Callable[[dict], None] | None = None,
+                              cancel_check: Callable[[], bool] | None = None) -> dict:
+    """End-to-end inverse design pipeline. Returns deliverables dict.
+
+    ``cancel_check`` (optional) is polled by the heavy COMSOL/MATLAB
+    subprocess launcher so a UI Stop click can kill the running child
+    promptly instead of waiting for the current stage to finish. /
+    ``cancel_check`` 由重型 COMSOL/MATLAB 子进程启动器轮询，使 UI 点 Stop
+    能及时杀掉正在跑的子进程，而非等当前阶段跑完。
+    """
     project_root = project_root or PROJECT_ROOT
+    global _CANCEL_CHECK
+    _CANCEL_CHECK = cancel_check  # install for _run_subprocess; next run overwrites / 注入供 _run_subprocess 使用，下次运行会覆盖
     from src.config import load_config
 
     config = load_config(str(project_root / "config.yaml"))
@@ -705,6 +903,28 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
     from src.scoring.recognisability_score import chladni_powder_density
     np.save(output_dir / "phase1_best_powder_broad.npy", chladni_powder_density(p1_result["best_composite_amp"], sigma_rel=0.05))
     np.save(output_dir / "phase1_best_powder_sharp.npy", chladni_powder_density(p1_result["best_composite_amp"], sigma_rel=0.025))
+    # Best single-frequency figure (heuristic pick; see gallery for the full
+    # set — a single scalar can't reliably identify the most recognisable one). /
+    # 最佳单频图（启发式挑选；可靠判断请看图廊——单一标量分数选不准最可辨认的那张）
+    if p1_result.get("best_single_amp") is not None:
+        bs_amp = p1_result["best_single_amp"]
+        np.save(output_dir / "phase1_best_single_amp.npy", bs_amp)
+        np.save(output_dir / "phase1_best_single_powder_broad.npy", chladni_powder_density(bs_amp, sigma_rel=0.05))
+        np.save(output_dir / "phase1_best_single_powder_sharp.npy", chladni_powder_density(bs_amp, sigma_rel=0.025))
+        bs = p1_result["best_single"]
+        _emit(progress, "phase1_best_single",
+              f"Best single drive (heuristic) {bs['subset'][0]}Hz: broad enr={bs['broad']['enrich']:.2f}× rec={bs['broad']['recall']:.2f}; "
+              f"see phase1_single_freq_gallery.png to eyeball all single tones",
+              best_single=bs)
+
+    # Browsable gallery of all single-frequency figures (metric-free; for eyes). /
+    # 全部单频图廊（不靠指标，给人眼挑）
+    try:
+        _save_single_freq_gallery(
+            p1_result.get("single_freq_amps", {}), target, p1_result.get("per_freq", {}),
+            p1_result["best_composite_amp"], output_dir / "phase1_single_freq_gallery.png")
+    except Exception as exc:
+        print(f"[Phase 1] gallery render skipped: {exc}")
 
     final = {
         "candidate_id": cfg.candidate_id,
@@ -713,7 +933,8 @@ def run_production_pipeline(cfg: ProductionPipelineConfig, project_root: Path | 
         "shear_ratio": cfg.shear_ratio,
         "stage_reached": "phase1",
         "surrogate_metrics": surr_metrics,
-        "phase1": {k: v for k, v in p1_result.items() if k != "best_composite_amp"},
+        "phase1": {k: v for k, v in p1_result.items()
+                   if k not in ("best_composite_amp", "best_single_amp", "single_freq_amps")},
         "wallclock_seconds": {"surrogate": elapsed_surr, "phase1": elapsed_p1},
     }
 

@@ -3543,7 +3543,28 @@
       stiffnessRatioInput.value = formatMaterialValue(material.stiffness_ratio ?? 1.05);
       // 前端逻辑 / Frontend logic
       shearRatioInput.value = formatMaterialValue(material.shear_ratio ?? 1.0);
+      // 同步到 Run 面板，避免两套 sr/shear 漂移导致材料错配 / Mirror into Run panel so the two sr/shear sets can't drift and mismatch the material
+      syncRunPanelFromMaterialPanel();
     // 前端逻辑 / Frontend logic
+    }
+
+    // Keep the production Run panel's anisotropy inputs in lockstep with the
+    // Material panel. They used to be independent (Run panel hard-coded to
+    // sr=3.0), so changing material without also touching the Run panel
+    // silently ran a mismatched material (e.g. PLA modulus + CF-PETG sr).
+    // Uses getElementById so it is safe to call before the prod-panel consts
+    // are declared. /
+    // 让 Run 面板的各向异性输入始终跟随 Material 面板。两者原本独立（Run 面板写死
+    // sr=3.0），改材料却没动 Run 面板就会静默跑错配材料（如 PLA 模量 + CF-PETG sr）。
+    // 用 getElementById，故在 prod 面板常量声明前调用也安全
+    function syncRunPanelFromMaterialPanel() {
+      const sEl = document.getElementById("prodStiffnessRatioInput");
+      const hEl = document.getElementById("prodShearRatioInput");
+      if (!sEl || !hEl) return;
+      const sr = Number(stiffnessRatioInput.value);
+      const shear = Number(shearRatioInput.value);
+      if (Number.isFinite(sr)) sEl.value = formatMaterialValue(sr);
+      if (Number.isFinite(shear)) hEl.value = formatMaterialValue(shear);
     }
 
     // 前端逻辑 / Frontend logic
@@ -7068,6 +7089,8 @@
     scoringPresetSelect.addEventListener("change", () => applyScoringPreset(scoringPresetSelect.value));
     // 前端逻辑 / Frontend logic
     [densityInput, youngInput, poissonInput, thermalConductivityInput, heatCapacityInput, thermalExpansionInput, stiffnessRatioInput, shearRatioInput, roughnessWeightInput, massWeightInput, frequencyWeightInput, frequencyMinInput, frequencyMaxInput].forEach((input) => input.addEventListener("input", renderTuneOverview));
+    // 手动编辑材料各向异性时，实时同步到 Run 面板 / Mirror manual material-panel anisotropy edits into the Run panel in real time
+    [stiffnessRatioInput, shearRatioInput].forEach((input) => input.addEventListener("input", syncRunPanelFromMaterialPanel));
     // 前端逻辑 / Frontend logic
     saveButton.addEventListener("click", saveTarget);
     // 前端逻辑 / Frontend logic

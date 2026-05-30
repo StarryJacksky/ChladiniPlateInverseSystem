@@ -28,25 +28,29 @@ design_variables:
 
 # 材料参数 / Material parameters
 material:
-  # 默认材料 = FDM PLA（学校打印机常备）。θ 优化已移除后各向异性不再带来增益，
-  # 故默认改用工程上最易制造的 PLA，省去每次手动切换。/ Default = FDM PLA (common
-  # school printer filament). With θ optimisation removed, anisotropy no longer
-  # helps, so default to the easiest-to-manufacture PLA preset. Matches the
-  # frontend "PLA — FDM layered" preset (pla_fdm).
-  density_kg_m3: 1240 # 密度 / Density
-  poisson_ratio: 0.36 # 泊松比 / Poisson ratio
-  youngs_modulus_pa: 2900000000 # 杨氏模量 / Young's modulus
-  thermal_conductivity_w_mk: 0.13 # 导热系数 / Thermal conductivity
-  heat_capacity_j_kgk: 1800 # 定压热容 / Heat capacity
-  thermal_expansion_1_k: 0.00007 # 热膨胀系数 / Thermal expansion coefficient
+  # 默认材料 = FDM CF-PETG (tier1, sr=2.8)。实测发现：各向异性 sr 对图案质量至关重要
+  # —— 同一十字目标，CF-PETG(sr=3) COMSOL broad enr≈9.8，而准各向同性 PLA(sr=1.45) 只有
+  # ≈4.6，且 PLA 单频只出中心一坨、CF-PETG 单频能出近似十字。注意区分：被移除的是「θ 逐格
+  # 角度优化」(寄生)，而「材料各向异性 sr」本身有用，故默认回到 CF-PETG。匹配前端预设
+  # cf_petg_t1。/ Default = FDM CF-PETG (tier1). Empirically the anisotropy ratio sr is
+  # essential to pattern quality: on the same cross target CF-PETG(sr≈3) gives COMSOL
+  # broad enr≈9.8 vs ≈4.6 for near-isotropic PLA(sr=1.45). What was removed is per-cell
+  # θ-ANGLE optimisation (parasitic); the material's sr anisotropy itself helps, so the
+  # default reverts to CF-PETG. Matches frontend preset cf_petg_t1.
+  density_kg_m3: 1300 # 密度 / Density
+  poisson_ratio: 0.38 # 泊松比 / Poisson ratio
+  youngs_modulus_pa: 3700000000 # 杨氏模量 / Young's modulus
+  thermal_conductivity_w_mk: 0.25 # 导热系数 / Thermal conductivity
+  heat_capacity_j_kgk: 1400 # 定压热容 / Heat capacity
+  thermal_expansion_1_k: 0.00005 # 热膨胀系数 / Thermal expansion coefficient
   # 正交各向异性参数 / Orthotropic anisotropy
   # 材料档位参考 / Material tier reference:
   #   tier0 (SLA grey resin)   : sr ≈ 1.05, near-isotropic
-  #   FDM PLA (current default) : sr ≈ 1.45 — 学校常备、易制造 / common & easy to print
-  #   tier1 (FDM CF-PETG)      : sr ≈ 2.8-3.0 — 各向异性，θ 移除后无额外增益 / no extra gain after θ removal
+  #   FDM PLA                  : sr ≈ 1.45 — 学校常备但准各向同性，图案质量明显更差 / common but near-isotropic, worse patterns
+  #   tier1 (FDM CF-PETG, 默认) : sr ≈ 2.8-3.0 — 各向异性，magic 165 即按此档校准 / anisotropic, magic 165 calibrated here
   #   tier2 (Continuous CF)    : sr ≈ 12.0 — surrogate 上限，工程难制造 / surrogate ceiling, hard to manufacture
-  stiffness_ratio: 1.45 # E_||/E_⊥（沿主刚度方向 vs 垂直），1.0 = 各向同性 / E_||/E_perp, 1.0 = isotropic
-  shear_ratio: 0.85 # G_pp / G_iso 剪切模量相对各向同性比 / Shear modulus ratio vs isotropic
+  stiffness_ratio: 2.80 # E_||/E_⊥（沿主刚度方向 vs 垂直），1.0 = 各向同性 / E_||/E_perp, 1.0 = isotropic
+  shear_ratio: 0.75 # G_pp / G_iso 剪切模量相对各向同性比 / Shear modulus ratio vs isotropic
 
 # 生产 pipeline 配置 / Production pipeline configuration
 # 经过 350+ 次实验后验证的最佳路径：W10 surrogate → COMSOL eigfreq → Phase 1 IC-likeness → Phase 2 trust-region
@@ -69,11 +73,12 @@ production:
   phase2_score_mode: composite # composite (enr·√rec, 防塌陷) | enrich_only (legacy) / Phase 2 acceptance score mode
   phase1_top_k_modes: 6 # IC-likeness 选 top-K 模态 / Top-K IC-likeness modes
   phase1_off_resonance_hz: 1.5 # 偏离本征频率的驱动偏移 / Off-resonance offset
-  magic_off_resonance_hz: [165.0] # tier1 经验发现的 magic 频率（探索新材料请重新扫频或关闭 enable_magic_freqs） / tier1 empirically-discovered magic freq
+  magic_off_resonance_hz: [165.0] # CF-PETG tier1(sr≈3) 经验 magic 频率；battery 实测它能把十字打出来。换材料/目标请用前端"Pre-sweep magic freqs"重扫或关 enable_magic_freqs / tier1 CF-PETG magic freq (battery confirmed it yields the cross); re-sweep for other materials/targets or disable
   enable_magic_freqs: true # 是否把 magic 加入 Phase 1 drive；非 tier1 材料建议改 false / Whether to include magic freqs in P1 drive list
   phase1_w10_topn: 3 # Phase 1 drive 列表里追加 W10 训练频率的 top-N（按 W10 权重排序）；0 关闭 / Include top-N W10-trained freqs in P1 drive list (sorted by W10 weight)
   eig_n_modes: 30 # COMSOL eigenfreq 求解阶数 / COMSOL eigenfrequency modes
   phase1_band_slack_hz: 20.0 # Phase 1 选频允许超出 W10 设计带宽的 slack；防止低频"中心一坨"基频混进 drive 列表 / Slack for Phase 1 in-band gate (rejects out-of-band fundamentals like 72 Hz central blobs)
+  phase1_offband_min_enrichment: 2.0 # 带外本征模态的质量旁路：enrichment≥此值才放行（放行十字/叉的优质低频模态 enr≈6，仍挡掉中心一坨 enr≈1）；调到很大=恢复旧硬下限 / Quality escape hatch: admit out-of-band eigenmodes only if enrichment ≥ this (lets in good low-order cross/X modes, still blocks central-blob fundamentals); set huge to restore hard floor
   phase2_max_iters: 3 # 信任域外层迭代数（0 = 跳过 Phase 2；旧默认 1 实质 delta=0） / Trust-region outer iters (was 1, raised so P2 can actually escape the P1 basin)
   phase2_inner_steps: 200 # 每次 Phase 2 内层 W10 步数（旧默认 80 太短） / Inner W10 steps per Phase 2 iter (was 80)
   phase2_lr_h_init: 0.025 # / Trust-region H LR initial

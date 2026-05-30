@@ -88,9 +88,16 @@ def main() -> int:
         print(f"  Surrogate enrichment: {sm.get('enrichment', 0):.2f}×")
     else:
         p1 = result["phase1"]["best_composite"]
-        print(f"  Phase 1 best: {p1['method']}({'+'.join(p1['subset'])})")
+        print(f"  Phase 1 best composite: {p1['method']}({'+'.join(p1['subset'])})")
         print(f"    broad enr={p1['broad']['enrich']:.2f}× rec={p1['broad']['recall']:.2f}")
         print(f"    tight enr={p1['tight']['enrich']:.2f}× rec={p1['tight']['recall']:.2f}")
+        bs = result["phase1"].get("best_single")
+        if bs:
+            print(f"  Phase 1 best SINGLE freq (heuristic): {bs['subset'][0]}Hz")
+            print(f"    broad enr={bs['broad']['enrich']:.2f}× rec={bs['broad']['recall']:.2f}")
+            print(f"    tight enr={bs['tight']['enrich']:.2f}× rec={bs['tight']['recall']:.2f}")
+            print(f"    NOTE: a scalar score can't pick the most recognisable tone —")
+            print(f"          eyeball all single frequencies in phase1_single_freq_gallery.png")
         if "phase2" in result:
             p2 = result["phase2"]
             print(f"  Phase 2: best iter {p2['best_iter']} → score {p2.get('best_score', 0):.3f} "
