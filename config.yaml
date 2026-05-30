@@ -65,8 +65,10 @@ material:
 # Validated path after 350+ experiments: W10 surrogate → COMSOL eigfreq → Phase 1 → Phase 2.
 production:
   default_candidate_id: "production_design" # 默认候选编号 / Default candidate id
-  stiffness_ratio: 3.0 # tier1 CF-PETG，泛化最好 / tier1 CF-PETG, best generalisation
-  shear_ratio: 1.0 # / Default shear
+  # 各向异性 sr/shear 统一由上面的 material: 段定义（此处不再重复，避免覆盖所选材料）。
+  # 仍可用 production.stiffness_ratio 或 CLI --stiffness-ratio 临时覆盖。/ Anisotropy is
+  # defined once in material: above; not duplicated here so it can't silently override the
+  # chosen material. A production.stiffness_ratio key or CLI flag can still override.
   w10_num_steps: 300 # surrogate Adam 步数 / Surrogate Adam steps
   w10_lr_h: 0.05 # H 学习率 / H learning rate
   w10_num_frequencies: 6 # 联合频率数 K / Joint frequency count K (theta optimisation removed 2026-05; see BATTERY_FINDINGS.md)

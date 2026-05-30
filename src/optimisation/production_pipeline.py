@@ -91,6 +91,7 @@ def build_default_pipeline_config(config_yaml_path: str | Path = "config.yaml",
 
     config = load_config(str(config_yaml_path))
     overrides = overrides or {}
+    material = config.get("material", {}) or {}
 
     def take(key: str, default: Any) -> Any:
         if key in overrides:
@@ -105,8 +106,14 @@ def build_default_pipeline_config(config_yaml_path: str | Path = "config.yaml",
 
     return ProductionPipelineConfig(
         candidate_id=str(take("default_candidate_id", "production_design")),
-        stiffness_ratio=float(take("stiffness_ratio", 3.0)),
-        shear_ratio=float(take("shear_ratio", 1.0)),
+        # Material anisotropy lives in config.yaml `material:`; allow a
+        # `production:` key or explicit override to win, else fall back to the
+        # material section (NOT a hard-coded 3.0 that silently ignores the
+        # chosen material). /
+        # 各向异性定义在 material: 段；production 覆盖或显式 override 优先，
+        # 否则回落到 material（而非硬编码 3.0 把所选材料悄悄忽略）
+        stiffness_ratio=float(take("stiffness_ratio", material.get("stiffness_ratio", 3.0))),
+        shear_ratio=float(take("shear_ratio", material.get("shear_ratio", 1.0))),
         w10_num_steps=int(take("w10_num_steps", 300)),
         w10_lr_h=float(take("w10_lr_h", 0.05)),
         w10_num_frequencies=int(take("w10_num_frequencies", 6)),
