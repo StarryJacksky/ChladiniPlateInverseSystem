@@ -1,0 +1,691 @@
+%==============================================================================
+%  Chladni 板逆向设计 ------ 学术论文（中文）
+%  编译： xelatex chladni_paper_zh.tex （连续编译两遍以解析引用编号）
+%
+%  中文支持说明：
+%   本文用 XeLaTeX 编译。下面的 preamble 会自动检测系统是否安装了 ctex：
+%     - 标准 TeX Live / MacTeX：直接 \usepackage{ctex}，并自动选用系统中文字体
+%       （macOS 通常为 Songti SC；Windows 为 SimSun；Linux 为 Noto/思源宋体）。
+%     - 若未安装 ctex：回退到 xeCJK + 随附的最小 ctexhook.sty + 一个可用 CJK 字体
+%       （此处默认 Droid Sans Fallback，可按需改为本机已装的中文字体）。
+%   实验部分按要求暂时留空（仅保留小节骨架）。
+%==============================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{bm}
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{xcolor}
+
+% ---- 中文支持：ctex 优先，xeCJK + shim 回退 ----
+\usepackage{fontspec}
+\IfFileExists{ctex.sty}
+  {\usepackage[fontset=none]{ctex}%
+   \IfFontExistsTF{Songti SC}{\setCJKmainfont{Songti SC}}
+     {\IfFontExistsTF{SimSun}{\setCJKmainfont{SimSun}}
+       {\IfFontExistsTF{Noto Serif CJK SC}{\setCJKmainfont{Noto Serif CJK SC}}
+         {\setCJKmainfont{Droid Sans Fallback}}}}}
+  {\usepackage{xeCJK}%
+   \setCJKmainfont{Droid Sans Fallback}[AutoFakeBold=2.2,AutoFakeSlant=0.15]}
+
+\providecommand{\IfFontExistsTF}[3]{#3} % 安全兜底（ctex 缺失时不需要）
+
+\usepackage[hidelinks,breaklinks]{hyperref}
+\usepackage{titlesec}
+\titleformat{\section}{\normalfont\large\bfseries}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\setlist{itemsep=2pt,topsep=3pt,parsep=0pt}
+
+\newcommand{\Aone}{A_1}
+\newcommand{\Dfour}{D_4}
+\newcommand{\matH}{\mathbf{H}}
+\newcommand{\matK}{\mathbf{K}}
+\newcommand{\matM}{\mathbf{M}}
+
+\title{\bfseries 中心激振 Chladni 板图案逆向设计的物理可达性边界：\\[2pt]
+\large 一个对称性约束下"可微代理 $\to$ 有限元"框架及其可制造化输出}
+
+\author{%
+Chladni 板逆向设计团队\\
+\small 帝国理工学院（Imperial College London）物理系\\
+\small 本科一年级 {\textperiodcentered} Term 3 暑期项目\\
+\small 代码仓库：\texttt{ChladiniPlateInverseSystem}}
+
+\date{2026 年 5 月 31 日}
+
+\begin{document}
+\maketitle
+
+%------------------------------------------------------------------ 摘要
+\begin{abstract}
+\noindent
+本文研究一个经典而苛刻的逆问题：给定一个目标图案，反求一块板（一个空间分布的厚度场，
+以及可选的逐格纤维取向）连同一组驱动频率，使其 Chladni 沙图近似该目标。问题被置于一套
+固定且不可更改的硬件约束之下：$150\,\text{mm}$ 见方的方板、由 $15\times15$ 厚度网格离散、
+半径 $8\,\text{mm}$ 的中心夹持、四边自由，以及一个\emph{单一}的中心点激振配合扫频；高保真
+有限元模型（COMSOL Multiphysics 与 LiveLink\texttrademark{} for MATLAB）作为主要的真值来源。
+经历三个算法时代、约二十条算法路线与数百个有限元候选，我们得到四条核心且大多反直觉的结论。
+其一，任意客制化图案的逆向是\emph{物理上不可能}的，而非工程上不努力：该构型的二面体对称群
+$\Dfour$ 迫使中心点激振只能耦合到 $\Aone$ 不可约表示，因此目标落在 $\Aone$ 上的能量占比构成
+一个硬性的可达性上限。其二，材料各向异性（纤维取向 $\theta$）在工作频段内几乎是惰性的，因为
+惯性项以若干数量级压倒刚度项，而 $\theta$ 只通过刚度进入物理。其三，可微薄板代理与厚板有限元
+模型之间的差距，是占主导地位的实际天花板，且它是一种系统性的物理差异而非数值噪声。其四，因此
+诚实的交付物不是"任意逆向"，而是一套可复现、可制造的\emph{系统}：把可微代理用作指南针，一条
+两阶段的有限元生产管线（模态选择 + 信赖域精修），以及一个可直接 3D 打印的导出。本文完整给出
+理论与方法；定量的实验验证另行报告，相应章节在此按要求留空为骨架。
+
+\medskip
+\noindent\textbf{关键词：}Chladni 沙图；逆向设计；结构动力学；薄板振动；二面体对称；不可约表示；
+可微代理；拓扑/厚度优化；有限元验证；增材制造。
+\end{abstract}
+
+%------------------------------------------------------------------ 1
+\section{引言}
+
+\subsection{背景与动机}
+Chladni 沙图是细粉在振动板上勾勒出的图案：粉末远离反节点、聚集在面外位移最小的节线上，从而把一个
+本征模态变成肉眼可见的图样~\cite{chladni1787,waller1939}。\emph{正}问题------由板几何、材料与驱动
+频率预测节线图案------原则上是线性结构动力学的标准练习。本文考虑的\emph{逆}问题要难得多：\emph{给定
+一个期望的目标图案，反求一块板的设计与一个驱动频率，使其 Chladni 图案重现该目标。}这一类逆向设计
+处在结构动力学本征值布置、形状/拓扑优化与可制造性的交汇处，也是研究"一条纯计算管线在面对一块真正
+固定的硬件时究竟能被推到多远"的理想载体。
+
+\subsection{问题陈述}
+我们固定一块在中心被单点激振的方板，问：通过空间地改变板厚（以及作为诱人额外自由度的、3D 打印件的
+局部纤维取向），并选择一个或多个扫频频率，所得节线图案能否被做成近似任意目标------例如字母对、十字、
+对角线或圆环？这些约束（见第~\ref{sec:contract} 节）在整个研究周期内不可更改；每一个算法都必须
+\emph{围绕}它们来设计，而不是放松它们。
+
+\subsection{贡献与中心论点}
+我们的中心论点是：此类研究最有价值的产出，并不是证明"任意图案都能产生"------我们将表明那在物理上并不
+存在------而是精确刻画\emph{可达性边界在哪里、为什么在那里，以及如何把贴着边界的最优解工程化为可交付的
+产品。}具体而言，本文贡献如下：
+\begin{enumerate}[label=（\arabic*）]
+\item 一套\textbf{基于对称性的可达性理论}，识别出二面体群 $\Dfour$ 的 $\Aone$ 不可约表示是中心点
+激振唯一能激发的通道，由此给出一个闭式的、与目标相关的可达上限（第~\ref{sec:theory} 节）；
+\item 一份\textbf{各向异性的尺度分析}，表明纤维取向 $\theta$ 在工作频段是一个寄生自由度，其质量
+--刚度尺度分离达若干数量级，使其敏感度可忽略（第~\ref{sec:aniso} 节）；
+\item 一个带伴随/自动微分灵敏度的\textbf{可微正交各向异性板代理}，并明确地把它定位为"指南针，而非
+裁判"（第~\ref{sec:surrogate} 节）；
+\item 一个植根于真实撒粉沉积物理、而非像素重叠的\textbf{可识别度指标}（第~\ref{sec:metric} 节）；
+\item 一条显式管理代理--有限元差距的\textbf{两阶段有限元生产管线}（模态选择 + 信赖域精修，
+第~\ref{sec:pipeline} 节）；以及
+\item 一个把设计变成可打印零件的\textbf{可制造导出与软件系统}（第~\ref{sec:software} 节）。
+\end{enumerate}
+全文采用一种刻意诚实的项目报告语气：负面结果、被撤回的假设以及方法论上的失误，都作为一等的发现被
+报告，因为在一个固定硬件的逆问题中，它们与任何正面结果一样，能同样锐利地划定可行域。
+
+\subsection{组织结构}
+第~\ref{sec:related} 节回顾直接可比的前人工作；第~\ref{sec:contract} 节形式化问题与硬件约束；
+第~\ref{sec:theory} 节发展对称性天花板；第~\ref{sec:method} 节给出完整方法（代理、各向异性分析、
+指标、管线、导出、软件）；第~\ref{sec:experiments} 节是实验章节，按要求留空为骨架；
+第~\ref{sec:discussion} 节讨论由此得到的教训；第~\ref{sec:limits} 节陈述局限与未来工作；
+第~\ref{sec:conclusion} 节作结。
+
+%------------------------------------------------------------------ 2
+\section{相关工作}\label{sec:related}
+
+\paragraph{Chladni / 模态图案的拓扑优化。}
+最直接可比的前人工作是 2024 年关于"面向振动模态可操控性的 Chladni 图案拓扑优化设计"的
+研究~\cite{acta2024}，它采用基于密度的拓扑优化（SIMP），以"计算所得本征向量与目标 Chladni 图案
+之间误差最小"为目标，逆向设计材料分布以定制单阶与多阶图案。其本征向量误差目标与我们自身评分体系的
+演进同源，其 SIMP 密度变量在思路上也与我们的密度/厚度场相近。关键差别在于，它\emph{并不}受
+"单中心激振 $+\ \Dfour$ 对称"约束------这正是我们 $\Aone$ 天花板的来源------因此其可达图样空间本质上更大。
+模态定向 SIMP 的方法学谱系可上溯到谐振结构的拓扑优化~\cite{tcherniak2002}，并更广泛地立足于本征值
+拓扑优化~\cite{pedersen2000,achtziger2007} 与经典的密度法框架~\cite{bendsoe1989,bendsoe1999,bendsoe2003}。
+
+\paragraph{能量地形表述。}
+一条开源工作把 Chladni 逆向设计表述为"能量地形"问题，将模态平方的非负叠加
+$E(x,y)=\sum_k b_k\,\varphi_k(x,y)^2$ 朝目标塑形~\cite{bellette}。这与我们的振幅谷损失一致，并独立
+印证了一种结构性偏好：模态平方的非负叠加偏爱方块、条带、网格、十字与大连通字形，而排斥细小、分离的
+特征------该偏好与我们的对称性分析及撒粉物理所预测的高度一致。
+
+\paragraph{结构化板中的 cymatics 与波控制。}
+通过板微结构重塑弯曲波场与节线，已在弯曲波隐身的语境中被展示~\cite{misseroni2016}；而强迫响应的
+Chladni 图案则被与一个非齐次 Helmholtz 方程的最大熵态相联系~\cite{tuanchen}------二者都为我们在
+第~\ref{sec:gap} 节重提的"强迫响应 vs 自由振动"之分提供了背景。
+
+\paragraph{硬件驱动的控制。}
+最后，对 Chladni 板上颗粒的多激振器主动控制~\cite{zhou2016} 表明，真正打破对称性天花板需要作用于
+\emph{硬件}------增加激振器或偏心激振------这一结论恰与我们从相反方向得到的理论相印证，并框定了我们对未来
+工作的建议。Level-set 形状优化~\cite{allaire2004} 作为一种我们未采用的几何表示被列出以备对照；本文
+更倾向于密度/厚度场表示。
+
+%------------------------------------------------------------------ 3
+\section{问题形式化与硬件约束}\label{sec:contract}
+
+\subsection{正问题模型}
+设 $\Omega=[0,L]^2$ 为一块厚度空间变化 $h(\bm{x})$ 的薄板中面，在中心小圆盘上被夹持、四边自由。
+在 Kirchhoff--Love 薄板假设下，自由振动本征问题是如下双调和型广义问题
+\begin{equation}
+\matK(\bm{h})\,\bm{\phi}_i \;=\; \omega_i^2\,\matM(\bm{h})\,\bm{\phi}_i,
+\label{eq:eig}
+\end{equation}
+其中 $\matK$、$\matM$ 为（离散后的）刚度与质量算子，$\omega_i$ 为本征角频率，$\bm{\phi}_i$ 为
+模态振型。高保真描述则通过 Mindlin--Reissner 厚板理论~\cite{reissner1945,mindlin1951} 保留横向
+剪切，这正是有限元求解器内部所用的模型。在角频率 $\omega$、载荷向量 $\bm{f}$ 的稳态单点谐波激励下，
+强迫响应为
+\begin{equation}
+\bm{u}(\omega)=\big(\matK-\omega^2\matM + \mathrm{i}\,\omega\,\mathbf{C}\big)^{-1}\bm{f},
+\label{eq:forced}
+\end{equation}
+其中 $\mathbf{C}$ 为阻尼算子。Chladni 图案即 $|\bm{u}|$ 取小的轨迹：粉末沉积在面外振幅最小处，我们
+用一个把质量集中到节线上的撒粉密度泛函来建模（见第~\ref{sec:metric} 节）。
+
+\subsection{逆问题}
+逆问题寻求使所沉积图案近似目标图像 $T$ 的设计变量。主设计变量是离散在指定网格上的厚度场，
+\begin{equation}
+\matH=\{h_{mn}\}_{m,n=1}^{15}\in\mathbb{R}^{15\times15},
+\end{equation}
+可选地再以逐格纤维取向场 $\bm{\theta}$、以及一小组 $K$ 个驱动频率 $\{\omega_k\}$ 及其权重
+$\{w_k\}$ 增广。目标函数是第~\ref{sec:metric} 节定义的可识别度泛函 $\mathcal{R}(\,\cdot\,;T)$。
+
+\subsection{不可变硬件约束}
+表~\ref{tab:contract} 列出在整个研究中保持固定、并界定问题物理上限的约束。
+
+\begin{table}[h]
+\centering
+\caption{不可变硬件约束。所有算法都围绕它们设计。}
+\label{tab:contract}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+项 & 值 & 来源 \\
+\midrule
+设计网格   & $15\times15$ 厚度场                 & 有限元 \texttt{H.csv} 合同 \\
+板尺寸     & $150\,\text{mm}\times150\,\text{mm}$ & 一体化打印边界 \\
+中心夹持   & 半径 $8\,\text{mm}$ 圆域            & 标准实验装置 \\
+边界       & 四边自由                            & 自由振动 \\
+激振       & 中心单点 + 扫频                     & 不引入多激振器 / 外接质量 \\
+主反馈     & 有限元特征频率 / 强迫响应           & LiveLink with MATLAB \\
+厚度范围   & $0.6$--$2.0\,\text{mm}$，相邻差 $\Delta\le1.0\,\text{mm}$ & 制造可行性 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%------------------------------------------------------------------ 4
+\section{对称性天花板}\label{sec:theory}
+
+\subsection{构型的二面体对称}
+一块带中心夹持与中心点激振的方板，在八阶二面体群 $\Dfour$（四个旋转与四个反射）下不变。由于
+\emph{居中}激振的算子束 $(\matK,\matM)$ 与载荷 $\bm{f}$ 都是 $\Dfour$ 对称的，整个稳态响应必须按
+$\Dfour$ 的表示论变换~\cite{tinkham1964}。该群有五个不可约表示（irrep）：一维的 $A_1,A_2,B_1,B_2$
+与二维的 $E$。
+
+\subsection{中心激振只耦合到 \texorpdfstring{$\Aone$}{A1}}
+恰好作用于（被夹持的）中心的点力，其载荷本身在 $\Dfour$ 的每个元素下都不变，因此整体落在平凡表示
+$\Aone$ 中。由不可约表示的正交性，这样的载荷只能激发同样按 $\Aone$ 变换的响应分量：强迫响应在任何
+非 $\Aone$ 子空间上的投影恒为零。我们把这一投影实现为对任意候选场的 $\Dfour$ 不可约表示分解。其实际
+后果是一条干净的、\emph{闭式}的可达性陈述：
+\begin{equation}
+\boxed{\;\text{可达性}(T)\;=\;\frac{\lVert \mathcal{P}_{\Aone} T\rVert^2}
+{\lVert T\rVert^2}\;,}
+\label{eq:reach}
+\end{equation}
+其中 $\mathcal{P}_{\Aone}$ 把目标投影到 $\Aone$ 子空间。目标落在 $\Aone$ 之外的能量\emph{无论算法
+多强}都无法重现，因为中心激振根本不向那些 irrep 提供通道。
+
+\subsection{代表性目标的可达性算例}
+式~\eqref{eq:reach} 是解析的，可直接在每个目标上求值。表~\ref{tab:reach} 给出由此得到的 $\Aone$
+占比。X 形完全落在 $\Aone$，原则上完全可达；单对角线只有一半可达（其余落在 $B_2$）；而"IC"字母对把
+大半能量放在 $E$ 与 $B_1$，因此其大部分信号在\emph{结构上}不可容许。这第一次为"IC 为何从不出现"
+给出了一个与任何特定优化器无关的精确数学答案。
+
+\begin{table}[h]
+\centering
+\caption{解析可达性（式~\eqref{eq:reach}）：$\Aone$ 能量占比是中心激振所能指望重现的硬性上限。}
+\label{tab:reach}
+\small
+\begin{tabular}{@{}lccl@{}}
+\toprule
+目标 & $\Aone$ 占比 & $\Aone$ 之外（不可达） & 含义 \\
+\midrule
+X 形        & $100.0\%$ & $0\%$            & 理论上完全可达 \\
+单对角线    & $51.7\%$  & $48.3\%$（$B_2$）& 半可达 \\
+IC 字母     & $41.9\%$  & $58.1\%$（$E{+}B_1$）& 大半信号无法进入 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent 这对整条管线的含义十分锐利：一个目标必须先\emph{可容许}（高 $\Aone$ 占比），任何优化才值得
+进行。把可达性裁决用作前置过滤器------而不是事后在经验上撞见天花板------回头看，正是本项目最重要的一条
+方法论教训。
+
+%------------------------------------------------------------------ 5
+\section{方法}\label{sec:method}
+
+\subsection{可微正交各向异性板代理}\label{sec:surrogate}
+管线的核心是一个可微 Kirchhoff 板代理，其实现使损失对厚度场端到端可微。我们由完整的层合能量
+泛函~\cite{reddy2003} 组装正交各向异性弯曲刚度算子；在一般表述中，每一格都可以把其弯曲刚度张量旋转
+一个局部角度 $\theta$。离散本征问题~\eqref{eq:eig} 用稀疏求解器求解，损失对 $\matH$（以及 $\bm\theta$、
+$\omega$）的梯度由自动微分~\cite{baydin2018,paszke2019} 与解析本征对灵敏度~\cite{fox1968,nelson1976}
+相结合得到，后者是对~\eqref{eq:eig} 的本征值与本征向量求导的经典途径；伴随观点~\cite{giles2000} 使
+梯度计算与设计变量数目无关。
+
+决定性的设计抉择关乎\emph{角色}而非表述：代理被当作\textbf{指南针，而非裁判}。它足够快，可在秒级把
+厚度场与频率推进到"代理意义下好"的区域，但绝不允许它判定胜负；那一权柄属于有限元模型。把代理当成
+真理、以及把代理当成最终裁判这两种相反的误用，项目早期都犯过，且都产出了在高保真复评中无法存活的
+过度乐观设计（见第~\ref{sec:gap} 节）。
+
+\subsection{各向异性假设及其崩塌}\label{sec:aniso}
+一个诱人的假设催生了正交各向异性表述：既然 3D 打印件天然各向异性，让纤维取向 $\theta$ 逐格变化便会
+使弯曲刚度算子不再与 $\Dfour$ 对易，从而允许中心激振泄漏进非 $\Aone$ 的 irrep，进而打破
+第~\ref{sec:theory} 节的天花板。这一论证在物理上颇具吸引力。
+
+然而尺度分析预言其效应在工作频段可忽略。把强迫算子写作 $\matK-\omega^2\matM$，在相关频率范围内，
+惯性项 $\omega^2\lVert\matM\rVert$ 以若干数量级压倒刚度项 $\lVert\matK\rVert$。由于 $\theta$
+\emph{只}通过 $\matK$ 进入物理，它对响应的影响被同一比值压制：响应在主导阶上由质量控制，$\theta$
+本应经由刚度引入的对称破缺被淹没。此外，取向场还是一个\emph{寄生}优化维度：它给一个非凸损失曲面再添
+一维，并把梯度预算从 $\matH$ 与 $\omega$ 的干净收敛上引开。再加上对代表性可打印材料实测各向异性比远
+小于乐观文献值的独立印证，结论只会被进一步加固。因此我们保留正交各向异性机制以求一般性，但把 $\theta$
+视作实际冻结，并以各向同性路径为默认。相应的定量消融在第~\ref{sec:experiments} 节报告。
+
+\subsection{植根于撒粉物理的可识别度指标}\label{sec:metric}
+早期评分使用像素重叠度量（IoU/Jaccard、Dice、Chamfer 距离）~\cite{jaccard1912,dice1945,barrow1977}，
+它们离散、不可微、且对模态切换不稳定。我们以一个植根于真实沉积物理的指标取而代之：粉末聚集在
+$|\bm{u}|\approx0$ 处，因此相关量是一个集中在节线上的撒粉密度。可识别度泛函综合了（i）\emph{富集度}
+（目标区内撒粉密度与全图均值之比）；（ii）\emph{召回}（目标被覆盖的比例）；（iii）\emph{对比度}；
+以及（iv）一个\emph{方向}项。该泛函的一个连续可微替身------振幅谷损失------被用于优化器内部，而离散撒粉
+模型用于评估。我们也指出其与最优传输目标的联系：匹配节线测度而非像素，天然可用 Sinkhorn
+散度~\cite{cuturi2013} 表达，它如同用于波形匹配的 Wasserstein 目标~\cite{engquist2014} 一样，规避了
+逐像素 $L^2$/IoU 损失的 cycle-skipping 病态。指标选择并非装饰：它会重排哪些候选被视作"最佳"，从而
+导向整个搜索------这一点我们在第~\ref{sec:discussion} 节重提。
+
+\subsection{两阶段有限元生产管线}\label{sec:pipeline}
+生产管线以两个阶段把代理与有限元模型耦合，从而把可能出错的两件事------选错频率与选错形状------解耦。
+
+\paragraph{阶段一 ------ 模态选择。}
+我们计算候选板的有限元特征频率，按每阶本征模态与目标的相似度排序，\emph{在共振点上}驱动强迫
+响应~\eqref{eq:forced}，并合成最佳单模态或互补模态的复合。在共振点驱动至关重要：偏共振驱动会让中心
+点力主导响应并把模态"灌歪"，使干净节线无法形成。我们还在原理上发现，\emph{两个互补模态的干涉}
+（拍点复合）可能比任何单一本征模态更像目标------这是单模态视角不可见的自由度。
+
+\paragraph{阶段二 ------ 信赖域精修。}
+以有限元响应为真值，厚度场由嵌在代理管理框架~\cite{booker1999} 中的信赖域迭代~\cite{conn2000}
+精修：代理提出一步，有限元模型对其重评，然后接受该步或收缩信赖半径。相邻迭代间的模态对应由模态置信
+判据（MAC）~\cite{allemang1982} 跟踪。这通过"信赖"显式管理代理--有限元差距并单调精修，与同时校正
+频率和形状从而发散的朴素回路形成对照。
+
+\subsection{代理--有限元差距}\label{sec:gap}
+薄板代理与厚板有限元模型存在永久性差异：板理论（薄板 vs 含剪切的厚板）、网格密度、边界几何（抽象的
+中心约束 vs 圆形夹持），以及二维平面应力 vs 完整三维弹性张量。这些是\emph{系统性的物理差异}，而非
+噪声。定性地说，代理在低模态阶极佳、在高阶退化，而代理与有限元频率之间的映射服从一条干净的幂律而非
+随机散布------这证明差距是结构性的。对系统性差距的正确应对，既不是信任代理，也不是对其过拟合，而是把它
+当指南针、让有限元模型仲裁；这正是第~\ref{sec:pipeline} 节两阶段管线存在的理由。另一个发人深省的
+观察关乎数值卫生：归一化中一个跨尺度的加性常数（$\text{amp}/(\max(\text{amp})+\varepsilon)$ 中固定
+的 $\varepsilon$），每当有限元振幅比代理小许多数量级时，便会悄悄把一个关键指标钳住，从而系统性地
+\emph{低}报历史结果，直到被修正。
+
+\subsection{可制造导出与软件系统}\label{sec:software}
+管线终止于一个可制造的产物。一个零依赖导出器把 $15\times15$ 厚度场转成阶梯长方体 STL（每格一个长方体，
+平底以利贴床，台阶可选柔化），无需任何取向控制即可直接为熔融沉积打印切片。系统以全栈应用交付：一个
+多线程后端编排代理与有限元求解器（管理求解器生命周期、自动发现工具路径，并暴露包括第~\ref{sec:theory}
+节可达性裁决在内的结果与诊断接口），以及一个围绕目标设计、材料调参、运行控制、结果检视、按中心驱动
+可激发性过滤的均匀板图样画廊、与 3D 打印导出标签页组织的单页前端。项目的工程纪律包括一次量化指标
+认知偏差的只读算法审计、针对回退的严格回滚纪律，以及逐实验的可复现性。
+
+%------------------------------------------------------------------ 6 (演进史)
+\section{算法演进：三个时代与约二十条路线}\label{sec:eras}
+
+第~\ref{sec:method} 节的最终架构并非一开始就设计出来，而是从一段漫长的试错过程中沉淀而成；这段
+历史本身也是贡献的一部分，因为每一条被放弃的路线都标出了可行域的一面墙。我们把这段历史组织为三个
+时代外加一个现代生产期（表~\ref{tab:eras}）。下文所引的里程碑数字描述的是\emph{开发轨迹}；受控的
+实验验证仍是第~\ref{sec:experiments} 节（刻意留空）的主题。
+
+\begin{table}[h]
+\centering
+\caption{三个时代与现代生产期。}
+\label{tab:eras}
+\small
+\begin{tabular}{@{}p{2.6cm}p{2.9cm}p{5.0cm}p{3.6cm}@{}}
+\toprule
+时代 & 阶段 & 核心范式 & 结局 \\
+\midrule
+I------盲走 & Phase A--I（9 条） & "猜厚度 $\to$ 跑有限元 $\to$ 改" & 分数卡在 $0.034$，全部不达标 \\
+II------结构化 & W1--W6（6 条） & 先验过滤 + 主损失重构 + 梯度链路 & IC 分数推到 $0.171$ \\
+III------可识别度 & W7--W8（2 条） & 以撒粉物理重定义成功 & X 形富集度 $3.76\times$（天花板） \\
+现代生产期 & W9、W10、两阶段（约 3 条） & 可微代理 + 有限元信赖域回路 + 产品化 & 两阶段管线 + 软件 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{时代 I------盲走（Phase A--I）}\label{sec:eraI}
+最朴素的表述把 $225$ 维厚度场直接当作优化变量，用各种无梯度方法搜索（表~\ref{tab:eraI}）。随机与
+进化搜索只能跑出"通用板模态家族"（弧、星、环、中心主导的团块），毫无字母感；响应引导的误差图能说
+\emph{哪里}错，却说不出\emph{该把哪条}节线移到哪里，因为本征模态是全局对象；最初的 Kirchhoff--Love
+代理已经暴露出代理--有限元差距；而严格评分升级把虚高的 $\approx0.2$ 诚实地砍到 $0.034$。把设计合同
+从 $225$ 维扩到 $675$ 维也无济于事。时代 I 以诚实最佳分 $0.034$ 收场，远低于 $0.08$ 的工程门槛，并
+得到一个清晰诊断：再多跑几代也没用，问题必须从物理与数学层重新设计。
+
+\begin{table}[h]
+\centering
+\caption{时代 I------九条盲走路线及其教训。}
+\label{tab:eraI}
+\small
+\begin{tabular}{@{}p{0.7cm}p{5.1cm}p{2.2cm}p{6.6cm}@{}}
+\toprule
+路线 & 方法 & 方法学依据 & 教训 \\
+\midrule
+A & 随机/进化搜索（遗传 + 突变 + 邻格差修复 + 骨架引导） & \cite{holland1975,bendsoe2003} & 只有通用板模态家族；毫无字母 \\
+B & 响应引导误差闭环（missing/extra 误差图；迭代反演） & \cite{tarantola2005} & 误差图定位错误却给不出纠正动作；模态是全局的 \\
+C & Kirchhoff--Love 板代理（稀疏双调和特征求解） & \cite{leissa1969,waller1939} & 首次暴露代理--有限元差距；代理高分迁移不过去 \\
+D & 严格形状评分（$v1\to v5$；IoU/Dice/Chamfer） & \cite{jaccard1912,dice1945,barrow1977} & 诚实指标胜过好看指标：最佳从 $\approx0.2$ 跌到 $0.034$ \\
+E & 设计合同扩展（SIMP 密度/损耗/材料场，$225\to675$） & \cite{bendsoe1989,bendsoe1999} & 升维不是答案；节线落点仍控制不住 \\
+F & Auxiliary Physics 局部启发式（直接/模式搜索） & \cite{hooke1961} & 历史最稳健来源，但封顶 $\approx0.032$--$0.034$ \\
+G & 隐空间联合物理（人工 basis；POD） & \cite{berkooz1993} & 人手设计的 basis 可能漏关键方向 \\
+H & 隐空间 CMA-ES 优化 & \cite{hansen2001} & 暴露代理乐观：代理好、有限元差 \\
+I & 响应校准的隐空间调度（代理/贝叶斯优化） & \cite{jones1998,shahriari2016} & 首次把"代理不可靠"做成系统层；未充分落地 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{时代 II------结构化搜索（W1--W6）}\label{sec:eraII}
+第二个时代以结构取代盲走：一个物理先验过滤器、一个可微主损失、一条接通的梯度链路，以及一个数据驱动
+的设计子空间（表~\ref{tab:eraII}）。有两点值得强调。其一，W1 的可达性先验早已通过 $0.78$ 的
+$\Dfour$ 失配\emph{预言了整个 IC 结局}；当时未把这一裁决用作前置过滤器，回头看是本项目最大的方法论
+失误（它正是后来在第~\ref{sec:theory} 节被形式化的理论）。其二，W6------本时代的高潮------把 IC 分数
+从 $0.034$ 推到 $0.171$，约五倍的增益却仍然不像 IC，这恰恰促成了时代 III 对"成功"的重新定义。
+
+\begin{table}[h]
+\centering
+\caption{时代 II------六条结构化路线及其关键结果。}
+\label{tab:eraII}
+\small
+\begin{tabular}{@{}p{0.7cm}p{5.1cm}p{2.2cm}p{6.6cm}@{}}
+\toprule
+路线 & 方法 & 方法学依据 & 关键结果 / 教训 \\
+\midrule
+W1 & 可达性先验过滤（Courant 节点域 + $\Dfour$ 失配 + 笔画宽度） & \cite{courant1953,pleijel1956,waller1939} & IC 失配 $0.78$ 预言结局；未前置使用（最大失误） \\
+W2 & 主损失重构（IoU $\to$ 振幅谷） & \cite{nocedal2006} & 优化更顺；物理上限不变 \\
+W3 & 可微板 + 伴随（$\partial\,\text{loss}/\partial\matH$） & \cite{giles2000,baydin2018,paszke2019,fox1968,nelson1976} & 梯度链路终于接通；第一个结构性能力升级 \\
+W4 & 低维流形搜索（历史候选 PCA） & \cite{pearson1901,berkooz1993} & 数据 basis 压倒人工 basis；损失远低于 W3 \\
+W5 & 同伦延拓（向目标 warm start） & \cite{allgower1990,blake1987} & 卡在 $\lambda\approx0.3$------一个诚实的可达性指标 \\
+W6 & 模态频率聚簇（把特征值聚到驱动频率附近） & \cite{pedersen2000,achtziger2007} & 时代 II 高潮：IC 分数 $0.034\to0.171$（$5\times$），仍不可辨 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{时代 III------可识别度（W7--W8）}\label{sec:eraIII}
+时代 III 的触发，是意识到一个好分数（$0.171$）仍然不像目标。成功被重定义为接受"相似而非全等"，整个
+评分体系围绕撒粉物理重写。W7 的多频均方根复合------以一阶随机优化~\cite{kingma2015} 在强迫
+响应~\cite{leissa1969} 上优化------被证明是一次\emph{伪}突破：优化器学会加权 $|\bm{u}|^2$ 来人造低
+振幅区，而有限元无法复现，并且总倾向于塌缩回单频。W8 随即用第~\ref{sec:metric} 节的撒粉沉积指标取代
+像素重叠，并以节线匹配的最优传输视角加以表述~\cite{chladni1787,cuturi2013,engquist2014}。在新指标下
+重排整个候选历史后发现：项目曾在\emph{错误}的指标上优化了数月，更好的候选一直被埋没。X 形富集度达
+$2.84\times$，在下文的归一化修复后达 $3.76\times$，成为项目天花板。
+
+\subsection{现代生产期------W9、W10 与两阶段管线}\label{sec:modern}
+现代生产期建起了此前各时代只是示意过的部件。W9 信赖域回路结构正确但参数欠调（内层步数太少、校正太弱、
+信赖半径萎缩到 $0.094\,\text{mm}$），其有限元最佳 $1.40\times$ 没有突破------教训是：当根因是代理物理
+本身时，围着烂代理打转无济于事；但 W9 仍贡献了 Phase 2 后来继承的信赖域与代理管理机制及模态
+跟踪~\cite{conn2000,booker1999,allemang1982}。W10 实现了第~\ref{sec:surrogate} 节的可微正交各向
+异性板~\cite{reddy2003}，而第~\ref{sec:pipeline} 节的两阶段管线最终实现了时代 I 一路欠下的迭代校准
+回路：把频率校正（直接在有限元共振点驱动）与形状校正（一个小的信赖域残差）解耦。
+
+\subsection{横切的经验性发现}\label{sec:crosscut}
+有三条发现跨越各时代反复出现，值得单独陈述。
+
+\paragraph{共振点驱动 vs 偏共振驱动。}
+一个后期的 bug 级发现：Phase 1 曾默认在 $f_{\text{eig}}+1.5\,\text{Hz}$（偏共振）驱动以避开求解器
+奇异，但这让中心点力主导响应、把模态"灌歪"，使十字/叉等图案出不来。改为共振点驱动（offset 0）后，
+干净的模态节线立刻恢复。偏共振的伪影也解释了那条虚假的"中间横杠"：偏共振时中心是被点力顶起的反节点
+亮纹，而非真实节线。
+
+\paragraph{一个跨尺度的数值常数曾经掩盖真相。}
+撒粉密度归一化 $\text{amp}/(\max(\text{amp})+\varepsilon)$ 中固定的 $\varepsilon$，在代理域（振幅
+$\mathcal{O}(1)$）无碍，但在有限元域（振幅 $\mathcal{O}(10^{-12})$）该常数比信号大一千倍，把关键
+指标悄悄钳到 $\approx1.00$。修复后所有历史有限元数字上修（X 形从 $2.84\times$ 升到 $3.76\times$）。
+教训直白：跨尺度的加性常数是隐形杀手。
+
+\paragraph{指标定义了搜索的方向。}
+项目先后用过五个主指标，每换一次就重排一次"最佳候选"（某个 W6 变体在一个指标下第一、在另一个指标下
+第十）：像素重叠（IoU/Dice/Chamfer）、平滑的像素分、振幅谷损失、多频 RMS（易被优化器作弊），以及
+最终第~\ref{sec:metric} 节的撒粉物理可识别度。后来一次只读的算法审计进一步量化了即便在最后一族里
+仍残留的偏差（例如富集度可能偏好紧凑的中心团块而非展开形状，固定百分位阈值对撒粉密度敏感）。我们在
+第~\ref{sec:discussion} 节重申的元教训是：先把"成功"定义清楚，再去优化它。
+
+%------------------------------------------------------------------ 7  (留空)
+\section{实验设置与结果}\label{sec:experiments}
+
+\noindent\emph{本节按要求暂时留空为骨架；定量实验撰写待补，将填充下列各小节。此处尚未报告任何
+数值结果。}
+
+\subsection{实验设置}
+\noindent\textit{【待补充。】}板与材料参数、有限元模型配置（网格、单元类型、阻尼、经 LiveLink 的特征
+频率与频域求解器设置）、撒粉模型参数、优化器超参数，以及目标集合。
+
+\subsection{可达性理论的验证}
+\noindent\textit{【待补充。】}经验确认：可达到的可识别度随表~\ref{tab:reach} 的解析 $\Aone$ 占比
+在目标集合上同步变化。
+
+\subsection{各向异性消融（材料对照）}
+\noindent\textit{【待补充。】}目标 $\times$ 材料的消融，比较各向异性配置（取向激活）与各向同性基线
+（取向冻结），连同复合振幅对 $\theta$ 的直接敏感度测量。
+
+\subsection{代理--有限元差距的量化}
+\noindent\textit{【待补充。】}跨模态阶的模态置信统计、代理到有限元的频率映射，以及有限元管线复现了
+代理所预测改进的多少比例。
+
+\subsection{端到端案例研究}
+\noindent\textit{【待补充。】}代表性目标（X 形、IC、十字、单对角线、圆环）的完整管线结果，含最佳单
+模态与复合驱动、精修后的厚度场，以及导出的可打印几何。
+
+%------------------------------------------------------------------ 7
+\section{讨论}\label{sec:discussion}
+
+摘要中的四条发现凝聚成一套统一的设计哲学。其一，第~\ref{sec:theory} 节的可达性理论重新框定了"失败"：
+当 IC 这样的目标无法被产生，这并非算法不足，而是关于"中心激振能激发哪些 irrep"的结构性事实，与其
+继续对一个不可容许的目标做优化，不如把这一事实精确地讲清楚。其二，第~\ref{sec:aniso} 节的各向异性
+分析是关于"物理上看似合理"的自由度的一则警示：一种机制可以是真实的（取向确实通过刚度破坏对称），却
+在定量上无关紧要（因为响应在工作频段由质量控制），所以当尺度如此判定时，必须允许自己最得意的假设
+死去。其三，第~\ref{sec:gap} 节的代理--有限元差距表明，实践中起作用的天花板往往不是深层物理，而是
+"你优化的模型"与"你相信的模型"之间的保真度差距，而有纪律的应对是给每个模型分派它擅长的角色。其四，
+第~\ref{sec:metric} 节的指标讨论强调：在逆问题中，"成功"的定义本身就是一个会悄悄导向搜索的设计抉择；
+把它定义对------此处即以撒粉物理而非像素重叠来定义------是能否开始优化的前提。反复出现的元教训是：在固定
+硬件的逆问题中，相当一部分精力理应花在\emph{刻画边界}上，而非花在硬撞边界上。
+
+%------------------------------------------------------------------ 8
+\section{局限与未来工作}\label{sec:limits}
+
+这些局限是内禀的而非偶然的。任何非 $\Dfour$ 兼容的目标------任意字母对、单对角线、L 形、任意 logo------在
+中心点激振下都物理不可达，这是一道硬天花板而非调参问题。材料各向异性余量有限，既因实测各向异性比并
+不大，也因取向梯度在偏共振时可忽略。代理永远不是有限元模型，因此任何只看代理的"突破"都必须在高保真
+下复核。
+
+由此可见，真正的进一步进展需要改变\emph{硬件}，按杠杆由大到小排列：破坏 $\Dfour$ 对称的激振（多激
+振器或偏心驱动）、改变边界（非方板），或引入离散拓扑（孔与槽）。这些超出本研究的固定约束，却是唯一
+能抬升 $\Aone$ 天花板的路径。在现有约束内，有前景的改进包括：一个对称感知的方向指标（修复对称目标
+上的主轴退化）、一个真正物理的时分多频驱动（而非数值均方根复合），以及对阶段二信赖域参数的进一步
+调优。
+
+%------------------------------------------------------------------ 9
+\section{结论}\label{sec:conclusion}
+
+在一套固定的硬件约束下------一块带单一中心激振的方板------我们表明，正确的问题不是"逆向能力能有多强"，而是
+"可达性边界在哪里、为什么"。一套基于对称性的理论识别出 $\Aone$ 不可约表示是中心激振唯一能激发的通道，
+并把它转化为一个闭式的、与目标相关的上限；一份尺度分析把材料各向异性从被寄予厚望的脱困之路降格为一个
+寄生自由度；而一条"代理作指南针"的两阶段管线管理了占主导的实际障碍------薄板代理与厚板有限元模型之间的
+差距。交付物是一套诚实、可复现、可制造的系统，而非一个关于任意逆向的不可能承诺。我们认为，剩余的余量
+不在算法里，而在硬件里。量化这些主张的实验验证另行报告；本文相应章节按设计留空为骨架。
+
+%------------------------------------------------------------------ 致谢
+\section*{致谢}
+本工作系帝国理工学院本科一年级 Term 3 暑期项目的一部分。感谢本管线所依赖的各开源科学软件的维护者。
+
+%------------------------------------------------------------------ 参考文献
+\begin{thebibliography}{99}
+\setlength{\itemsep}{2pt}
+
+\bibitem{chladni1787} E.~F.~F. Chladni. \textit{Entdeckungen \"uber die Theorie
+des Klanges}. Leipzig, 1787.
+
+\bibitem{waller1939} M.~D. Waller. Vibrations of free square plates.
+\textit{Proc. Phys. Soc.}, 51:831, 1939.
+
+\bibitem{reissner1945} E. Reissner. The effect of transverse shear deformation on
+the bending of elastic plates. \textit{J. Appl. Mech.}, 12:A69--A77, 1945.
+
+\bibitem{mindlin1951} R.~D. Mindlin. Influence of rotatory inertia and shear on
+flexural motions of isotropic, elastic plates. \textit{J. Appl. Mech.},
+18:31--38, 1951.
+
+\bibitem{leissa1969} A.~W. Leissa. \textit{Vibration of Plates}. NASA SP-160,
+1969.
+
+\bibitem{reddy2003} J.~N. Reddy. \textit{Mechanics of Laminated Composite Plates
+and Shells: Theory and Analysis}, 2nd ed. CRC Press, 2003.
+
+\bibitem{tinkham1964} M. Tinkham. \textit{Group Theory and Quantum Mechanics}.
+McGraw--Hill, 1964.
+
+\bibitem{courant1953} R. Courant and D. Hilbert. \textit{Methods of Mathematical
+Physics}, Vol.~1. Interscience, 1953.
+
+\bibitem{pleijel1956} \r{A}. Pleijel. Remarks on Courant's nodal line theorem.
+\textit{Comm. Pure Appl. Math.}, 9:543--550, 1956.
+
+\bibitem{letcher2014} T. Letcher and M. Waytashek. Material property testing of
+3D-printed specimen in PLA on an entry-level 3D printer. \textit{ASME IMECE},
+2014.
+
+\bibitem{pyl2018} L. Pyl, K.-A. Kalteremidou, and D. Van Hemelrijck. Exploration
+of the mechanical properties of FDM-printed PLA. \textit{Procedia Manufacturing},
+14:104--, 2018.
+
+\bibitem{formlabs2018} Formlabs. \textit{Validating Isotropy in SLA 3D Printing}.
+Technical white paper, 2018.
+
+\bibitem{vatphoto2025} Vat-photopolymerisation anisotropy study.
+\textit{Scientific Reports}, 15:97294, 2025.
+
+\bibitem{bambutds} Bambu Lab. \textit{PETG-CF Technical Data Sheet}（TDS V3.0）.
+
+\bibitem{holland1975} J.~H. Holland. \textit{Adaptation in Natural and Artificial
+Systems}. University of Michigan Press, 1975.
+
+\bibitem{bendsoe2003} M.~P. Bends\o{}e and O. Sigmund. \textit{Topology
+Optimization: Theory, Methods and Applications}. Springer, 2003.
+
+\bibitem{tarantola2005} A. Tarantola. \textit{Inverse Problem Theory and Methods
+for Model Parameter Estimation}. SIAM, 2005.
+
+\bibitem{jaccard1912} P. Jaccard. The distribution of the flora in the alpine
+zone. \textit{New Phytologist}, 11:37--50, 1912.
+
+\bibitem{dice1945} L.~R. Dice. Measures of the amount of ecologic association
+between species. \textit{Ecology}, 26:297--302, 1945.
+
+\bibitem{barrow1977} H.~G. Barrow et al. Parametric correspondence and chamfer
+matching. \textit{Proc. IJCAI}, 1977.
+
+\bibitem{bendsoe1989} M.~P. Bends\o{}e. Optimal shape design as a material
+distribution problem. \textit{Struct. Optim.}, 1:193--202, 1989.
+
+\bibitem{bendsoe1999} M.~P. Bends\o{}e and O. Sigmund. Material interpolation
+schemes in topology optimization. \textit{Arch. Appl. Mech.}, 69:635--654, 1999.
+
+\bibitem{hooke1961} R. Hooke and T.~A. Jeeves. ``Direct search'' solution of
+numerical and statistical problems. \textit{J. ACM}, 8:212--229, 1961.
+
+\bibitem{berkooz1993} G. Berkooz, P. Holmes, and J.~L. Lumley. The proper
+orthogonal decomposition in the analysis of turbulent flows. \textit{Annu. Rev.
+Fluid Mech.}, 25:539--575, 1993.
+
+\bibitem{hansen2001} N. Hansen and A. Ostermeier. Completely derandomized
+self-adaptation in evolution strategies. \textit{Evol. Comput.}, 9(2):159--195,
+2001.
+
+\bibitem{jones1998} D.~R. Jones, M. Schonlau, and W.~J. Welch. Efficient global
+optimization of expensive black-box functions. \textit{J. Global Optim.},
+13:455--492, 1998.
+
+\bibitem{shahriari2016} B. Shahriari et al. Taking the human out of the loop: A
+review of Bayesian optimization. \textit{Proc. IEEE}, 104:148--175, 2016.
+
+\bibitem{nocedal2006} J. Nocedal and S.~J. Wright. \textit{Numerical
+Optimization}, 2nd ed. Springer, 2006.
+
+\bibitem{giles2000} M.~B. Giles and N.~A. Pierce. An introduction to the adjoint
+approach to design. \textit{Flow Turbul. Combust.}, 65:393--415, 2000.
+
+\bibitem{baydin2018} A.~G. Baydin et al. Automatic differentiation in machine
+learning: a survey. \textit{J. Mach. Learn. Res.}, 18:1--43, 2018.
+
+\bibitem{paszke2019} A. Paszke et al. PyTorch: An imperative style, high-performance
+deep learning library. \textit{Proc. NeurIPS}, 2019.
+
+\bibitem{fox1968} R.~L. Fox and M.~P. Kapoor. Rates of change of eigenvalues and
+eigenvectors. \textit{AIAA J.}, 6:2426--2429, 1968.
+
+\bibitem{nelson1976} R.~B. Nelson. Simplified calculation of eigenvector
+derivatives. \textit{AIAA J.}, 14:1201--1205, 1976.
+
+\bibitem{pearson1901} K. Pearson. On lines and planes of closest fit to systems of
+points in space. \textit{Phil. Mag.}, 2:559--572, 1901.
+
+\bibitem{allgower1990} E.~L. Allgower and K. Georg. \textit{Numerical Continuation
+Methods: An Introduction}. Springer, 1990.
+
+\bibitem{blake1987} A. Blake and A. Zisserman. \textit{Visual Reconstruction}.
+MIT Press, 1987.
+
+\bibitem{pedersen2000} N.~L. Pedersen. Maximization of eigenvalues using topology
+optimization. \textit{Struct. Multidisc. Optim.}, 20:2--11, 2000.
+
+\bibitem{achtziger2007} W. Achtziger and M. Ko\v{c}vara. On the maximization of
+the fundamental eigenvalue in topology optimization. \textit{Struct. Multidisc.
+Optim.}, 34:181--195, 2007.
+
+\bibitem{kingma2015} D.~P. Kingma and J. Ba. Adam: A method for stochastic
+optimization. \textit{Proc. ICLR}, 2015.
+
+\bibitem{cuturi2013} M. Cuturi. Sinkhorn distances: Lightspeed computation of
+optimal transport. \textit{Proc. NeurIPS}, 2013.
+
+\bibitem{engquist2014} B. Engquist and B.~D. Froese. Application of the
+Wasserstein metric to seismic signals. \textit{Commun. Math. Sci.}, 12:979--988,
+2014.
+
+\bibitem{conn2000} A.~R. Conn, N.~I.~M. Gould, and P.~L. Toint.
+\textit{Trust-Region Methods}. SIAM, 2000.
+
+\bibitem{booker1999} A.~J. Booker et al. A rigorous framework for optimization of
+expensive functions by surrogates. \textit{Struct. Multidisc. Optim.}, 17:1--13,
+1999.
+
+\bibitem{allemang1982} R.~J. Allemang and D.~L. Brown. A correlation coefficient
+for modal vector analysis. \textit{Proc. Int. Modal Analysis Conf. (IMAC)}, 1982.
+
+\bibitem{acta2024} Topology optimization design of Chladni patterns for vibration
+mode manipulability. \textit{Acta Mechanica Sinica}, 2024.
+DOI:~10.1007/s10409-023-23445-x.
+
+\bibitem{tcherniak2002} D. Tcherniak. Topology optimization of resonating
+structures using SIMP method. \textit{Int. J. Numer. Meth. Eng.}, 54:1605--1622,
+2002.
+
+\bibitem{bellette} P. Bellette. \texttt{chladni\_inverse\_design}. 开源实现
+（能量地形表述）.
+
+\bibitem{misseroni2016} D. Misseroni, A.~B. Movchan, and N.~V. Movchan. Cymatics
+for the cloaking of flexural vibrations in a structured plate. \textit{Scientific
+Reports}, 6:23929, 2016.
+
+\bibitem{tuanchen} P.-T. Tuan, Y.-F. Chen, et al. Maximum-entropy reconstruction
+of Chladni forced-response nodal patterns via the inhomogeneous Helmholtz
+equation.
+
+\bibitem{zhou2016} Q. Zhou et al. Controlling the motion of multiple objects on a
+Chladni plate. \textit{Nature Communications}, 7:12764, 2016.
+
+\bibitem{allaire2004} G. Allaire, F. Jouve, and A.-M. Toader. Structural
+optimization using sensitivity analysis and a level-set method. \textit{J.
+Comput. Phys.}, 194:363--393, 2004.
+
+\end{thebibliography}
+
+\end{document}

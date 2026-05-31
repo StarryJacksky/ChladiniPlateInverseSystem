@@ -1,0 +1,902 @@
+%==============================================================================
+%  Chladni Plate Inverse-Design — academic paper (English)
+%  Compile:  xelatex chladni_paper_en.tex  (run twice for references)
+%            or  pdflatex chladni_paper_en.tex  (run twice)
+%  The experimental section is intentionally left as a scaffold (to be completed).
+%==============================================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{bm}
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{microtype}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage[hidelinks,breaklinks]{hyperref}
+\usepackage{titlesec}
+
+\titleformat{\section}{\normalfont\large\bfseries}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalfont\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\setlist{itemsep=2pt,topsep=3pt,parsep=0pt}
+
+\newcommand{\Done}{D_1}     % placeholder guard, not used
+\newcommand{\Aone}{A_1}
+\newcommand{\Dfour}{D_4}
+\newcommand{\matH}{\mathbf{H}}
+\newcommand{\matK}{\mathbf{K}}
+\newcommand{\matM}{\mathbf{M}}
+
+\title{\bfseries Physical Reachability Limits of Pattern Inverse-Design for
+Centrally-Driven Chladni Plates:\\[2pt]
+\large A Symmetry-Constrained, Differentiable-Surrogate-to-FEA Framework with
+Manufacturable Output}
+
+\author{%
+Chladni Plate Inverse-Design Team\\
+\small Department of Physics, Imperial College London\\
+\small Term~3 Summer Project (first-year undergraduate)\\
+\small \texttt{ChladniPlateInverseSystem}}
+
+\date{31 May 2026}
+
+\begin{document}
+\maketitle
+
+%------------------------------------------------------------------ Abstract
+\begin{abstract}
+\noindent
+We study a classic and severely constrained inverse problem: given a target
+image, recover a plate (a spatial thickness field, and optionally a per-cell
+fibre orientation) together with a set of drive frequencies whose Chladni sand
+pattern approximates the target. The problem is posed under a fixed,
+non-negotiable hardware contract: a $150\,\text{mm}$ square plate discretised by
+a $15\times15$ thickness grid, an $8\,\text{mm}$ central clamp, free edges, and a
+\emph{single} central point excitation with a frequency sweep, with a
+high-fidelity finite-element model (COMSOL Multiphysics with
+LiveLink\texttrademark{} for MATLAB) as the primary source of truth. Across an
+extended development effort spanning three algorithmic ``eras'', roughly twenty
+algorithm lines and several hundred finite-element candidates, we converge on
+four central, and largely counter-intuitive, conclusions. (i)~Arbitrary
+custom-pattern inversion is \emph{physically impossible} rather than an
+engineering shortfall: the dihedral symmetry group $\Dfour$ of the configuration
+forces a central point drive to couple only into the $\Aone$ irreducible
+representation, so the fraction of target energy lying in $\Aone$ is a hard
+reachability ceiling. (ii)~Material anisotropy (the fibre orientation $\theta$)
+is essentially inert in the working band, because the inertial term dominates the
+stiffness term by several orders of magnitude and $\theta$ enters the physics only
+through stiffness. (iii)~The gap between a differentiable thin-plate surrogate and
+the thick-plate finite-element model is the dominant practical ceiling, and is a
+systematic physical difference rather than numerical noise. (iv)~The honest
+deliverable is therefore not ``arbitrary inversion'' but a reproducible,
+manufacturable \emph{system}: a differentiable surrogate used as a compass, a
+two-phase finite-element production pipeline (modal selection followed by
+trust-region refinement), and a directly 3D-printable export. We develop the
+theory and the methodology in full; the quantitative experimental validation is
+reported separately and the corresponding section here is left as a scaffold.
+
+\medskip
+\noindent\textbf{Keywords:} Chladni figures; inverse design; structural dynamics;
+plate vibration; dihedral symmetry; irreducible representations; differentiable
+surrogate; topology/thickness optimisation; finite-element validation;
+additive manufacturing.
+\end{abstract}
+
+%------------------------------------------------------------------ 1
+\section{Introduction}
+
+\subsection{Background and motivation}
+Chladni figures are the patterns traced by fine powder on a vibrating plate: the
+powder migrates away from antinodes and accumulates along nodal lines where the
+out-of-plane displacement is minimal, rendering an eigenmode visible to the naked
+eye~\cite{chladni1787,waller1939}. The \emph{forward} problem---predicting the
+nodal pattern from the plate geometry, material and drive frequency---is, in
+principle, a standard exercise in linear structural dynamics. The
+\emph{inverse} problem we consider here is far harder: \emph{given a desired
+target image, recover a plate design and a drive frequency whose Chladni pattern
+reproduces it.} Inverse design of this kind sits at the intersection of
+structural-dynamics eigenvalue placement, shape/topology optimisation, and
+manufacturability, and it is an attractive vehicle for studying how far a purely
+computational pipeline can be pushed against a genuinely fixed piece of
+hardware.
+
+\subsection{Problem statement}
+We fix a square plate excited at its centre by a single point source and ask
+whether, by spatially varying the plate thickness (and, as a tempting extra
+degree of freedom, the local fibre orientation of a 3D-printed part) and by
+choosing one or more sweep frequencies, the resulting nodal pattern can be made to
+resemble an arbitrary target such as a letter pair, a cross, a diagonal, or a
+ring. The constraints (Section~\ref{sec:contract}) are immutable for the entire
+study; every algorithm must be designed \emph{around} them rather than relaxing
+them.
+
+\subsection{Contributions and central thesis}
+Our central thesis is that the most valuable output of such a study is not a
+demonstration that ``any pattern can be produced''---which we show does not exist
+physically---but a precise characterisation of \emph{where the reachability
+boundary lies, why it lies there, and how to engineer the boundary-hugging
+optimum into a deliverable product.} Concretely, this paper contributes:
+\begin{enumerate}[label=(\arabic*)]
+\item a \textbf{symmetry-based reachability theory} that identifies the $\Aone$
+irreducible representation of the dihedral group $\Dfour$ as the only channel a
+central point drive can excite, yielding a closed-form, target-specific upper
+bound on what is achievable (Section~\ref{sec:theory});
+\item a \textbf{scaling analysis of anisotropy} showing that the fibre
+orientation $\theta$ is a parasitic degree of freedom in the working band, with a
+mass--stiffness scale separation of several orders of magnitude that renders its
+sensitivity negligible (Section~\ref{sec:aniso});
+\item a \textbf{differentiable orthotropic-plate surrogate} with adjoint/autograd
+sensitivities, framed explicitly as a ``compass, not a judge''
+(Section~\ref{sec:surrogate});
+\item a \textbf{recognisability metric} grounded in the actual powder-deposition
+physics rather than pixel overlap (Section~\ref{sec:metric});
+\item a \textbf{two-phase finite-element production pipeline} (modal selection
+followed by trust-region refinement) that manages the surrogate--FEA gap
+explicitly (Section~\ref{sec:pipeline}); and
+\item a \textbf{manufacturable export and software system} that turns a design
+into a printable part (Section~\ref{sec:software}).
+\end{enumerate}
+Throughout, we adopt a deliberately honest, project-report register: negative
+results, retracted assumptions, and methodological mistakes are reported as
+first-class findings, because in a fixed-hardware inverse problem they delimit the
+feasible region as sharply as any positive result.
+
+\subsection{Organisation}
+Section~\ref{sec:related} reviews directly comparable prior art.
+Section~\ref{sec:contract} formalises the problem and the hardware contract.
+Section~\ref{sec:theory} develops the symmetry ceiling.
+Section~\ref{sec:method} presents the full methodology (surrogate, anisotropy
+analysis, metric, pipeline, export, software). Section~\ref{sec:experiments} is
+the experimental section and is intentionally left as a scaffold to be completed.
+Section~\ref{sec:discussion} discusses the lessons; Section~\ref{sec:limits}
+states the limitations and future work; Section~\ref{sec:conclusion} concludes.
+
+%------------------------------------------------------------------ 2
+\section{Related work}\label{sec:related}
+
+\paragraph{Topology optimisation of Chladni / modal patterns.}
+The most directly comparable prior art is the 2024 study on topology-optimisation
+design of Chladni patterns for vibration-mode manipulability~\cite{acta2024},
+which uses density-based topology optimisation (SIMP) with an objective that
+minimises the error between computed eigenvectors and a target Chladni pattern,
+inversely designing material distributions for single- and multi-order patterns.
+Its eigenvector-error objective is cognate to our own scoring evolution, and its
+SIMP density variable is close in spirit to our density/thickness field. The key
+difference is that it is \emph{not} bound by a single-central-excitation $\Dfour$
+constraint---the very source of our $\Aone$ ceiling---so its reachable pattern
+space is intrinsically larger. The methodological lineage of mode-targeting SIMP
+traces back to topology optimisation of resonating structures~\cite{tcherniak2002}
+and, more broadly, to eigenvalue topology
+optimisation~\cite{pedersen2000,achtziger2007} within the classical
+density-based framework~\cite{bendsoe1989,bendsoe1999,bendsoe2003}.
+
+\paragraph{Energy-landscape formulations.}
+An open-source line of work frames Chladni inverse design as an
+``energy-landscape'' problem in which a nonnegative mixture of squared mode shapes,
+$E(x,y)=\sum_k b_k\,\varphi_k(x,y)^2$, is shaped toward the
+target~\cite{bellette}. This matches our amplitude-valley loss and independently
+confirms a structural bias: nonnegative squared mixtures prefer boxes, bands,
+grids, crosses and large connected glyphs, and resist fine, separated features---a
+bias strongly consistent with what our symmetry analysis and powder physics
+predict.
+
+\paragraph{Cymatics and wave control in structured plates.}
+Reshaping flexural-wave fields and nodal lines through plate microstructure has
+been demonstrated in the context of flexural cloaking~\cite{misseroni2016}, and
+forced-response Chladni patterns have been related to maximum-entropy states of
+an inhomogeneous Helmholtz equation~\cite{tuanchen}, both of which inform the
+distinction between forced response and free vibration that we revisit in
+Section~\ref{sec:gap}.
+
+\paragraph{Hardware-driven control.}
+Finally, multi-actuator active control of particles on a Chladni
+plate~\cite{zhou2016} demonstrates that genuinely breaking the symmetry ceiling
+requires acting on the \emph{hardware}---additional shakers or off-centre
+excitation---a conclusion that our theory reaches from the opposite direction and
+that frames our recommendations for future work. Level-set shape
+optimisation~\cite{allaire2004} is noted as an alternative geometry representation
+that we did not adopt, preferring a density/thickness field.
+
+%------------------------------------------------------------------ 3
+\section{Problem formulation and hardware contract}\label{sec:contract}
+
+\subsection{Forward model}
+Let $\Omega=[0,L]^2$ be the mid-surface of a thin plate of spatially varying
+thickness $h(\bm{x})$, clamped on a small central disc and free on all four
+edges. Under the Kirchhoff--Love thin-plate assumption, the free-vibration
+eigenproblem is the biharmonic-type generalised problem
+\begin{equation}
+\matK(\bm{h})\,\bm{\phi}_i \;=\; \omega_i^2\,\matM(\bm{h})\,\bm{\phi}_i,
+\label{eq:eig}
+\end{equation}
+where $\matK$ and $\matM$ are the (discretised) stiffness and mass operators,
+$\omega_i$ the angular eigenfrequencies and $\bm{\phi}_i$ the mode shapes. A
+high-fidelity description retains transverse shear via the Mindlin--Reissner
+thick-plate theory~\cite{reissner1945,mindlin1951}, which is the model used inside
+the finite-element solver. Under a steady single-point harmonic excitation of
+angular frequency $\omega$ and load vector $\bm{f}$, the forced response is
+\begin{equation}
+\bm{u}(\omega)=\big(\matK-\omega^2\matM + \mathrm{i}\,\omega\,\mathbf{C}\big)^{-1}\bm{f},
+\label{eq:forced}
+\end{equation}
+with $\mathbf{C}$ a damping operator. The Chladni pattern is the locus of small
+$|\bm{u}|$: powder is deposited where the out-of-plane amplitude is minimal,
+which we model by a powder-density functional that concentrates mass on nodal
+lines (Section~\ref{sec:metric}).
+
+\subsection{Inverse problem}
+The inverse problem seeks design variables that make the deposited pattern
+resemble a target image $T$. The primary design variable is the thickness field,
+discretised on the mandated grid,
+\begin{equation}
+\matH=\{h_{mn}\}_{m,n=1}^{15}\in\mathbb{R}^{15\times15},
+\end{equation}
+optionally augmented by a per-cell fibre orientation field $\bm{\theta}$ and by a
+small set of $K$ drive frequencies $\{\omega_k\}$ with weights $\{w_k\}$. The
+objective is a recognisability functional $\mathcal{R}(\,\cdot\,;T)$ defined in
+Section~\ref{sec:metric}.
+
+\subsection{Immutable hardware contract}
+Table~\ref{tab:contract} lists the constraints that remained fixed throughout the
+study and that define the physical ceiling of the problem.
+
+\begin{table}[h]
+\centering
+\caption{Immutable hardware contract. Every algorithm is designed around these.}
+\label{tab:contract}
+\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+Item & Value & Source \\
+\midrule
+Design grid          & $15\times15$ thickness field        & FEA \texttt{H.csv} contract \\
+Plate size           & $150\,\text{mm}\times150\,\text{mm}$ & one-shot print boundary \\
+Central clamp        & radius $8\,\text{mm}$ disc          & standard rig \\
+Edges                & free on all four sides              & free vibration \\
+Excitation           & single central point + sweep        & no multi-shaker / added mass \\
+Primary feedback     & FEA eigenfrequency / forced response& LiveLink with MATLAB \\
+Thickness range      & $0.6$--$2.0\,\text{mm}$, neighbour $\Delta\le1.0\,\text{mm}$ & manufacturability \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%------------------------------------------------------------------ 4
+\section{The symmetry ceiling}\label{sec:theory}
+
+\subsection{Dihedral symmetry of the configuration}
+A square plate with a central clamp and a central point drive is invariant under
+the dihedral group $\Dfour$ of order eight (four rotations and four
+reflections). Because both the operator pencil $(\matK,\matM)$ and the load
+$\bm{f}$ of a \emph{centred} excitation are $\Dfour$-symmetric, the entire
+steady-state response must transform according to the representation theory of
+$\Dfour$~\cite{tinkham1964}. The group has five irreducible representations
+(irreps): the one-dimensional $A_1,A_2,B_1,B_2$ and the two-dimensional $E$.
+
+\subsection{Central excitation couples only to \texorpdfstring{$\Aone$}{A1}}
+The load of a point force applied exactly at the (clamped) centre is itself
+invariant under every element of $\Dfour$; it therefore lies entirely in the
+trivial representation $\Aone$. By orthogonality of irreps, such a load can only
+excite response components that also transform as $\Aone$: the projection of the
+forced response onto any non-$\Aone$ subspace vanishes identically. We implement
+this projection explicitly as a $\Dfour$ irreducible-representation
+decomposition of any candidate field. The practical consequence is a clean,
+\emph{closed-form} reachability statement:
+\begin{equation}
+\boxed{\;\text{reachability}(T)\;=\;\frac{\lVert \mathcal{P}_{\Aone} T\rVert^2}
+{\lVert T\rVert^2}\;,}
+\label{eq:reach}
+\end{equation}
+where $\mathcal{P}_{\Aone}$ projects the target onto the $\Aone$ subspace. Energy
+of the target outside $\Aone$ cannot be reproduced \emph{no matter how strong the
+algorithm}, because the central drive provides no channel into those irreps.
+
+\subsection{Worked reachability of representative targets}
+Equation~\eqref{eq:reach} is analytic and can be evaluated directly on each
+target. Table~\ref{tab:reach} reports the resulting $\Aone$ fractions. An X-shape
+lives entirely in $\Aone$ and is in principle fully reachable; a single diagonal
+is only half-reachable (its complement lies in $B_2$); and the ``IC'' letter pair
+places the majority of its energy in $E$ and $B_1$, so most of its signal is
+\emph{structurally} inadmissible. This furnishes, for the first time in the
+project, an exact mathematical answer to the question ``why does IC never appear''
+that is independent of any particular optimiser.
+
+\begin{table}[h]
+\centering
+\caption{Analytic reachability (Eq.~\eqref{eq:reach}): the $\Aone$ energy
+fraction is a hard upper bound a central drive can hope to reproduce.}
+\label{tab:reach}
+\small
+\begin{tabular}{@{}lccl@{}}
+\toprule
+Target & $\Aone$ fraction & Outside $\Aone$ (unreachable) & Meaning \\
+\midrule
+X-shape          & $100.0\%$ & $0\%$            & theoretically fully reachable \\
+Single diagonal  & $51.7\%$  & $48.3\%$ ($B_2$) & half reachable \\
+IC letters       & $41.9\%$  & $58.1\%$ ($E{+}B_1$) & majority cannot couple in \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent The implication for the whole pipeline is sharp: a target must first be
+\emph{admissible} (high $\Aone$ fraction) before any amount of optimisation is
+worthwhile. Using the reachability verdict as a front-end filter---rather than
+discovering the ceiling empirically after the fact---is, in retrospect, the single
+most important methodological lesson of the project.
+
+%------------------------------------------------------------------ 5
+\section{Methodology}\label{sec:method}
+
+\subsection{Differentiable orthotropic-plate surrogate}\label{sec:surrogate}
+At the heart of the pipeline is a differentiable Kirchhoff plate surrogate
+implemented so that the loss is end-to-end differentiable with respect to the
+thickness field. We assemble the orthotropic bending-stiffness operator from the
+full laminate energy functional~\cite{reddy2003}; each cell may, in the general
+formulation, rotate its bending-stiffness tensor by a local angle $\theta$. The
+discrete eigenproblem~\eqref{eq:eig} is solved with a sparse solver, and gradients
+of the loss with respect to $\matH$ (and $\bm\theta$, $\omega$) are obtained by a
+combination of automatic differentiation~\cite{baydin2018,paszke2019} and analytic
+eigenpair sensitivities~\cite{fox1968,nelson1976}, the latter being the classical
+route to differentiating eigenvalues and eigenvectors of~\eqref{eq:eig}. The
+adjoint viewpoint~\cite{giles2000} makes the gradient computation independent of
+the number of design variables.
+
+The decisive design decision is one of \emph{role}, not of formulation: the
+surrogate is treated as a \textbf{compass, not a judge}. It is fast enough to push
+the thickness field and frequency to a ``surrogate-good'' region in seconds, but
+it is never allowed to decide the winner; that authority belongs to the
+finite-element model. Two opposite misuses---treating the surrogate as the truth,
+and treating it as the final referee---were both committed earlier in the project
+and both produced over-optimistic designs that did not survive high-fidelity
+re-evaluation (Section~\ref{sec:gap}).
+
+\subsection{The anisotropy hypothesis and its collapse}\label{sec:aniso}
+A tempting hypothesis motivated the orthotropic formulation: since 3D-printed
+parts are naturally anisotropic, letting the fibre orientation $\theta$ vary per
+cell would make the bending-stiffness operator cease to commute with $\Dfour$,
+allowing a central drive to leak into non-$\Aone$ irreps and thereby break the
+ceiling of Section~\ref{sec:theory}. The argument is physically appealing.
+
+A scaling analysis nonetheless predicts that the effect is negligible in the
+working band. Writing the forced operator as $\matK-\omega^2\matM$, in the
+relevant frequency range the inertial term $\omega^2\lVert\matM\rVert$ exceeds the
+stiffness term $\lVert\matK\rVert$ by several orders of magnitude. Because
+$\theta$ enters the physics \emph{only} through $\matK$, its influence on the
+response is suppressed by the same ratio: the response is, to leading order,
+mass-controlled, and the symmetry-breaking that $\theta$ would introduce through
+the stiffness is drowned out. The orientation field is, in addition, a
+\emph{parasitic} optimisation dimension: it inflates a non-convex loss landscape
+and diverts gradient budget away from a clean convergence in $\matH$ and $\omega$.
+Independent confirmation that the realised anisotropy ratio of representative
+printable materials is far smaller than the optimistic literature values only
+reinforces the conclusion. We therefore retain the orthotropic machinery for
+generality but treat $\theta$ as effectively frozen, and the isotropic path as the
+default. The corresponding quantitative ablation is reported in
+Section~\ref{sec:experiments}.
+
+\subsection{A recognisability metric grounded in powder physics}\label{sec:metric}
+Early scoring used pixel-overlap measures (IoU/Jaccard, Dice, Chamfer
+distance)~\cite{jaccard1912,dice1945,barrow1977}, which are discrete,
+non-differentiable, and unstable under mode switching. We replace them with a
+metric grounded in the actual deposition physics: powder accumulates where
+$|\bm{u}|\approx0$, so the relevant quantity is a powder density concentrated on
+nodal lines. The recognisability functional combines (i)~\emph{enrichment}, the
+ratio of powder density inside the target region to the global mean;
+(ii)~\emph{recall}, the fraction of the target covered; (iii)~\emph{contrast}; and
+(iv)~a \emph{direction} term. A continuous, differentiable surrogate of this
+functional---an amplitude-valley loss---is used inside the optimiser, while the
+discrete powder model is used for evaluation. We also note the connection to
+optimal-transport objectives: matching nodal-line measures rather than pixels is
+naturally expressed through Sinkhorn divergences~\cite{cuturi2013}, which, like
+Wasserstein objectives for waveform matching~\cite{engquist2014}, avoid the
+cycle-skipping pathologies of pixelwise $L^2$/IoU losses. The choice of metric is
+not cosmetic: it re-shuffles which candidates are considered ``best'' and
+therefore steers the entire search, a point we return to in
+Section~\ref{sec:discussion}.
+
+\subsection{Two-phase finite-element production pipeline}\label{sec:pipeline}
+The production pipeline couples the surrogate to the finite-element model in two
+phases that decouple the two things that can go wrong---picking the wrong
+frequency and picking the wrong shape.
+
+\paragraph{Phase 1 — modal selection.}
+We compute the finite-element eigenfrequencies of the candidate plate, rank each
+eigenmode by its likeness to the target, drive the forced
+response~\eqref{eq:forced} \emph{on resonance}, and compose the best single mode
+or a composite of complementary modes. Driving on resonance is essential: an
+off-resonance drive lets the central point force dominate and skews the modes, so
+that clean nodal lines never form. We also find, in principle, that an
+\emph{interference of two complementary modes} (a beat composite) can be more
+target-like than any single eigenmode---a degree of freedom invisible to a
+single-mode view.
+
+\paragraph{Phase 2 — trust-region refinement.}
+Taking the finite-element response as ground truth, the thickness field is refined
+by a trust-region iteration~\cite{conn2000} embedded in a surrogate-management
+framework~\cite{booker1999}: the surrogate proposes a step, the finite-element
+model re-evaluates it, and the step is accepted or the trust radius shrunk. Modal
+correspondence between iterations is tracked by the Modal Assurance
+Criterion~\cite{allemang1982}. This explicitly manages the surrogate--FEA gap
+through ``trust'' and refines monotonically, in contrast to a naive loop that
+corrects frequency and shape simultaneously and diverges.
+
+\subsection{The surrogate--FEA gap}\label{sec:gap}
+The thin-plate surrogate and the thick-plate finite-element model differ
+permanently: plate theory (thin versus shear-deformable thick), mesh density,
+boundary geometry (an abstract central constraint versus a circular clamp), and
+two-dimensional plane stress versus a full three-dimensional elasticity tensor.
+These are \emph{systematic physical differences}, not noise. Qualitatively, the
+surrogate is excellent at low modal order and degrades at high order, and the
+mapping between surrogate and finite-element frequencies follows a clean power law
+rather than a random scatter---evidence that the gap is structural. The correct
+response to a systematic gap is neither to trust the surrogate nor to over-fit
+against it, but to use it as a compass and let the finite-element model arbitrate;
+this is precisely the rationale for the two-phase pipeline of
+Section~\ref{sec:pipeline}. A separate, sobering observation concerns numerical
+hygiene: a single cross-scale additive constant in a normalisation
+($\text{amp}/(\max(\text{amp})+\varepsilon)$ with a fixed $\varepsilon$) silently
+clamped a key metric whenever the finite-element amplitudes were many orders of
+magnitude smaller than the surrogate's, systematically \emph{under}-reporting
+historical results until corrected.
+
+\subsection{Manufacturable export and software system}\label{sec:software}
+The pipeline terminates in a manufacturable artefact. A zero-dependency exporter
+converts the $15\times15$ thickness field into a stepped-box STL (one box per
+cell, flat-bottomed for bed adhesion, with optional smoothing of the steps),
+directly slicable for fused-deposition printing without any orientation control.
+The system is delivered as a full-stack application: a multithreaded backend that
+orchestrates the surrogate and the finite-element solver (managing the solver
+lifecycle, auto-discovering tool paths, and exposing result and diagnostic
+endpoints including the reachability verdict of Section~\ref{sec:theory}), and a
+single-page frontend organised around target design, material tuning, run control,
+results inspection, a uniform-plate pattern gallery filtered by central-drive
+excitability, and a 3D-print export tab. The engineering discipline of the project
+included a read-only algorithmic audit that quantified cognitive biases in the
+metrics, strict roll-back discipline against regressions, and per-experiment
+reproducibility.
+
+%------------------------------------------------------------------ 6 (EVOLUTION)
+\section{Algorithmic evolution: three eras and roughly twenty lines}\label{sec:eras}
+
+The architecture of Section~\ref{sec:method} did not arrive by design; it
+precipitated out of an extended trial-and-error process that is itself part of the
+contribution, because each abandoned line marks a wall of the feasible region. We
+organise the history into three eras followed by a modern production period
+(Table~\ref{tab:eras}). The milestone numbers quoted below describe the
+\emph{development trajectory}; the controlled experimental validation remains the
+(deliberately empty) subject of Section~\ref{sec:experiments}.
+
+\begin{table}[h]
+\centering
+\caption{The three eras and the modern production period.}
+\label{tab:eras}
+\small
+\begin{tabular}{@{}p{2.9cm}p{3.0cm}p{5.2cm}p{3.4cm}@{}}
+\toprule
+Era & Phases & Core paradigm & Outcome \\
+\midrule
+I --- Blind search & Phase A--I (9 lines) & ``guess thickness $\to$ run FEA $\to$ tweak'' & score stuck at $0.034$; all below bar \\
+II --- Structured & W1--W6 (6 lines) & prior filter + main-loss redesign + gradient path & IC score pushed to $0.171$ \\
+III --- Recognisability & W7--W8 (2 lines) & redefine success via powder physics & X-shape enrichment $3.76\times$ (ceiling) \\
+Modern production & W9, W10, two-phase ($\sim$3 lines) & differentiable surrogate + FEA trust-region loop + productisation & two-phase pipeline + software \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Era I --- blind search (Phases A--I)}\label{sec:eraI}
+The most naive formulation treats the $225$-dimensional thickness field directly
+as the optimisation variable and searches it with gradient-free methods
+(Table~\ref{tab:eraI}). Random and evolutionary search only ever produced the
+``generic plate-mode family'' (arcs, stars, rings, centre-dominant blobs) with no
+letter-like structure; response-guided error maps could say \emph{where} a pattern
+was wrong but not \emph{which} nodal line to move where, because eigenmodes are
+global objects; a first Kirchhoff--Love proxy already exposed the
+surrogate-to-FEA gap; and a strict-scoring upgrade honestly cut an inflated best
+of $\approx0.2$ down to $0.034$. Expanding the design contract from $225$ to
+$675$ dimensions did not help. Era~I ended with a best honest score of $0.034$,
+far below the $0.08$ engineering bar, and a clear diagnosis: more generations
+would not help; the problem had to be redesigned from the physics and mathematics
+upward.
+
+\begin{table}[h]
+\centering
+\caption{Era I --- the nine blind-search lines and their lessons.}
+\label{tab:eraI}
+\small
+\begin{tabular}{@{}p{0.7cm}p{5.3cm}p{2.2cm}p{6.8cm}@{}}
+\toprule
+Line & Method & Methodological basis & Lesson \\
+\midrule
+A & Random / evolutionary search (GA, mutation, neighbour-diff repair, skeleton guidance) & \cite{holland1975,bendsoe2003} & Only the generic plate-mode family; no letters \\
+B & Response-guided loop (missing/extra error maps; iterative inversion) & \cite{tarantola2005} & Error maps locate error but not the corrective move; modes are global \\
+C & Kirchhoff--Love plate proxy (sparse biharmonic eigensolve) & \cite{leissa1969,waller1939} & First exposure of the surrogate-to-FEA gap; proxy scores do not transfer \\
+D & Strict shape scoring ($v1\to v5$; IoU/Dice/Chamfer) & \cite{jaccard1912,dice1945,barrow1977} & Honest metrics beat pretty ones: best falls from $\approx0.2$ to $0.034$ \\
+E & Design-contract expansion (SIMP density/loss/material, $225\to675$) & \cite{bendsoe1989,bendsoe1999} & More dimensions are not the answer; placement still fails \\
+F & Auxiliary-physics local heuristics (direct/pattern search) & \cite{hooke1961} & Most robust historical source, but capped at $\approx0.032$--$0.034$ \\
+G & Latent joint physics (hand-designed basis; POD) & \cite{berkooz1993} & A hand-made basis can miss key directions \\
+H & CMA-ES in latent coefficient space & \cite{hansen2001} & Exposes surrogate optimism: good on proxy, poor on FEA \\
+I & Response-calibrated scheduling (surrogate/Bayesian optimisation) & \cite{jones1998,shahriari2016} & First systemic treatment of ``surrogate is unreliable''; not fully landed \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Era II --- structured search (W1--W6)}\label{sec:eraII}
+The second era replaced blind search with structure: a physical prior filter, a
+differentiable main loss, a connected gradient path, and a data-driven design
+subspace (Table~\ref{tab:eraII}). Two points deserve emphasis. First, the
+realizability prior of W1 already \emph{predicted the entire IC outcome} through a
+$\Dfour$-mismatch of $0.78$; that this verdict was not used as a front-end filter
+at the time is, in retrospect, the single biggest methodological miss of the
+project (it is precisely the theory later formalised in
+Section~\ref{sec:theory}). Second, W6 --- the climax of the era --- pushed the IC
+score from $0.034$ to $0.171$, a roughly fivefold gain that nonetheless still did
+not look like IC, which is exactly what motivated the redefinition of success in
+Era~III.
+
+\begin{table}[h]
+\centering
+\caption{Era II --- the six structured lines and their key results.}
+\label{tab:eraII}
+\small
+\begin{tabular}{@{}p{0.7cm}p{5.3cm}p{2.2cm}p{6.8cm}@{}}
+\toprule
+Line & Method & Methodological basis & Key result / lesson \\
+\midrule
+W1 & Realizability prior filter (Courant nodal domains + $\Dfour$ mismatch + stroke width) & \cite{courant1953,pleijel1956,waller1939} & IC mismatch $0.78$ predicted the ending; not used up front (biggest miss) \\
+W2 & Main-loss redesign (IoU $\to$ amplitude valley) & \cite{nocedal2006} & Smoother optimisation; physical ceiling unchanged \\
+W3 & Differentiable plate + adjoint ($\partial\,\text{loss}/\partial\matH$) & \cite{giles2000,baydin2018,paszke2019,fox1968,nelson1976} & Gradient path finally connected; first structural upgrade \\
+W4 & Low-dimensional manifold search (PCA of candidates) & \cite{pearson1901,berkooz1993} & Data basis beats hand-made basis; markedly lower loss than W3 \\
+W5 & Homotopy continuation (warm-start toward target) & \cite{allgower1990,blake1987} & Stalls at $\lambda\approx0.3$ --- an honest reachability indicator \\
+W6 & Spectral placement (cluster eigenvalues near drive) & \cite{pedersen2000,achtziger2007} & Era II climax: IC score $0.034\to0.171$ ($5\times$), still not legible \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Era III --- recognisability (W7--W8)}\label{sec:eraIII}
+Era~III was triggered by the realisation that a good score ($0.171$) still did not
+look like the target. Success was redefined to accept ``similar, not identical'',
+and the scoring system was rewritten around powder physics. The multi-frequency
+root-mean-square composition of W7, optimised with a first-order stochastic
+method~\cite{kingma2015} over the forced response~\cite{leissa1969}, proved a
+\emph{pseudo}-breakthrough: the optimiser learns to weight $|\bm{u}|^2$ to
+fabricate low-amplitude regions that the finite-element model cannot reproduce,
+and it tends to collapse back to a single frequency. W8 then replaced pixel
+overlap with the powder-deposition metric of Section~\ref{sec:metric}, formulated
+through an optimal-transport view of nodal-line matching~%
+\cite{chladni1787,cuturi2013,engquist2014}. Re-ranking the entire candidate history under the new
+metric revealed that the project had optimised the \emph{wrong} metric for months
+and that better candidates had been buried. The X-shape enrichment reached
+$2.84\times$, and $3.76\times$ after the normalisation fix discussed below, which
+became the project ceiling.
+
+\subsection{Modern production --- W9, W10 and the two-phase pipeline}\label{sec:modern}
+The modern period built the pieces that the earlier eras had only gestured at. The
+W9 trust-region loop was structurally correct but under-tuned (too few inner
+steps, too-weak correction, a trust radius that shrank to $0.094\,\text{mm}$), and
+its best finite-element result of $1.40\times$ did not break through --- the lesson
+being that circling a poor surrogate does not help when the root cause is the
+surrogate physics itself; W9 nonetheless contributed the trust-region and
+surrogate-management machinery with modal tracking~%
+\cite{conn2000,booker1999,allemang1982} that Phase~2 later inherited. W10
+implemented the differentiable orthotropic plate of
+Section~\ref{sec:surrogate}~\cite{reddy2003}, and the two-phase pipeline of
+Section~\ref{sec:pipeline} finally realised the iterative calibration loop that
+Era~I had owed all along, by decoupling the frequency correction (driven directly
+at the finite-element resonance) from the shape correction (a small trust-region
+residual).
+
+\subsection{Cross-cutting empirical findings}\label{sec:crosscut}
+Three findings recur across the eras and deserve separate statement.
+
+\paragraph{On-resonance versus off-resonance drive.}
+A late, bug-level discovery: Phase~1 once defaulted to driving at
+$f_{\text{eig}}+1.5\,\text{Hz}$ (off-resonance) to avoid a solver singularity, but
+this let the central point force dominate the response and skewed the modes, so
+that cross- and X-patterns never formed. Switching to an on-resonance drive
+(offset zero) instantly recovered clean modal nodal lines. The off-resonance
+artefact also explains a spurious ``bar through the middle'': off resonance, the
+centre is an antinode bright streak pushed up by the point force, not a true nodal
+line.
+
+\paragraph{A cross-scale numerical constant once hid the truth.}
+The powder-density normalisation $\text{amp}/(\max(\text{amp})+\varepsilon)$ with a
+fixed $\varepsilon$ was harmless in surrogate-space, where amplitudes are
+$\mathcal{O}(1)$, but in finite-element space, where amplitudes are
+$\mathcal{O}(10^{-12})$, the constant was a thousand times larger than the signal
+and silently clamped the key metric to $\approx 1.00$. After the fix, all
+historical finite-element numbers rose (the X-shape from $2.84\times$ to
+$3.76\times$). The lesson is blunt: a cross-scale additive constant is a silent
+killer.
+
+\paragraph{The metric defines the direction of search.}
+Five primary metrics were used over the project, and each switch re-shuffled the
+``best candidate'' (one W6 variant was first under one metric and tenth under
+another): pixel overlaps (IoU/Dice/Chamfer); a smoothed pixel score; an
+amplitude-valley loss; a multi-frequency RMS (easy for the optimiser to cheat);
+and finally the powder-physics recognisability of Section~\ref{sec:metric}. A
+separate read-only algorithmic audit later quantified residual biases even in the
+last family (for example, that enrichment can prefer a compact central blob over an
+extended shape, and that fixed-percentile thresholds are sensitive to powder
+density). The meta-lesson, which we restate in Section~\ref{sec:discussion}, is to
+define ``success'' before optimising it.
+
+%------------------------------------------------------------------ 7  (BLANK)
+\section{Experimental setup and results}\label{sec:experiments}
+
+\noindent\emph{This section is intentionally left as a scaffold; the quantitative
+experimental write-up is pending and will populate the subsections below. No
+numerical results are reported here yet.}
+
+\subsection{Experimental setup}
+\noindent\textit{[To be completed.]} Plate and material parameters, the
+finite-element model configuration (mesh, element type, damping, eigenfrequency
+and frequency-domain solver settings via LiveLink), the powder model parameters,
+optimiser hyper-parameters, and the target set.
+
+\subsection{Validation of the reachability theory}
+\noindent\textit{[To be completed.]} Empirical confirmation that achievable
+recognisability tracks the analytic $\Aone$ fraction of Table~\ref{tab:reach}
+across the target set.
+
+\subsection{Anisotropy ablation (material battery)}
+\noindent\textit{[To be completed.]} A target $\times$ material ablation comparing
+an anisotropic configuration (orientation active) against an isotropic baseline
+(orientation frozen), together with the direct sensitivity measurement of the
+composite amplitude to $\theta$.
+
+\subsection{Quantification of the surrogate--FEA gap}
+\noindent\textit{[To be completed.]} Modal-assurance statistics across modal
+order, the surrogate-to-finite-element frequency map, and the fraction of the
+surrogate-predicted improvement that the finite-element pipeline reproduces.
+
+\subsection{End-to-end case studies}
+\noindent\textit{[To be completed.]} Full pipeline results for representative
+targets (X-shape, IC, cross, single diagonal, ring), including the best
+single-mode and composite drives, the refined thickness field, and the exported
+printable geometry.
+
+%------------------------------------------------------------------ 7
+\section{Discussion}\label{sec:discussion}
+
+The four findings of the abstract cohere into a single design philosophy. First,
+the reachability theory of Section~\ref{sec:theory} reframes failure: when a
+target such as IC cannot be produced, this is not an algorithmic shortfall but a
+structural fact about which irreps a central drive can excite, and it is better to
+state that fact precisely than to keep optimising against an inadmissible target.
+Second, the anisotropy analysis of Section~\ref{sec:aniso} is a cautionary tale
+about ``physically plausible'' degrees of freedom: a mechanism can be real
+(orientation does break symmetry through the stiffness) and yet be quantitatively
+irrelevant (because the response is mass-controlled in the working band), so a
+favourite hypothesis must be allowed to die when the scaling says so. Third, the
+surrogate--FEA gap of Section~\ref{sec:gap} shows that the operative ceiling in
+practice is often not the deep physics but the fidelity gap between the model one
+optimises and the model one believes, and that the disciplined response is to
+assign each model the role it is good at. Fourth, the metric discussion of
+Section~\ref{sec:metric} underlines that in an inverse problem the definition of
+``success'' is itself a design choice that silently steers the search; defining it
+correctly---here, in terms of powder physics rather than pixel overlap---is
+prerequisite to optimising at all. The recurring meta-lesson is that a substantial
+fraction of effort in a fixed-hardware inverse problem is well spent on
+\emph{characterising the boundary} rather than on pushing against it.
+
+%------------------------------------------------------------------ 8
+\section{Limitations and future work}\label{sec:limits}
+
+The limitations are inherent rather than incidental. Any target that is not
+$\Dfour$-compatible---an arbitrary letter pair, a single diagonal, an L-shape, a
+generic logo---is physically unreachable under a central point drive, and this is a
+hard ceiling rather than a tuning problem. Material anisotropy offers little
+headroom, both because realised anisotropy ratios are modest and because the
+orientation gradient is negligible off resonance. A surrogate is never the
+finite-element model, so any surrogate-only ``breakthrough'' must be re-checked at
+high fidelity.
+
+It follows that genuine further progress requires changing the
+\emph{hardware}, in decreasing order of leverage: a $\Dfour$-symmetry-breaking
+excitation (multiple shakers or an off-centre drive), a changed boundary (a
+non-square plate), or discrete topology (holes and slots). These lie outside the
+fixed contract of the present study but are the only routes that can lift the
+$\Aone$ ceiling. Within the present contract, promising refinements include a
+symmetry-aware direction metric (to fix principal-axis degeneracy on symmetric
+targets), a genuinely physical time-division multi-frequency drive rather than a
+numerical root-mean-square composite, and further tuning of the trust-region
+parameters of Phase~2.
+
+%------------------------------------------------------------------ 9
+\section{Conclusion}\label{sec:conclusion}
+
+Under a fixed hardware contract---a square plate with a single central
+excitation---we have shown that the right question is not ``how strong can the
+inversion be'' but ``where is the reachability boundary, and why''. A
+symmetry-based theory identifies the $\Aone$ irreducible representation as the only
+channel a central drive can excite and turns this into a closed-form, target-specific
+ceiling; a scaling analysis demotes material anisotropy from a hoped-for escape
+route to a parasitic degree of freedom; and a two-phase, surrogate-as-compass
+pipeline manages the dominant practical obstacle, the gap between a thin-plate
+surrogate and a thick-plate finite-element model. The deliverable is an honest,
+reproducible, manufacturable system rather than an impossible promise of arbitrary
+inversion. The remaining headroom, we argue, is not in the algorithm but in the
+hardware. The experimental validation that quantifies these claims is reported
+separately; the corresponding section here is left as a scaffold by design.
+
+%------------------------------------------------------------------ Ack
+\section*{Acknowledgements}
+This work was carried out as a first-year undergraduate Term~3 summer project at
+Imperial College London. We thank the maintainers of the open-source scientific
+software on which the pipeline is built.
+
+%------------------------------------------------------------------ References
+\begin{thebibliography}{99}
+\setlength{\itemsep}{2pt}
+
+\bibitem{chladni1787} E.~F.~F. Chladni. \textit{Entdeckungen \"uber die Theorie
+des Klanges}. Leipzig, 1787.
+
+\bibitem{waller1939} M.~D. Waller. Vibrations of free square plates.
+\textit{Proc. Phys. Soc.}, 51:831, 1939.
+
+\bibitem{reissner1945} E. Reissner. The effect of transverse shear deformation on
+the bending of elastic plates. \textit{J. Appl. Mech.}, 12:A69--A77, 1945.
+
+\bibitem{mindlin1951} R.~D. Mindlin. Influence of rotatory inertia and shear on
+flexural motions of isotropic, elastic plates. \textit{J. Appl. Mech.},
+18:31--38, 1951.
+
+\bibitem{leissa1969} A.~W. Leissa. \textit{Vibration of Plates}. NASA SP-160,
+1969.
+
+\bibitem{reddy2003} J.~N. Reddy. \textit{Mechanics of Laminated Composite Plates
+and Shells: Theory and Analysis}, 2nd ed. CRC Press, 2003.
+
+\bibitem{tinkham1964} M. Tinkham. \textit{Group Theory and Quantum Mechanics}.
+McGraw--Hill, 1964.
+
+\bibitem{courant1953} R. Courant and D. Hilbert. \textit{Methods of Mathematical
+Physics}, Vol.~1. Interscience, 1953.
+
+\bibitem{pleijel1956} \r{A}. Pleijel. Remarks on Courant's nodal line theorem.
+\textit{Comm. Pure Appl. Math.}, 9:543--550, 1956.
+
+\bibitem{letcher2014} T. Letcher and M. Waytashek. Material property testing of
+3D-printed specimen in PLA on an entry-level 3D printer. \textit{ASME IMECE},
+2014.
+
+\bibitem{pyl2018} L. Pyl, K.-A. Kalteremidou, and D. Van Hemelrijck. Exploration
+of the mechanical properties of FDM-printed PLA. \textit{Procedia Manufacturing},
+14:104--, 2018.
+
+\bibitem{formlabs2018} Formlabs. \textit{Validating Isotropy in SLA 3D Printing}.
+Technical white paper, 2018.
+
+\bibitem{vatphoto2025} Vat-photopolymerisation anisotropy study.
+\textit{Scientific Reports}, 15:97294, 2025.
+
+\bibitem{bambutds} Bambu Lab. \textit{PETG-CF Technical Data Sheet} (TDS V3.0).
+
+\bibitem{holland1975} J.~H. Holland. \textit{Adaptation in Natural and Artificial
+Systems}. University of Michigan Press, 1975.
+
+\bibitem{bendsoe2003} M.~P. Bends\o{}e and O. Sigmund. \textit{Topology
+Optimization: Theory, Methods and Applications}. Springer, 2003.
+
+\bibitem{tarantola2005} A. Tarantola. \textit{Inverse Problem Theory and Methods
+for Model Parameter Estimation}. SIAM, 2005.
+
+\bibitem{jaccard1912} P. Jaccard. The distribution of the flora in the alpine
+zone. \textit{New Phytologist}, 11:37--50, 1912.
+
+\bibitem{dice1945} L.~R. Dice. Measures of the amount of ecologic association
+between species. \textit{Ecology}, 26:297--302, 1945.
+
+\bibitem{barrow1977} H.~G. Barrow et al. Parametric correspondence and chamfer
+matching. \textit{Proc. IJCAI}, 1977.
+
+\bibitem{bendsoe1989} M.~P. Bends\o{}e. Optimal shape design as a material
+distribution problem. \textit{Struct. Optim.}, 1:193--202, 1989.
+
+\bibitem{bendsoe1999} M.~P. Bends\o{}e and O. Sigmund. Material interpolation
+schemes in topology optimization. \textit{Arch. Appl. Mech.}, 69:635--654, 1999.
+
+\bibitem{hooke1961} R. Hooke and T.~A. Jeeves. ``Direct search'' solution of
+numerical and statistical problems. \textit{J. ACM}, 8:212--229, 1961.
+
+\bibitem{berkooz1993} G. Berkooz, P. Holmes, and J.~L. Lumley. The proper
+orthogonal decomposition in the analysis of turbulent flows. \textit{Annu. Rev.
+Fluid Mech.}, 25:539--575, 1993.
+
+\bibitem{hansen2001} N. Hansen and A. Ostermeier. Completely derandomized
+self-adaptation in evolution strategies. \textit{Evol. Comput.}, 9(2):159--195,
+2001.
+
+\bibitem{jones1998} D.~R. Jones, M. Schonlau, and W.~J. Welch. Efficient global
+optimization of expensive black-box functions. \textit{J. Global Optim.},
+13:455--492, 1998.
+
+\bibitem{shahriari2016} B. Shahriari et al. Taking the human out of the loop: A
+review of Bayesian optimization. \textit{Proc. IEEE}, 104:148--175, 2016.
+
+\bibitem{nocedal2006} J. Nocedal and S.~J. Wright. \textit{Numerical
+Optimization}, 2nd ed. Springer, 2006.
+
+\bibitem{giles2000} M.~B. Giles and N.~A. Pierce. An introduction to the adjoint
+approach to design. \textit{Flow Turbul. Combust.}, 65:393--415, 2000.
+
+\bibitem{baydin2018} A.~G. Baydin et al. Automatic differentiation in machine
+learning: a survey. \textit{J. Mach. Learn. Res.}, 18:1--43, 2018.
+
+\bibitem{paszke2019} A. Paszke et al. PyTorch: An imperative style, high-performance
+deep learning library. \textit{Proc. NeurIPS}, 2019.
+
+\bibitem{fox1968} R.~L. Fox and M.~P. Kapoor. Rates of change of eigenvalues and
+eigenvectors. \textit{AIAA J.}, 6:2426--2429, 1968.
+
+\bibitem{nelson1976} R.~B. Nelson. Simplified calculation of eigenvector
+derivatives. \textit{AIAA J.}, 14:1201--1205, 1976.
+
+\bibitem{pearson1901} K. Pearson. On lines and planes of closest fit to systems of
+points in space. \textit{Phil. Mag.}, 2:559--572, 1901.
+
+\bibitem{allgower1990} E.~L. Allgower and K. Georg. \textit{Numerical Continuation
+Methods: An Introduction}. Springer, 1990.
+
+\bibitem{blake1987} A. Blake and A. Zisserman. \textit{Visual Reconstruction}.
+MIT Press, 1987.
+
+\bibitem{pedersen2000} N.~L. Pedersen. Maximization of eigenvalues using topology
+optimization. \textit{Struct. Multidisc. Optim.}, 20:2--11, 2000.
+
+\bibitem{achtziger2007} W. Achtziger and M. Ko\v{c}vara. On the maximization of
+the fundamental eigenvalue in topology optimization. \textit{Struct. Multidisc.
+Optim.}, 34:181--195, 2007.
+
+\bibitem{kingma2015} D.~P. Kingma and J. Ba. Adam: A method for stochastic
+optimization. \textit{Proc. ICLR}, 2015.
+
+\bibitem{cuturi2013} M. Cuturi. Sinkhorn distances: Lightspeed computation of
+optimal transport. \textit{Proc. NeurIPS}, 2013.
+
+\bibitem{engquist2014} B. Engquist and B.~D. Froese. Application of the
+Wasserstein metric to seismic signals. \textit{Commun. Math. Sci.}, 12:979--988,
+2014.
+
+\bibitem{conn2000} A.~R. Conn, N.~I.~M. Gould, and P.~L. Toint.
+\textit{Trust-Region Methods}. SIAM, 2000.
+
+\bibitem{booker1999} A.~J. Booker et al. A rigorous framework for optimization of
+expensive functions by surrogates. \textit{Struct. Multidisc. Optim.}, 17:1--13,
+1999.
+
+\bibitem{allemang1982} R.~J. Allemang and D.~L. Brown. A correlation coefficient
+for modal vector analysis. \textit{Proc. Int. Modal Analysis Conf. (IMAC)}, 1982.
+
+\bibitem{acta2024} Topology optimization design of Chladni patterns for vibration
+mode manipulability. \textit{Acta Mechanica Sinica}, 2024.
+DOI:~10.1007/s10409-023-23445-x.
+
+\bibitem{tcherniak2002} D. Tcherniak. Topology optimization of resonating
+structures using SIMP method. \textit{Int. J. Numer. Meth. Eng.}, 54:1605--1622,
+2002.
+
+\bibitem{bellette} P. Bellette. \texttt{chladni\_inverse\_design}. Open-source
+implementation (energy-landscape formulation).
+
+\bibitem{misseroni2016} D. Misseroni, A.~B. Movchan, and N.~V. Movchan. Cymatics
+for the cloaking of flexural vibrations in a structured plate. \textit{Scientific
+Reports}, 6:23929, 2016.
+
+\bibitem{tuanchen} P.-T. Tuan, Y.-F. Chen, et al. Maximum-entropy reconstruction
+of Chladni forced-response nodal patterns via the inhomogeneous Helmholtz
+equation.
+
+\bibitem{zhou2016} Q. Zhou et al. Controlling the motion of multiple objects on a
+Chladni plate. \textit{Nature Communications}, 7:12764, 2016.
+
+\bibitem{allaire2004} G. Allaire, F. Jouve, and A.-M. Toader. Structural
+optimization using sensitivity analysis and a level-set method. \textit{J.
+Comput. Phys.}, 194:363--393, 2004.
+
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,18 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{ctexhook}[2026/05/31 v1 minimal ctexhook shim for xeCJK]
+\RequirePackage{etoolbox}
+\ExplSyntaxOn
+\prg_new_conditional:Npnn \ctex_if_format_at_least:n #1 { p , T , F , TF }
+  { \prg_return_true: }
+\cs_new_protected:Npn \ctex_disable_package:n #1
+  { \cs_gset:cpn {ver@#1.sty} {} {} }
+\cs_new_protected:Npn \ctex_replace_package:nn #1#2
+  { \ctex_disable_package:n {#1} \AtEndPreamble { \RequirePackage{#2} } }
+\cs_new_protected:Npn \ctex_at_end_preamble:n #1 { \AtEndPreamble {#1} }
+\cs_new_protected:Npn \ctex_after_end_preamble:n #1 { \AfterEndPreamble {#1} }
+\cs_new_protected:Npn \ctex_at_begin_package:nn #1#2
+  { \AddToHook { package/#1/before } {#2} }
+\cs_new_protected:Npn \ctex_at_end_package:nn #1#2
+  { \AddToHook { package/#1/after } {#2} }
+\ExplSyntaxOff
+\endinput
