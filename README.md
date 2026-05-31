@@ -8,6 +8,8 @@ Chladni Studio 是一个用于 Chladni 板的本地逆向设计工具。用户�
 
 ## Start Here / 从这里开始
 
+- **[★ Paper / 结案论文](./paper/chladni_paper_zh.pdf)** — [中文 PDF](./paper/chladni_paper_zh.pdf) · [English PDF](./paper/chladni_paper_en.pdf) · LaTeX 源码 [zh](./paper/chladni_paper_zh.tex) / [en](./paper/chladni_paper_en.tex)
+- **[★ Final Project Report / 结案项目报告](./reports/final_project_report.zh-CN.md)** — [中文](./reports/final_project_report.zh-CN.md) · [English](./reports/final_project_report.en.md)
 - **[★ Final Results & Production Pipeline / 最终成果与生产流水线](./docs/final_results.zh-CN.md)** — read first / 推荐先读
 - [Reports Index / 报告索引](./reports/INDEX.md) · [Candidates Index / 候选索引](./candidates/INDEX.md) · [Scripts Index / 脚本索引](./scripts/INDEX.md)
 - [Deployment Guide / 三系统部署教程](./docs/deployment_guide.md) ([中文](./docs/deployment_guide.zh-CN.md) | [English](./docs/deployment_guide.en.md))
