@@ -1,0 +1,209 @@
+% !TEX program = xelatex
+% Chladni Plate Inverse Design System: Improvement Directions (Final)
+% Incorporates the June 2026 decision-experiment errata
+% (reports/future_directions_for_successors.en.md)
+% Compile: xelatex improvement_directions_final_en.tex
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{array}
+\usepackage[colorlinks=true,linkcolor=blue,urlcolor=blue]{hyperref}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\linespread{1.15}
+\setlength{\parskip}{0.35em}
+
+\title{\textbf{Chladni Plate Inverse Design System:\\Improvement Directions (Final)\\
+\large From ``self-validation inside the simulation'' to ``reproducible in reality'' ---\\
+\large incorporating the June 2026 decision-experiment errata, with a trial-history review}}
+\author{Chladni Studio Project Team}
+\date{June 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+What our software does can be summed up in one sentence: the user draws a pattern, and the program works backwards to design an unevenly thick plate and a few drive frequencies so that sand on the vibrating plate arranges itself into that pattern. The first edition of this report proposed five improvement directions centred on the optimiser and the scoring. A subsequent round of decision experiments (see \code{reports/future\_directions\_for\_successors}) overturned that ordering: the project's real bottleneck is not algorithmic cleverness but the fact that \textbf{the entire chain validates itself inside the simulation} --- the surrogate is tuned against COMSOL, COMSOL is treated as the truth, yet no real plate was ever used to calibrate it; meanwhile the optimiser is structurally pushed by the physics ceiling onto \textbf{off-resonance operating points that are physically unreproducible}. ``The pattern exists in COMSOL but not in reality'' is not a bug; it is the inevitable outcome of this methodology. This final edition reorders the directions accordingly: (0)~close the simulation-to-real-plate validation loop first; (1)~make physical reproducibility a hard constraint, choosing frequencies only from well-isolated eigenfrequencies; (2)~face the symmetry ceiling honestly: restrict the targets or change the physics; (3)~unify the excitation models of the surrogate, COMSOL, and the real rig; (4)~scoring and geometry-aware refinements come last. The first edition's ``centre-artefact correction'' is now closed: its mechanism diagnosis was correct, but the artefact is cosmetic, the centre-exclusion mask has long been active in the production configuration, and the proposed ``proper fix'' was tested and found ineffective --- do not invest further. The trial-history review is retained and updated at the end.
+\end{abstract}
+
+\section{Background: How the System Works, and Where It Went Wrong}
+
+\subsection{The pipeline}
+
+The pipeline has four steps. First, the user supplies a $256\times 256$ black-and-white target image. Second, a fast ``draft physics engine'' that we wrote ourselves (a \emph{surrogate}) iterates about 300 times, jointly adjusting the plate's $15\times 15$ thickness layout $H$ and six candidate drive frequencies. Third, the plate goes to the accurate-but-slow COMSOL simulation, which computes its first 30 resonance modes; the most target-relevant frequencies are selected (Phase~1), plus one ``lucky frequency'' (165~Hz) found by sweeping. Fourth (Phase~2), the COMSOL results feed back into one careful round of fine-tuning. The pipeline finally reported ``sand on the target lines 4.85 times denser than the plate average'' for the IC target.
+
+\subsection{Two facts revealed by the decision experiments}
+
+A final round of read-only decision experiments (scripts \code{scripts/\_decexp\_*.py}, outputs in \code{reports/\_decision\_experiments/}) established two facts that change everything:
+
+\textbf{Fact one: the chain never touched reality.} At no point did the project verify that COMSOL predicts a real plate. The surrogate is calibrated against COMSOL and COMSOL is treated as the truth, but this ``judge'' was never itself examined. The $4.85\times$ is therefore a \textbf{simulation-internal number}, never anchored to reality.
+
+\textbf{Fact two: the designs systematically operate off resonance.} A census of 32 design-versus-COMSOL-eigenfrequency pairs shows 23 designs put more than half of their drive energy outside resonance. The base production design has only \textbf{4\% of its energy on-resonance}: its dominant frequency 165.4~Hz (weight 0.604 --- the ``lucky frequency'') sits 2.87 half-power bandwidths away from the nearest eigenmode; 1099~Hz (weight 0.289) sits 25 bandwidths away; and about 36\% of the energy lands in the 800--1000~Hz \textbf{``modal desert''} --- a band containing no eigenmode at all. Off resonance means weak, mode-mixed, faint responses; and a real plate's modes shift further due to material and printing deviations, so the same frequencies on a real plate just produce another faint blur. \textbf{``Reality does not reproduce the COMSOL picture'' is not bad luck; it is guaranteed.}
+
+\subsection{Why does the optimiser run off resonance?}
+
+Because the physics ceiling pushes it there. Single centre-point excitation plus square (D4) symmetry means \textbf{only the symmetric mode family (A1) can be effectively excited and reproduced}. An asymmetric target like ``IC'' simply cannot be expressed in the symmetric on-resonance modes (only about 42\% of IC is physically allowed; an X is 100\%, a single diagonal about 52\%). Scoring ``does the picture look right'', the optimiser is structurally driven towards off-resonance points that ``happen to look like IC'' --- exactly the points that cannot be reproduced. \textbf{In other words, the pipeline could ``do IC'' precisely because it used physically untenable frequencies.} The first edition acknowledged the ceiling but badly underestimated its central role: it is not background scenery; it is the engine of the whole contradiction.
+
+\subsection{Evidence credibility grades}
+
+Following the errata document, every key claim here carries a source grade --- do not mistake estimates for verdicts:
+
+\begin{center}
+\small
+\begin{tabular}{@{}llp{0.5\textwidth}@{}}
+\toprule
+Tag & Credibility & Meaning \\
+\midrule
+{[COMSOL truth]} & High & From COMSOL eigenfrequency / forced-response exports \\
+{[Code verified]} & High & Confirmed by reading the source \\
+{[Surrogate estimate]} & Medium & Computed on the coarse $25\times 25$ surrogate; needs recheck \\
+{[Needs experiment]} & Unverified & Only a real plate can confirm \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The 4\%, 23/32, and modal-desert figures above are [COMSOL truth]; the A1 accessibility percentages are [Code verified] (mathematics) plus [Needs experiment] (real-plate reproducibility).
+
+\subsection*{Glossary}
+
+\begin{center}
+\small
+\begin{tabular}{@{}p{0.26\textwidth}p{0.66\textwidth}@{}}
+\toprule
+Term & Plain-language meaning \\
+\midrule
+surrogate & our hand-written fast approximate physics engine: a compass, not a judge \\
+enrichment & how many times denser the sand is on the target lines than the plate average \\
+recall / precision & how much of the target the ``quiet zone'' covers / how much of the quiet zone actually lies on the target \\
+nodal line / quiet zone & where the plate barely vibrates; sand settles there \\
+D4 / A1 & the square's eight self-mapping operations / the most symmetric mode family, unchanged by all of them \\
+on-resonance & the drive frequency lies within the half-power bandwidth of an eigenfrequency: strong, reproducible response \\
+half-power bandwidth & the effective width of a resonance peak, $\approx \zeta f$; outside it the response drops sharply \\
+modal isolation & the spacing between a chosen eigenfrequency and its neighbours; poor isolation makes patterns error-sensitive \\
+dynamic amplification & how much louder the resonant response is than a static push; low amplification means faint patterns \\
+modal desert & a frequency band containing no eigenmode; energy sent there yields only weak response \\
+PCA design manifold & a few dozen ``directions of useful change'' distilled from historically good designs \\
+optimal transport (OT) & the minimum effort to ``carry'' the current sand picture into the target one \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Direction 0 (the Foundation): Close the Simulation-to-Real-Plate Loop}
+
+The first thing a successor should do is not to change any algorithm, but to \textbf{print a plate and measure it}: obtain its real eigenfrequencies and mode shapes by tap testing or laser vibrometry (lowest-cost alternative: sweep the frequency, sprinkle sand, photograph), then fit the COMSOL material and boundary parameters against the measurements.
+
+Why this is rank zero: until it is done, COMSOL is an \textbf{unexamined judge}, and every downstream number (including $4.85\times$) hangs in the air. Every other improvement --- better scoring, smarter search --- presupposes that this judge can be trusted. \textbf{Without this link, everything else is a castle in the air.}
+
+A minimal executable version: (a)~print the current production design and one uniform plate; (b)~sweep the frequency and record how the sand pattern changes (a slow-motion phone camera is enough to start); (c)~compare measured eigenfrequencies against COMSOL's list and fit Young's modulus, density, and clamp stiffness; (d)~write the fitted parameters back into \code{config.yaml}, rerun Phase~1, and check whether the mode predictions now line up. This step simultaneously answers ``how far is COMSOL from reality'' and ``which parameter causes most of the gap''. [Needs experiment]
+
+\section{Direction 1: Physical Reproducibility as a Hard Constraint (absorbing the old ``frequency inner loop'')}
+
+\subsection{The constraint itself}
+
+Evidence in Section~1.2. The new rule is simple: \textbf{drive only at well-isolated eigenfrequencies} (spacing to the nearest neighbour much larger than the half-power bandwidth, so that even when the real plate's modes shift, the operating point stays on resonance); and explicitly penalise off-resonance and densely packed modal regions in the objective. We recommend a ``reproducibility score''
+\begin{equation}
+S_{\mathrm{repro}} \;=\; \text{dynamic amplification} \times \text{modal isolation},
+\end{equation}
+and discarding any design below threshold no matter how target-like its picture is. For the current production design, the recommended isolated on-resonance candidates are \textbf{58 / 132 / 264 / 371 Hz} ($\le 600$~Hz, spacing $\ge 4$ bandwidths), avoiding the 800--1000~Hz modal desert. [Surrogate estimate --- recheck with COMSOL]
+
+\subsection{The proper home of the old ``frequency inner loop''}
+
+The first edition proposed ``sweep the whole frequency range for each plate inside the loop, score at the best frequency, then take the thickness gradient'' (modal superposition makes the sweep nearly free; Danskin's theorem makes the gradient at the argmax clean). Under the new framework this idea is \textbf{not discarded --- it is conscripted}: once frequencies may only be chosen from the COMSOL eigenfrequency set, ``max over a continuous band'' collapses into \textbf{``discrete selection over the eigenfrequency list, plus an isolation penalty''} --- which is exactly the reproducibility constraint. At each step, eigendecompose the proxy plate once, take its eigenfrequency list (not a continuous sweep), choose the drive points by ``pattern score $\times$ reproducibility score'', then take the thickness gradient. The old trust-region intuition (``steps small enough that the new plate's best frequencies stay close to the old plate's'') carries over unchanged.
+
+\section{Direction 2: Face the Ceiling Honestly --- Change the Targets or Change the Physics}
+
+The physics (Section~1.3) leaves exactly two ways out; pick one or pursue both:
+
+\textbf{(a) Change the targets}: restrict the target library to \textbf{physically reachable patterns} --- figures with high A1-symmetric content (X, cross, ring, star), or ``mode-neighbourhood'' patterns obtained by lightly perturbing the uniform-plate mode catalogue (\code{src/uniform\_pattern/}). The companion move is to put the existing realisability verdict (\code{target\_realizability.py}, the D4 accessibility score) \textbf{at the front of the UI}: as soon as the user draws, tell them ``this much of your figure is physically allowed'', and guide them to redraw below threshold --- instead of burning two hours of compute to deliver a disappointing result.
+
+\textbf{(b) Change the physics}: genuinely break the D4 constraint --- a multi-exciter phased array, distributed or edge excitation, or an asymmetric plate shape. The shelved \code{mosaic\_z} six-point phased scheme was the right embryo of this route (provided the real rig can do multi-point phased driving). This is the only physically honest path to ``arbitrary patterns''. [Needs experiment]
+
+The closing line of the popular-science article is technically exact: ``Stop shaking the plate from the centre. Add more exciters, push from off-centre, or change the plate's shape --- and a whole new world of patterns opens up.''
+
+\section{Direction 3: Unify the Three Excitation Models}
+
+{[Code verified]} The surrogate and COMSOL currently solve \emph{different} physical problems: the surrogate uses \textbf{whole-plate base inertial excitation} (\code{direct\_forced\_response}: $f=-M\,a_{\mathrm{base}}$, as if the plate sat on a shaker table), while the COMSOL runner uses a \textbf{Gaussian point force with position, amplitude, and phase} (\code{run\_chladni\_forced\_response.m}). The optimiser selects plates under physics A and validates them under physics B --- a standing hazard. The real rig uses a single centre exciter.
+
+To do: unify the excitation description across surrogate, COMSOL, and the rig (recommendation: standardise on the rig --- centre point excitation with the measured drive amplitude), and run a systematic surrogate-versus-COMSOL comparison to quantify in which frequency bands and on which metrics the surrogate can be trusted. This is also the prerequisite for computing Direction 1's reproducibility score accurately at the surrogate stage.
+
+\section{Direction 4 (Last): Scoring and Geometry-Aware Refinements}
+
+The content of the first edition's directions 1, 2, and 4 (scoring rework, geometric losses, randomised restarts) is \textbf{not wrong --- its position was}: \textbf{refining the score on an uncalibrated, off-resonance foundation only optimises a fiction more precisely.} Once Directions 0--3 have landed and the judge is trustworthy, proceed as originally planned:
+
+\begin{enumerate}[leftmargin=2em]
+\item \textbf{Pass marks + ``looks-like'' ranking}: enrichment and contrast become feasibility floors (hinge penalties keep things differentiable); the ranking key becomes the $F_\beta$ score between the valley mask and the target (recall and precision together, eliminating ``an X scoring high on a diagonal target''). Also fix the ``all-zero field scores recall = 1.0'' edge-case bug.
+\item \textbf{Geometry-aware losses}: distance-field (SDF) and optimal-transport (Sinkhorn) losses tell the optimiser where the sand is misplaced and which way to move it, with multi-scale blurring; two skeletons already exist in the codebase (\code{signed\_distance\_loss.py}, \code{sinkhorn\_loss.py}). Topological sanity checks (component and branch counts) for final ranking.
+\item \textbf{Randomised restarts}: restore random thickness initialisation (the current optimiser is deterministic, so multi-start is a no-op); sample far-apart starts in the PCA design-manifold coordinates; derive the restart benchmark from the realisability analysis, adapt it per target, and cap the restart count.
+\end{enumerate}
+
+\section{Case Closed: the Centre Artefact (``Jupiter'') --- an Instructive Erratum}
+
+\subsection{Closing verdict}
+
+The mechanism diagnosis of the eternal central sand blob in simulations (nicknamed ``Jupiter'') \textbf{was correct}: the central 8~mm is clamped and its degrees of freedom are zeroed ([Code verified] \code{orthotropic\_plate.py}), and the powder model reads ``small amplitude'' as ``sand here'' --- so as long as relative displacement is plotted, Jupiter appears, resonant or not. Three facts close the case:
+
+\begin{enumerate}[leftmargin=2em]
+\item In reality the plate centre is \textbf{occupied by the bolt and clamp hardware} --- no sand pattern lives there anyway. Jupiter is a \textbf{cosmetic artefact} that does not affect the usable peripheral pattern.
+\item Excluding the centre from scoring has \textbf{long been active in the production configuration} (\code{remove\_center\_region: true}); the first edition's ``quick fix'' was, in fact, already deployed.
+\item The first edition's ``proper fix'' --- scoring on absolute displacement $u_{\mathrm{abs}} = u_{\mathrm{rel}} + a_{\mathrm{base}}/\omega^2$, claimed to dissolve the phantom pile --- \textbf{was tested and found ineffective}: on the real production design's forward solution, the centre's powder share \emph{rose} from 31\% to 46\%, and the peripheral pattern changed by 14\%. Reason: this design's dynamic amplification is only about 4, the base term is not negligible, and the absolute-displacement ``quiet zones'' become cancellation bands where $u_{\mathrm{rel}}\approx -u_{\mathrm{base}}$ --- which do not coincide with nodal lines. [Surrogate estimate] \textbf{Spend no more time on this fix.}
+\end{enumerate}
+
+\subsection{Why this section is retained}
+
+Because it is a ready-made methodological case study: the first edition's mistake here is the project's signature mistake in miniature --- \textbf{prescribing for reality from inside simulation reasoning, without experiment first}. The ``proper fix'' is physically correct on paper (sand does respond to absolute acceleration), yet it fails in this plate's actual parameter regime (low amplification). It demonstrates why this final edition makes ``measure first, prescribe second'' the first principle.
+
+\section{A Review of the Trial History, with Corrections}
+
+The team's trial notes preserve many valuable judgements; this section connects them to the new evidence.
+
+\subsection{The materials journey: uniform $\rightarrow$ anisotropic $\rightarrow$ dropping $\theta$}
+
+The storyline: SLA printing first, for material uniformity; patterns stayed stubbornly symmetric even with large thickness differences; switch to FDM anisotropic material; per-cell fibre orientation $\theta$ first, found ineffective, fell back to one orientation plate-wide.
+
+The physics: thickness alone is a weak symmetry breaker (bending stiffness scales with thickness cubed, and the printable range is narrow); a uniform anisotropy direction reduces D4 to D2, so patterns depart from the uniform plate yet keep mirror symmetries. The correction concerns \emph{why} $\theta$ was dropped: not ``too many degrees of freedom confused the program'', but [Code verified] W10 operates off resonance where inertia dwarfs stiffness by about five orders of magnitude ($\omega^2 M \gg K$), and $\theta$ enters only through stiffness --- so \textbf{its gradient is nearly zero}. It was a physically inert, parasitic variable that drifted randomly and polluted the downstream COMSOL modes. A ten-run battery confirmed plain isotropic PLA beats carbon-fibre plates with ``optimised'' $\theta$ on 4 of 6 targets. The cheap material is the recommended one.
+
+\subsection{The scoring journey: re-attributing ``sand only piles in the middle''}
+
+The earliest scoring (reward sand near the target, punish it away) kept producing ``sand piles in the middle'' designs, attributed at the time to ``the equations have no solution shaped like our target''. Half right: given the Jupiter mechanism, much of the early middle-piling was \textbf{the centre artefact} --- the model marks the centre as the best sand location. The physical limitation is real, but it manifests as ``patterns lean symmetric and simple'', not ``sand crowds the centre''. The prequel is also worth recording: before the three metrics there was a pixel-wise IoU/Dice generation, which failed for being discrete, non-differentiable, and jumpy at mode switches; the \textbf{powder-physics reformulation} saved the scoring system --- and is why Direction 4 may safely reintroduce geometric comparison on the continuous sand-density field.
+
+\subsection{What the surrogate actually is}
+
+Not an off-the-shelf tool, but our own plate-vibration solver (Kirchhoff--Love discretised on a coarse $25\times 25$ grid), written in PyTorch for one decisive reason: \textbf{automatic differentiation} --- the derivative of the sand picture with respect to thickness becomes directly computable, enabling gradient search. Remember its character: \textbf{systematically optimistic} (promises 8--18$\times$ improvements where COMSOL delivers 1.5--4$\times$), treats the plate as paper-thin, ignores 3-D effects. The project rule ``the surrogate picks directions, never declares victory'' now gains a second clause: \textbf{neither does COMSOL --- only a real plate declares victory.}
+
+\subsection{The off-resonance decision and its double chain reaction}
+
+``Escaping the eigenmodes'' (any frequency yielding a stable pattern, not just resonances) was partially supported by the metal-plate experiments, and the lucky 165~Hz is its direct product. In hindsight the decision had \textbf{two} unnoticed chain reactions. First, off resonance $\omega^2 M \gg K$, which turned $\theta$ into a parasitic variable (Section~8.1). Second and more fatal, \textbf{off-resonance operating points are themselves physically unreproducible} (weak response, sensitive to modal shifts) --- 165~Hz sits 2.87 bandwidths from the nearest eigenmode. \textbf{The ``lucky frequency'' was a symptom, not a treasure.} Notably, the popular-science article's Section~7 had already recorded the opposite experimental observation: ``hit the note precisely --- drift slightly off the natural pitch and the centre push drowns the pattern.'' Experiment and theory were saying the same thing all along; nobody had yet confronted them with the off-resonance route.
+
+\subsection{An erratum to the erratum: the material mismatch was a one-off}
+
+An earlier analysis judged ``optimiser-versus-COMSOL material mismatch'' to be a second systematic root cause. A census of all 32 pairs corrects this: exactly 1 pair mismatched --- one stale legacy file (the base production design: isotropic in the optimiser vs $sr=1.67$ in COMSOL); all others agree. The correction is retained deliberately: it demonstrates why the credibility grading exists --- treating estimates as verdicts passes the cost of correction on to your successors.
+
+\section{Implementation Roadmap}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}clll@{}}
+\toprule
+Stage & Direction & Effort & Expected payoff \\
+\midrule
+0 & 0: real-plate calibration loop (print + tap/sweep + fit) & Medium & A trustworthy judge; numbers land \\
+1 & 1: reproducibility constraint + discrete eigenfrequency choice & Medium & Designs that ring on real plates \\
+1 & 2a: reachable target library + verdict up front & Small & Stop promising the impossible \\
+2 & 2b: change the physics (multi-exciter / edge / asymmetric) & Large & Genuinely unlock asymmetric patterns \\
+2 & 3: unified excitation + surrogate-vs-COMSOL audit & Medium & Select and validate under one physics \\
+3 & 4: scoring rework + geometric losses + restarts & Medium & Sharpen the ruler once the judge is trusted \\
+--- & Centre artefact & Closed & Mask already live; skip the ``proper fix'' \\
+\bottomrule
+\end{tabular}
+\caption{Final roadmap. The key difference from the first edition: let the simulation touch reality first (stages 0--1), then refine precision inside the simulation (stage 3).}
+\end{table}
+
+\section{Conclusion}
+
+The project's deepest methodological flaw was \textbf{closing the loop entirely inside simulation: treating COMSOL as the truth while never letting the truth face reality}. The first edition of this report --- including all of its scoring and optimiser analysis --- was an improvement effort \emph{inside} that closed loop: mostly correct in content, entirely misplaced in priority. Three sentences for whoever takes over: \textbf{build the experimental validation loop first; make physical reproducibility a hard constraint; and admit honestly that a centre-driven square plate cannot draw arbitrary asymmetric patterns} --- then either perfect the patterns physics allows, or change the physics. The trial history's meta-lesson held once more: the most valuable progress always came from re-attributing old conclusions --- including those of this report itself.
+
+\end{document}
