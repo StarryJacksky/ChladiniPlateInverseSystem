@@ -6,6 +6,22 @@ This directory holds **every experiment, validation run, and analysis** produced
 
 ---
 
+## ★ FOR SUCCESSORS / 交接给后辈（先读 / read first for future work）
+
+Post-closeout, evidence-graded **errata + re-prioritization** of the improvement
+directions: why the "COMSOL pattern ≠ real plate" gap is a forward-model / operating-regime
+problem (off-resonance driving + no real-plate calibration + physical ceiling), **not** the
+optimizer — and the directions that actually matter next.
+
+项目结案后的**勘误与重定向**（每条结论带可信度分级）：说明"COMSOL 图≠真实板"源于正向模型与工作点
+（离共振驱动 + 从未对真实板标定 + 物理天花板），**而非优化器**，并给出后辈真正该做的方向。
+
+| Path | Description |
+|---|---|
+| `future_directions_for_successors.zh-CN.md` / `.en.md` | **★ Read first for future work.** Validated diagnosis + re-prioritized directions (0: close the real-plate validation loop → 1: physical-reproducibility constraint → 2: face the physical ceiling → 3: model self-consistency → 4: scoring rebuild LAST). Evidence scripts: `../scripts/_decexp_*.py`; outputs: `_decision_experiments/`. |
+
+---
+
 ## 1. FINAL DELIVERABLES / 最终交付
 
 The customer-facing pipeline + validated SOTA results.
